@@ -8,10 +8,16 @@
 // ===========================================
 // Configuration
 // ===========================================
+// To configure: Go to Project Settings > Script Properties and set:
+//   - PROJECT_ID: Your Google Cloud project ID
+//   - LOCATION: API location (default: global)
+//   - MODEL: Gemini model name (default: gemini-3-flash-preview)
+// ===========================================
+const SCRIPT_PROPS = PropertiesService.getScriptProperties();
 const CONFIG = {
-  PROJECT_ID: 'cloud-llm-preview1', // Default reference
-  LOCATION: 'global',
-  MODEL: 'gemini-3-flash-preview',
+  PROJECT_ID: SCRIPT_PROPS.getProperty('PROJECT_ID') || 'YOUR_PROJECT_ID',
+  LOCATION: SCRIPT_PROPS.getProperty('LOCATION') || 'global',
+  MODEL: SCRIPT_PROPS.getProperty('MODEL') || 'gemini-3-flash-preview',
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',

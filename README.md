@@ -48,11 +48,23 @@ ge-demo-generator/
 
 Update `CONFIG` in `Code.gs` with your settings:
 
+### Option 1: Script Properties (Recommended for Security)
+
+1. Go to **Project Settings > Script Properties**
+2. Add the following properties:
+   - `PROJECT_ID`: Your Google Cloud project ID
+   - `LOCATION`: `global` (default)
+   - `MODEL`: `gemini-3-flash-preview` (or your preferred model)
+
+### Option 2: Direct Edit
+
+Update `CONFIG` in `Code.gs`:
+
 ```javascript
 const CONFIG = {
   PROJECT_ID: 'your-project-id',
-  LOCATION: 'us-central1',
-  MODEL: 'gemini-2.0-flash-001',
+  LOCATION: 'global',
+  MODEL: 'gemini-3-flash-preview',
   // ...
 };
 ```
