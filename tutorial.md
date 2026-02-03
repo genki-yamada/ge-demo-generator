@@ -105,8 +105,15 @@ uvx agent-starter-pack enhance
 > select a CI/CD runner: **1 (simple)**  
 
 ### 2. Deploy to Engine
+The generator in Step 5 provides options to customize your deployment:
+- **Update Existing**: (Default) Updates the currently deployed agent resource.
+- **Create New**: Forces the creation of a brand new agent resource on Vertex AI.
+- **Agent Name**: Customize the name of your agent (updates `pyproject.toml` automatically).
+
+Once configured, copy and run the generated command:
 ```bash
-make deploy
+# Example:
+# rm -f .resource_name && sed -i 's/name = "adk-agent"/name = "my-custom-agent"/' pyproject.toml && make deploy
 ```
 
 ### 3. Grant Execution Permissions

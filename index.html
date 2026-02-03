@@ -1051,10 +1051,43 @@
                   <span class="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px]">2</span>
                   Deploy to Agent Engine
                 </h3>
+
+                <!-- Deployment Options -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label class="block text-[10px] text-gray-500 mb-2 font-bold uppercase tracking-widest">Deployment
+                      Mode</label>
+                    <div class="flex gap-2">
+                      <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="deployMode" value="update" checked onchange="updateDeployCommand()"
+                          class="hidden peer">
+                        <div
+                          class="px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-[10px] font-bold text-center text-gray-400 peer-checked:bg-emerald-500/10 peer-checked:border-emerald-500/50 peer-checked:text-emerald-400 transition-all">
+                          Update Existing
+                        </div>
+                      </label>
+                      <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="deployMode" value="new" onchange="updateDeployCommand()"
+                          class="hidden peer">
+                        <div
+                          class="px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-[10px] font-bold text-center text-gray-400 peer-checked:bg-emerald-500/10 peer-checked:border-emerald-500/50 peer-checked:text-emerald-400 transition-all">
+                          Create New
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-[10px] text-gray-500 mb-2 font-bold uppercase tracking-widest">Agent
+                      Name</label>
+                    <input type="text" id="deployAgentName" value="adk-agent" oninput="updateDeployCommand()"
+                      class="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-mono text-emerald-400 focus:ring-1 focus:ring-emerald-500/50 transition-all shadow-inner outline-none">
+                  </div>
+                </div>
+
                 <div class="relative group">
-                  <pre
+                  <pre id="deployCommandBlock"
                     class="bg-black/60 rounded-xl p-4 text-[12px] font-mono text-white/80 border border-white/5 overflow-x-auto">make deploy</pre>
-                  <button onclick="copyRaw('make deploy')"
+                  <button onclick="copy('deployCommandBlock')"
                     class="absolute top-3 right-3 p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white transition-all opacity-0 group-hover:opacity-100 shadow-xl border border-gray-700">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1393,6 +1426,26 @@ gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role=
         container.appendChild(div);
       });
       document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function updateDeployCommand() {
+      const mode = document.querySelector('input[name="deployMode"]:checked').value;
+      const agentName = document.getElementById('deployAgentName').value.trim() || 'adk-agent';
+
+      let cmd = '';
+      if (mode === 'new') {
+        cmd += 'rm -f .resource_name && ';
+      }
+
+      if (agentName !== 'adk-agent') {
+        // We use sed to update the name in pyproject.toml before deploying
+        cmd += `sed -i 's/name = "adk-agent"/name = "${agentName}"/' pyproject.toml && `;
+      }
+
+      cmd += 'make deploy';
+
+      const block = document.getElementById('deployCommandBlock');
+      if (block) block.innerText = cmd;
     }
 
     function updateScriptLocally() {

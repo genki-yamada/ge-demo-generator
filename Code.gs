@@ -77,9 +77,11 @@ function generateDemo(userGoal, options = {}) {
     // Step 3: Skipping Server-side Ingestion (For Portability)
     result.steps.push({ step: 3, status: 'completed', message: 'Portability enabled: Dataset will be created in your environment' });
     
-    // Generate suffix for unique naming
+    // Generate unique suffix and base names
     const suffix = Utilities.getUuid().replace(/-/g, '').substring(0, 8);
-    const datasetId = 'demo_' + suffix;
+    const baseName = generateBaseName(userGoal, suffix); // Descriptive name like "retail-inventory-suffix"
+    const dirName = "demo-" + baseName;
+    const datasetId = ("demo_" + baseName).replace(/-/g, '_');
     
     result.datasetId = datasetId;
     result.dataPreview = planResult.dataPreview;
@@ -95,6 +97,7 @@ function generateDemo(userGoal, options = {}) {
       systemInstruction: planResult.systemInstruction,
       publicDatasetId: planResult.publicDatasetId,
       suffix: suffix,
+      dirName: dirName,
       tables: planResult.tables,
       userGoal: userGoal
     });
@@ -434,43 +437,42 @@ function repairTruncatedJson(jsonStr) {
 // ===========================================
 
 /**
- * Generates a short, filesystem-safe directory name from the user's goal.
+ * Generates a short, filesystem-safe base name from the user's goal.
  * @param {string} userGoal - The user's business problem description
  * @param {string} suffix - Unique suffix for collision avoidance
- * @returns {string} A short, descriptive directory name
+ * @returns {string} A short, descriptive base name (e.g. retail-inventory-abcd1234)
  */
-function generateDirectoryName(userGoal, suffix) {
+function generateBaseName(userGoal, suffix) {
   // Use AI to generate a short English identifier
-  const prompt = `Generate a short, filesystem-safe directory name (2-3 words, lowercase, hyphens only) that describes this business problem:
+  const prompt = `Generate a short, filesystem-safe identifier (2-3 words, lowercase, hyphens only) that describes this business problem:
 
 "${userGoal}"
 
 Rules:
-- Use ONLY lowercase letters and hyphens
+- Use ONLY lowercase letters and hyphens (no numbers, no special characters)
 - Maximum 20 characters
 - Must be descriptive of the business domain
 - Examples: "retail-inventory", "bakery-sales", "hotel-booking", "logistics-fleet"
 
-Return ONLY the directory name, nothing else.`;
+Return ONLY the name, nothing else.`;
 
   try {
     const result = callVertexAI(prompt);
     let cleanName = result.trim().toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')  // Replace invalid chars with hyphen
+      .replace(/[^a-z-]/g, '-')     // Replace non-alphabet/non-hyphen with hyphen
       .replace(/-+/g, '-')           // Collapse multiple hyphens
       .replace(/^-|-$/g, '')         // Remove leading/trailing hyphens
       .substring(0, 20);             // Limit length
     
-    if (cleanName.length < 3) cleanName = 'ge-demo';
+    if (cleanName.length < 3) cleanName = 'demo-env';
     return `${cleanName}-${suffix}`;
   } catch (e) {
-    return `ge-demo-${suffix}`;
+    return `env-${suffix}`;
   }
 }
 
 function generateSetupScript(params) {
-  const { datasetId, systemInstruction, publicDatasetId, suffix, tables, userGoal } = params;
-  const dirName = generateDirectoryName(userGoal || 'demo', suffix);
+  const { datasetId, systemInstruction, publicDatasetId, suffix, tables, userGoal, dirName } = params;
   
   const escapedInstruction = systemInstruction
     .replace(/\\/g, '\\\\\\\\')
