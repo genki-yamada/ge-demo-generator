@@ -29,8 +29,18 @@ Generates a complete `setup.sh` script that:
 ### 📖 Interactive Walkthrough
 Includes a built-in Cloud Shell tutorial (`tutorial.md`) that guides users through the deployment and demo execution.
 
-### ✅ Production Readiness
-Integrated with `agent-starter-pack` for rapid deployment to Vertex AI Agent Engine and Gemini Enterprise.
+### ✅ Targeted Production Deployment
+Step 5 allows flexible transition to Vertex AI Agent Engine with:
+- **Deployment Mode Choice**: Overwrite existing agent or create a brand new one.
+- **Custom Agent Naming**: Set a unique name for your agent in Agent Engine.
+- **Permission Automation**: Ready-to-use IAM commands for BigQuery/Maps access.
+
+## Naming Conventions
+
+The generator follows a consistent, descriptive naming pattern for all artifacts:
+- **Folders**: Prefixed with `demo-` followed by a descriptive ID (e.g., `demo-retail-inventory-831afa90`).
+- **BigQuery Datasets**: Prefixed with `demo_` and matches the folder description (e.g., `demo_retail_inventory_831afa90`).
+- **Agent Resource Name**: Defaults to `adk-agent` (customizable in Step 5).
 
 ## Project Structure
 
