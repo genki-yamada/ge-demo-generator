@@ -60,7 +60,10 @@ function generateDemo(userGoal, options = {}) {
     dataPreview: [],
     systemInstruction: null,
     setupScript: null,
-    rawTables: [] // Added to return raw data to the UI
+    rawTables: [], // Added to return raw data to the UI
+    suffix: null,
+    domainName: null,
+    referenceDate: null
   };
   
   try {
@@ -89,12 +92,16 @@ function generateDemo(userGoal, options = {}) {
     
     // Step 4: Setup Script Generation
     result.steps.push({ step: 4, status: 'running', message: 'Generating portable setup script...' });
+    result.suffix = suffix;
+    result.domainName = baseName.substring(0, baseName.lastIndexOf('-' + suffix));
     result.systemInstruction = planResult.systemInstruction;
+    result.referenceDate = planResult.referenceDate;
     result.publicDatasetId = planResult.publicDatasetId;
     result.demoGuide = planResult.demoGuide;
     result.setupScript = generateSetupScript({
       datasetId: datasetId,
       systemInstruction: planResult.systemInstruction,
+      referenceDate: planResult.referenceDate,
       publicDatasetId: planResult.publicDatasetId,
       suffix: suffix,
       dirName: dirName,
@@ -115,6 +122,7 @@ function generateDemo(userGoal, options = {}) {
       result: {
         dataPreview: result.dataPreview,
         systemInstruction: result.systemInstruction,
+        referenceDate: result.referenceDate,
         demoGuide: result.demoGuide,
         setupScript: result.setupScript,
         rawTables: result.rawTables
@@ -284,6 +292,7 @@ function planAndGenerateData(userGoal, options) {
   return {
     tables: parsed.tables,
     systemInstruction: parsed.systemInstruction,
+    referenceDate: parsed.referenceDate || '2023-11-01',
     publicDatasetId: parsed.publicDatasetId || options.publicDatasetId,
     demoGuide: parsed.demoGuide,
     dataPreview: dataPreview
@@ -319,6 +328,7 @@ Output in the following JSON format. Output **pure JSON only without code blocks
     }
   ],
   "systemInstruction": "Specific instruction for the agent (3-5 sentences).",
+  "referenceDate": "YYYY-MM-DD (Choose a realistic anchor date for this demo context, e.g., '2023-11-01')",
   "publicDatasetId": "bigquery-public-data.dataset_name.table_name",
   "demoGuide": [
     {
@@ -472,7 +482,7 @@ Return ONLY the name, nothing else.`;
 }
 
 function generateSetupScript(params) {
-  const { datasetId, systemInstruction, publicDatasetId, suffix, tables, userGoal, dirName } = params;
+  const { datasetId, systemInstruction, referenceDate, publicDatasetId, suffix, tables, userGoal, dirName } = params;
   
   const escapedInstruction = systemInstruction
     .replace(/\\/g, '\\\\\\\\')
@@ -538,7 +548,24 @@ gcloud services enable \\
   serviceusage.googleapis.com \\
   iam.googleapis.com \\
   cloudbilling.googleapis.com \\
+  logging.googleapis.com \\
+  monitoring.googleapis.com \\
+  clouderrorreporting.googleapis.com \\
+  telemetry.googleapis.com \\
   --project="$PROJECT_ID"
+
+# --- 2.1 IAM Configuration for Reasoning Engine ---
+echo "🔐 Configuring IAM permissions for Agent Engine..."
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+RE_SA="service-\${PROJECT_NUMBER}@gcp-sa-aiplatform-re.iam.gserviceaccount.com"
+
+# Grant specific roles required for MCP tool execution and BigQuery access
+echo "  Granting roles to \${RE_SA}..."
+for ROLE in "roles/mcp.toolUser" "roles/bigquery.jobUser" "roles/bigquery.dataViewer"; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:\${RE_SA}" \
+    --role="\${ROLE}" --condition=None >/dev/null 2>&1 || true
+done
 
 # Enable MCP services
 echo "🔧 Enabling MCP services..."
@@ -761,17 +788,7 @@ def get_maps_mcp_toolset():
     maps_api_key = os.getenv('MAPS_API_KEY')
     return MCPToolset(connection_params=StreamableHTTPConnectionParams(
         url=MAPS_MCP_URL, 
-        headers={"X-Goog-Api-Key": maps_api_key},
-        timeout=180
-    ))
-
-def get_maps_mcp_toolset():
-    """Creates a Google Maps MCP toolset."""
-    dotenv.load_dotenv()
-    maps_api_key = os.getenv('MAPS_API_KEY')
-    return MCPToolset(connection_params=StreamableHTTPConnectionParams(
-        url=MAPS_MCP_URL, 
-        headers={"X-Goog-Api-Key": maps_api_key},
+        headers={"x-goog-api-key": maps_api_key},
         timeout=180
     ))
 __TOOLS_EOF__
@@ -808,17 +825,23 @@ base_instruction = """
 Help the user answer questions by strategically combining insights from BigQuery and Google Maps:
 
 1. **BigQuery Toolset**: Access data in the [PROJECT_ID].[DATASET_ID] dataset.
-   - Available Tools: \`execute_query_job\`, \`get_table\`, \`list_tables\`.
+   - Available Tools: \\\`execute_sql\\\`, \\\`get_table_info\\\`, \\\`list_table_ids\\\`.
 [PUBLIC_DATASET_INFO]
 
 [GENERATED_SYSTEM_INSTRUCTION]
 
+- REFERENCE DATE: The current date for this demo is [REFERENCE_DATE]. Use this for absolute time references (e.g., 'today', 'last month').
+
 2. **Maps Toolset**: Real-world location analysis.
-   - Available Tools: \`compute_routes\`, \`get_place\`, \`search_places\`, \`geocode\`, \`reverse_geocode\`.
+   - Available Tools: \\\`compute_routes\\\`, \\\`get_place\\\`, \\\`search_places\\\`, \\\`geocode\\\`, \\\`reverse_geocode\\\`.
    - IMPORTANT: There is NO weather tool. Do not hallucinate or attempt to use weather services.
 
 ---------------------------------------------------
 CRITICAL OPERATIONAL RULES:
+- SCHEMA DISCOVERY: Always check the table schema using \\\`get_table_info\\\` before writing any SQL query. Never assume column names.
+- SQL SELF-CORRECTION: If a SQL query fails, analyze the error message, re-check the schema if necessary, and attempt to fix the query.
+- DATA HONESTY: If a tool returns no data (empty result), do not hallucinate results. Inform the user and suggest an alternative inquiry.
+- MAPS SPECIFICITY: Always include specific geographical context (city, state, etc.) from BigQuery data in your Google Maps search queries to ensure accuracy.
 - SEQUENTIAL EXECUTION: Always perform tool calls one at a time. Do not attempt multiple tool calls in a single response turn.
 - RESULT BLOCKING: Wait for a tool's output before deciding on the next tool call.
 ---------------------------------------------------
@@ -828,6 +851,7 @@ public_info = "- Additional Dataset: Use [PUBLIC_DATASET_ID] for context." if "$
 instruction = base_instruction\
     .replace("[PROJECT_ID]", PROJECT_ID)\
     .replace("[DATASET_ID]", "${datasetId}")\
+    .replace("[REFERENCE_DATE]", "${referenceDate}")\
     .replace("[PUBLIC_DATASET_INFO]", public_info.replace("[PUBLIC_DATASET_ID]", "${publicDatasetId}"))\
     .replace("[GENERATED_SYSTEM_INSTRUCTION]", """${escapedInstruction}""")
 

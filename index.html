@@ -848,7 +848,30 @@
               </div>
             </div>
 
-            <!-- Step 1: Initialization (Keep as sub-step title for clarity within Step 3) -->
+            <!-- Step 0: Prerequisites -->
+            <div class="mb-10 p-6 bg-amber-500/10 rounded-2xl border border-amber-500/20">
+              <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-[10px]">0</span>
+                Setup Authentication (Prerequisite)
+              </h3>
+              <p class="text-[13px] text-gray-300 mb-4">
+                Cloud Shell users <b>must</b> run this once to ensure local agents have Vertex AI access.
+              </p>
+              <div class="relative group">
+                <pre id="authCommand"
+                  class="bg-black/60 rounded-xl p-4 text-[12px] font-mono text-amber-200 border border-white/5 overflow-x-auto">gcloud auth application-default login</pre>
+                <button onclick="copyRaw('gcloud auth application-default login')"
+                  class="absolute top-3 right-3 p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white transition-all opacity-0 group-hover:opacity-100 shadow-xl border border-gray-700">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                    </path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Step 1: Initialization -->
             <div class="mb-0">
               <div class="flex items-center justify-between mb-4">
                 <label
@@ -1098,33 +1121,6 @@
                 </div>
               </div>
 
-              <div class="p-6 bg-amber-500/10 rounded-2xl border border-amber-500/20">
-                <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <span
-                    class="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-[10px]">3</span>
-                  Grant Execution Permissions
-                </h3>
-                <div class="relative group">
-                  <pre id="iamCommand"
-                    class="bg-black/60 rounded-xl p-4 text-[10px] font-mono text-amber-200/80 border border-white/5 overflow-x-auto leading-relaxed"># Use PROJECT_ID to find the Agent Engine SA
-PI=$(gcloud config get-value project)
-PN=$(gcloud projects list --filter="projectId:$PI" --format="value(projectNumber)")
-SA="service-$PN@gcp-sa-aiplatform-re.iam.gserviceaccount.com"
-
-# Grant required roles for MCP & BigQuery
-gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/mcp.toolUser" --condition=None
-gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/bigquery.jobUser" --condition=None
-gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/bigquery.dataViewer" --condition=None</pre>
-                  <button onclick="copyRaw(document.getElementById('iamCommand').innerText)"
-                    class="absolute top-3 right-3 p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white transition-all opacity-0 group-hover:opacity-100 shadow-xl border border-gray-700">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
-                      </path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
 
               <div class="p-6 bg-white/5 rounded-2xl border border-white/10">
                 <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -1180,6 +1176,8 @@ gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role=
 
   <script>
     let currentData = null;
+    let currentSuffix = '';
+    let currentDomainName = '';
 
     function toggleArchitecture() {
       const content = document.getElementById('architectureContent');
@@ -1379,6 +1377,14 @@ gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role=
       document.getElementById('setupCommand').innerText = `cat <<'__SETUP_SH__' > setup.sh\n${res.setupScript}\n__SETUP_SH__\nbash setup.sh`;
       document.getElementById('systemInstruction').value = res.systemInstruction;
 
+      currentSuffix = res.suffix || '';
+      currentDomainName = res.domainName || '';
+
+      if (currentDomainName) {
+        document.getElementById('deployAgentName').value = currentDomainName + '-agent';
+      }
+      updateDeployCommand();
+
       // Guide
       const guideContainer = document.getElementById('demoGuideSteps');
       guideContainer.innerHTML = '';
@@ -1430,17 +1436,23 @@ gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role=
 
     function updateDeployCommand() {
       const mode = document.querySelector('input[name="deployMode"]:checked').value;
-      const agentName = document.getElementById('deployAgentName').value.trim() || 'adk-agent';
+      let agentName = document.getElementById('deployAgentName').value.trim();
+
+      if (!agentName) {
+        agentName = (currentDomainName || 'adk') + '-agent';
+      }
+
+      // Always append suffix if available
+      const fullAgentName = currentSuffix ? `${agentName}-${currentSuffix}` : agentName;
 
       let cmd = '';
       if (mode === 'new') {
         cmd += 'rm -f .resource_name && ';
       }
 
-      if (agentName !== 'adk-agent') {
-        // We use sed to update the name in pyproject.toml before deploying
-        cmd += `sed -i 's/name = "adk-agent"/name = "${agentName}"/' pyproject.toml && `;
-      }
+      // Update pyproject.toml name and try to patch deploy.py display_name default
+      cmd += `sed -i 's/name = "adk-agent"/name = "${fullAgentName}"/' pyproject.toml && `;
+      cmd += `sed -i 's/default="adk-agent"/default="${fullAgentName}"/' mcp_app/app_utils/deploy.py 2>/dev/null || true && `;
 
       cmd += 'make deploy';
 
