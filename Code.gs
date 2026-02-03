@@ -534,6 +534,10 @@ gcloud services enable \\
   bigquery.googleapis.com \\
   apikeys.googleapis.com \\
   mapstools.googleapis.com \\
+  cloudresourcemanager.googleapis.com \\
+  serviceusage.googleapis.com \\
+  iam.googleapis.com \\
+  cloudbilling.googleapis.com \\
   --project="$PROJECT_ID"
 
 # Enable MCP services
