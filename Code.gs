@@ -29,7 +29,7 @@ const CONFIG = {
 // ===========================================
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('index')
-    .setTitle('BigQuery MCP Demo Generator')
+    .setTitle('GE Demo Generator (go/ge-demo-generator)')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
@@ -95,7 +95,8 @@ function generateDemo(userGoal, options = {}) {
       systemInstruction: planResult.systemInstruction,
       publicDatasetId: planResult.publicDatasetId,
       suffix: suffix,
-      tables: planResult.tables
+      tables: planResult.tables,
+      userGoal: userGoal
     });
     result.steps[3] = { step: 4, status: 'completed', message: 'Generation complete' };
     
@@ -166,23 +167,23 @@ Return ONLY the dataset ID, nothing else.`;
     const cleanId = result.trim().replace(/[`'"]/g, '').split('\n')[0];
     
     if (!cleanId.startsWith('bigquery-public-data.') || cleanId.split('.').length < 3) {
-      console.log('Invalid dataset format, using fallback. Raw:', result);
-      return FALLBACK;
-    }
-    
-    // Verify the table exists using BigQuery API
-    const verifiedId = verifyAndResolveTable(cleanId);
-    if (verifiedId) {
-      console.log('Verified public dataset:', verifiedId);
-      return verifiedId;
-    }
-    
-    console.log('Table verification failed, using fallback.');
-    return FALLBACK;
-  } catch (e) {
-    console.log('Dataset discovery failed:', e.message);
+    // console.log('Invalid dataset format, using fallback. Raw:', result);
     return FALLBACK;
   }
+  
+  // Verify the table exists using BigQuery API
+  const verifiedId = verifyAndResolveTable(cleanId);
+  if (verifiedId) {
+    // console.log('Verified public dataset:', verifiedId);
+    return verifiedId;
+  }
+  
+  // console.log('Table verification failed, using fallback.');
+  return FALLBACK;
+} catch (e) {
+  // console.log('Dataset discovery failed:', e.message);
+  return FALLBACK;
+}
 }
 
 /**
@@ -204,7 +205,7 @@ function verifyAndResolveTable(candidateId) {
     BigQuery.Tables.get(projectId, datasetId, tableId);
     return candidateId; // Table exists!
   } catch (e) {
-    console.log(`Table ${tableId} not found in ${datasetId}. Searching for alternatives...`);
+    // console.log(`Table ${tableId} not found in ${datasetId}. Searching for alternatives...`);
   }
   
   // Table doesn't exist. List tables in the dataset and pick a suitable one.
@@ -217,18 +218,18 @@ function verifyAndResolveTable(candidateId) {
         const match = tables.tables.find(t => t.tableReference.tableId.toLowerCase().includes(pattern));
         if (match) {
           const resolvedId = `${projectId}.${datasetId}.${match.tableReference.tableId}`;
-          console.log('Resolved to alternative table:', resolvedId);
+          // console.log('Resolved to alternative table:', resolvedId);
           return resolvedId;
         }
       }
       // Fallback to the first table
       const firstTable = tables.tables[0].tableReference.tableId;
       const resolvedId = `${projectId}.${datasetId}.${firstTable}`;
-      console.log('Resolved to first available table:', resolvedId);
+      // console.log('Resolved to first available table:', resolvedId);
       return resolvedId;
     }
   } catch (listError) {
-    console.log('Failed to list tables in dataset:', listError.message);
+    // console.log('Failed to list tables in dataset:', listError.message);
   }
   
   return null;
@@ -250,7 +251,7 @@ function planAndGenerateData(userGoal, options) {
     jsonStr = repairTruncatedJson(jsonStr);
     parsed = JSON.parse(jsonStr);
   } catch (e) {
-    console.log('Raw response (first 500 chars):', response.substring(0, 500));
+    // Removed raw response log for production cleanup
     throw new Error('Failed to parse AI response. Try reducing the row/table count.');
   }
   
@@ -314,17 +315,13 @@ Output in the following JSON format. Output **pure JSON only without code blocks
       "csvData": "column1,column2,...\\nvalue1,value2,...\\n..."
     }
   ],
-  "systemInstruction": "Specific instruction for the agent (3-5 sentences). It MUST:
-    1. Instruct the agent to introduce itself (e.g., 'I am an AI analyst for [Problem Name]').
-    2. Explicitly list the specific demo datasets/tables and public datasets it can access when greeted.
-    3. GUIDANCE: Always look for opportunities to JOIN multiple tables (including the public dataset) to provide deeper contextual insights.",
+  "systemInstruction": "Specific instruction for the agent (3-5 sentences).",
   "publicDatasetId": "bigquery-public-data.dataset_name.table_name",
   "demoGuide": [
-    "1. Greeting & Intro: [Example prompt]",
-    "2. Data Discovery: [Show schema and basic queries]",
-    "3. Multi-table Insight (JOIN): [Prompt requiring a JOIN between local tables or with public data]",
-    "4. Geospatial Context (Maps): [Example prompt]",
-    "5. Strategy & Recommendation: [Example prompt]"
+    {
+      "title": "Short title in user's language (e.g., '1. USER Greeting')",
+      "prompt": "The actual prompt text in user's language"
+    }
   ]
 }
 
@@ -332,9 +329,13 @@ Output in the following JSON format. Output **pure JSON only without code blocks
 - **RELATIONAL INTEGRITY**: Tables MUST be designed for joining. Ensure consistent Primary/Foreign keys (e.g., customer_id, product_id) with NO dangling references.
 - **CSV data MUST NOT exceed ${maxRows} rows**.
 - Use double quotes for CSV fields containing commas.
-- **LANGUAGE PARITY**: Generate all qualitative content (table/field descriptions, synthetic data values like names/locations/categories, and system instructions) in the **SAME LANGUAGE** as the user's input business problem. Use English only for technical identifiers like table/column names.
-- **SELF-INTRODUCTION**: The generated 'systemInstruction' MUST ensure the agent provides a detailed self-introduction including a summary of accessible data when receiving a general greeting.
-- **DEMO GUIDE**: The 'demoGuide' MUST be a 5-step sequence of prompts in the user's language that showcases the agent's ability to use both BigQuery and Maps toolsets to solve the user's problem.`;
+- **LANGUAGE PARITY**: Generate all qualitative content (table/field descriptions, synthetic data values, system instructions, and demo guide) in the **SAME LANGUAGE** as the user's input business problem.
+- **DEMO GUIDE**: Provide exactly 5 steps following this flow: 
+    1. USER Greeting (Simple greeting to trigger self-introduction)
+    2. Data Discovery (Ask about available tables/schema)
+    3. Multi-table Insight (JOIN between local tables or with public data)
+    4. Geospatial Context (Location/map analysis)
+    5. Strategy & Recommendation (Strategic advice based on data)`;
 }
 
 // ===========================================
@@ -348,6 +349,36 @@ function validateGeneratedData(planResult) {
   
   for (const table of planResult.tables) {
     if (!table.schema || !table.csvData) throw new Error(`Incomplete table data for "${table.tableName}"`);
+    
+    // Validate and repair CSV/Schema column count mismatch
+    const lines = table.csvData.trim().split('\n');
+    if (lines.length === 0) throw new Error(`Empty CSV data for "${table.tableName}"`);
+    
+    const csvHeaders = parseCSVLine(lines[0]);
+    const schemaColumnCount = table.schema.length;
+    const csvColumnCount = csvHeaders.length;
+    
+    if (csvColumnCount !== schemaColumnCount) {
+      // console.log(`Column mismatch for "${table.tableName}": CSV has ${csvColumnCount} columns, schema has ${schemaColumnCount}. Repairing...`);
+      
+      // Rebuild schema from CSV headers, inferring types from existing schema or defaulting to STRING
+      const schemaMap = {};
+      for (const field of table.schema) {
+        schemaMap[field.name.toLowerCase()] = field;
+      }
+      
+      const repairedSchema = csvHeaders.map(headerName => {
+        const normalizedName = headerName.trim().toLowerCase();
+        if (schemaMap[normalizedName]) {
+          return schemaMap[normalizedName];
+        }
+        // Default to STRING for unknown columns
+        return { name: headerName.trim(), type: 'STRING', description: 'Auto-generated field' };
+      });
+      
+      table.schema = repairedSchema;
+      // console.log(`Repaired schema for "${table.tableName}" to ${repairedSchema.length} columns.`);
+    }
   }
 }
 
@@ -402,13 +433,48 @@ function repairTruncatedJson(jsonStr) {
 // Step 4: Setup Script Generation (Portable version)
 // ===========================================
 
+/**
+ * Generates a short, filesystem-safe directory name from the user's goal.
+ * @param {string} userGoal - The user's business problem description
+ * @param {string} suffix - Unique suffix for collision avoidance
+ * @returns {string} A short, descriptive directory name
+ */
+function generateDirectoryName(userGoal, suffix) {
+  // Use AI to generate a short English identifier
+  const prompt = `Generate a short, filesystem-safe directory name (2-3 words, lowercase, hyphens only) that describes this business problem:
+
+"${userGoal}"
+
+Rules:
+- Use ONLY lowercase letters and hyphens
+- Maximum 20 characters
+- Must be descriptive of the business domain
+- Examples: "retail-inventory", "bakery-sales", "hotel-booking", "logistics-fleet"
+
+Return ONLY the directory name, nothing else.`;
+
+  try {
+    const result = callVertexAI(prompt);
+    let cleanName = result.trim().toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')  // Replace invalid chars with hyphen
+      .replace(/-+/g, '-')           // Collapse multiple hyphens
+      .replace(/^-|-$/g, '')         // Remove leading/trailing hyphens
+      .substring(0, 20);             // Limit length
+    
+    if (cleanName.length < 3) cleanName = 'ge-demo';
+    return `${cleanName}-${suffix}`;
+  } catch (e) {
+    return `ge-demo-${suffix}`;
+  }
+}
+
 function generateSetupScript(params) {
-  const { datasetId, systemInstruction, publicDatasetId, suffix, tables } = params;
-  const dirName = `my-ge-demo-${suffix}`;
+  const { datasetId, systemInstruction, publicDatasetId, suffix, tables, userGoal } = params;
+  const dirName = generateDirectoryName(userGoal || 'demo', suffix);
   
   const escapedInstruction = systemInstruction
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "'\\''")
+    .replace(/\\/g, '\\\\\\\\')
+    .replace(/'/g, "'\\\\''")
     .replace(/\{/g, '{{')
     .replace(/\}/g, '}}')
     .replace(/\n/g, '\\n');
@@ -473,40 +539,45 @@ echo "🔧 Enabling MCP services..."
 gcloud beta services mcp enable bigquery.googleapis.com --project="$PROJECT_ID" 2>/dev/null || true
 gcloud beta services mcp enable mapstools.googleapis.com --project="$PROJECT_ID" 2>/dev/null || true
 
-# Check for BQ permissions
+# Check for BQ permissions (with timeout to prevent hanging on new projects)
 echo "🛡 Checking permissions..."
-CAN_MK_BQ=$(bq ls 2>&1 || true)
+CAN_MK_BQ=$(timeout 30 bq ls --project_id="$PROJECT_ID" 2>&1 || echo "timeout_or_error")
 if [[ $CAN_MK_BQ == *"Access Denied"* ]]; then
   echo "❌ Error: Your account doesn't have BigQuery access in this project."
   exit 1
 fi
+echo "✅ Permissions OK"
 
 # --- 3. Data Provisioning ---
 ${bqCommands}
 
-# --- 4. Repo Setup ---
+# --- 4. Project Setup (Flat Structure) ---
 if [ -d "${dirName}" ]; then
   echo "📂 Removing existing directory ${dirName} for a clean setup..."
   rm -rf "${dirName}"
 fi
-echo "📦 Cloning base project..."
-git clone --depth 1 https://github.com/google/mcp.git ${dirName}
+
+echo "📦 Setting up project directory..."
+mkdir -p ${dirName}/adk_agent/mcp_app
 cd ${dirName}
 
-cd examples/launchmybakery
-# Cleanup and rename
-rm -rf adk_agent/mcp_app
-mv adk_agent/mcp_bakery_app adk_agent/mcp_app
+# Generate requirements.txt
+cat <<'__REQ_EOF__' > requirements.txt
+google-adk>=1.0.0
+google-genai>=1.9.0
+python-dotenv>=1.0.0
+vertexai>=1.0.0
+db-dtypes>=1.0.0
+__REQ_EOF__
 
 echo "📦 Installing dependencies..."
 uv venv
 uv pip install -r requirements.txt
-uv pip install --upgrade google-adk google-genai python-dotenv vertexai db-dtypes
 
 # --- 5. Generate Maps API Key ---
 echo "🔑 Generating Maps API key..."
-API_KEY_JSON=$(gcloud alpha services api-keys create --display-name="MCP-Demo-Key-${suffix}" \
-    --api-target=service=mapstools.googleapis.com \
+API_KEY_JSON=$(gcloud alpha services api-keys create --display-name="MCP-Demo-Key-${suffix}" \\
+    --api-target=service=mapstools.googleapis.com \\
     --format=json 2>/dev/null || echo "")
 
 if [ ! -z "$API_KEY_JSON" ]; then
@@ -530,6 +601,12 @@ MAPS_API_KEY="$API_KEY"
 PYTHONUNBUFFERED=1
 __ENV_EOF__
 
+# Create __init__.py files for proper Python package structure
+touch adk_agent/__init__.py
+cat <<'__INIT_EOF__' > adk_agent/mcp_app/__init__.py
+from . import agent
+__INIT_EOF__
+
 # --- 6. Customizing Agent ---
 echo "🔧 Configuring agent..."
 
@@ -537,81 +614,179 @@ cat <<'__TOOLS_EOF__' > adk_agent/mcp_app/tools.py
 import os
 import dotenv
 import google.auth
+import google.auth.transport.requests
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams 
+from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
+import httpx
+import anyio
 
-MAPS_MCP_URL = "https://mapstools.googleapis.com/mcp" 
-BIGQUERY_MCP_URL = "https://bigquery.googleapis.com/mcp" 
+# =============================================================================
+# 🛡️ Stability Patches for Reasoning Engine (Mandatory)
+# =============================================================================
 
-def _apply_cloud_shell_patch():
-    """
-    Robust patch for google-auth RefreshError specifically in Cloud Shell.
-    Monkey-patches the Compute Engine credentials class used by Cloud Shell
-    to fallback to gcloud CLI if the metadata server returns incomplete info.
-    """
+# Force HTTP/1.1 to prevent hangs in streaming responses
+_orig_client_init = httpx.AsyncClient.__init__
+def _patched_client_init(self, *args, **kwargs):
+    kwargs['http2'] = False 
+    return _orig_client_init(self, *args, **kwargs)
+httpx.AsyncClient.__init__ = _patched_client_init
+
+# Global flag to ensure identity is logged only once
+_identity_logged = False
+
+def _log_identity():
+    """Logs the current executing identity for debugging permissions."""
+    global _identity_logged
+    if _identity_logged: return
     try:
-        import google.auth.compute_engine.credentials
-        import subprocess
-        
-        target = google.auth.compute_engine.credentials.Credentials
-        _orig_refresh = target.refresh
-        
-        def _patched_refresh(self, request):
-            try:
-                return _orig_refresh(self, request)
-            except Exception as e:
-                err_msg = str(e).lower()
-                # Catch the specific 'missing email' error from metadata server
-                if "metadata server" in err_msg or "service account info" in err_msg:
-                    try:
-                        self.token = subprocess.check_output(["gcloud", "auth", "print-access-token"], text=True).strip()
-                        return
-                    except:
-                        pass
-                raise
-        target.refresh = _patched_refresh
+        import httpx
+        # Check metadata server for the service account email
+        r = httpx.get("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email", 
+                      headers={"Metadata-Flavor": "Google"}, timeout=1)
+        print(f"  [REAL IDENTITY] {r.text.strip()}")
+        _identity_logged = True
+    except:
+        # Fallback to standard check
+        try:
+            import google.auth
+            creds, _ = google.auth.default()
+            print(f"  [DETECTED IDENTITY] {getattr(creds, 'service_account_email', 'unknown')}")
+            _identity_logged = True
+        except: pass
+
+def _get_fresh_bq_token():
+    """Retrieves a fresh access token, prioritizing direct metadata server hits in GCP."""
+    # Try direct Metadata Server hit first (most reliable in Reasoning Engine)
+    import httpx
+    try:
+        url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
+        r = httpx.get(url, headers={"Metadata-Flavor": "Google"}, timeout=2)
+        if r.status_code == 200:
+            return r.json().get("access_token")
     except:
         pass
 
-_apply_cloud_shell_patch()
-
-def get_maps_mcp_toolset():
-    dotenv.load_dotenv()
-    maps_api_key = os.getenv('MAPS_API_KEY', 'no_api_found')
-    return MCPToolset(connection_params=StreamableHTTPConnectionParams(url=MAPS_MCP_URL, headers={"X-Goog-Api-Key": maps_api_key}))
-
-def get_bigquery_mcp_toolset():   
-    dotenv.load_dotenv()
-    project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'project_not_set')
-    credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/bigquery"])
-    
+    # Fallback to google-auth
+    import google.auth
+    import google.auth.transport.requests
+    scopes = ["https://www.googleapis.com/auth/bigquery", "https://www.googleapis.com/auth/cloud-platform"]
     try:
+        credentials, _ = google.auth.default(scopes=scopes)
         credentials.refresh(google.auth.transport.requests.Request())
+        return credentials.token
     except:
-        # The patch above should handle it, but we add a local fallback just in case
-        if not getattr(credentials, 'token', None):
-            import subprocess
-            try:
-                credentials.token = subprocess.check_output(["gcloud", "auth", "print-access-token"], text=True).strip()
-            except:
-                pass
+        # Final fallback to gcloud CLI
+        import subprocess
+        try:
+            return subprocess.check_output(["gcloud", "auth", "print-access-token"], text=True).strip()
+        except: return ""
 
-    # Note: Use x-goog-user-project (lowercase) as per official template for stability
+# Force HTTP/1.1 and inject fresh tokens for BigQuery MCP
+_orig_send = httpx.AsyncClient.send
+async def _patched_send(self, request, *args, **kwargs):
+    _log_identity()
+    
+    # If the URL is for BigQuery MCP, ensure a fresh token is injected
+    if "bigquery.googleapis.com/mcp" in str(request.url):
+        token = _get_fresh_bq_token()
+        if token:
+            request.headers['Authorization'] = f"Bearer {token}"
+            
+    # Execute the actual request
+    response = await _orig_send(self, request, *args, **kwargs)
+    
+    # Debug Logging: Capture body for any tool failure
+    if response.status_code >= 400 and "googleapis.com/mcp" in str(request.url):
+        try:
+            body = await response.aread()
+            print(f"  [DEBUG ERROR] {request.method} {request.url}")
+            print(f"  [DEBUG ERROR] Status: {response.status_code}")
+            print(f"  [DEBUG ERROR] Body: {body.decode('utf-8', errors='ignore')}")
+            response._content = body 
+        except: pass
+            
+    return response
+httpx.AsyncClient.send = _patched_send
+
+# Prevent AnyIO cross-task cancellation errors
+import anyio._backends._asyncio
+_orig_cancel_exit = anyio._backends._asyncio.CancelScope.__exit__
+def _patched_cancel_exit(self, etype, exc, tb):
+    try: return _orig_cancel_exit(self, etype, exc, tb)
+    except RuntimeError as e:
+        if "different task" in str(e): return False
+        raise
+anyio._backends._asyncio.CancelScope.__exit__ = _patched_cancel_exit
+
+# Prevent telemetry serialization failures for complex tool outputs
+try:
+    from opentelemetry.sdk.trace import Span
+    import json
+    def _safe_stringify(value):
+        if isinstance(value, (dict, list)):
+            try: return json.dumps(value, ensure_ascii=False, default=str)
+            except: return str(value)
+        return value
+    _orig_set_attribute = Span.set_attribute
+    def _patched_set_attribute(self, key, value):
+        return _orig_set_attribute(self, key, _safe_stringify(value))
+    Span.set_attribute = _patched_set_attribute
+except: pass
+
+# =============================================================================
+# 🔧 MCP Toolset Configuration
+# =============================================================================
+BIGQUERY_MCP_URL = "https://bigquery.googleapis.com/mcp" 
+MAPS_MCP_URL = "https://mapstools.googleapis.com/mcp" 
+
+def get_bigquery_mcp_toolset():
+    """Creates a BigQuery MCP toolset. Dynamic refresh is handled by the patch."""
+    dotenv.load_dotenv()
+    project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
     return MCPToolset(connection_params=StreamableHTTPConnectionParams(
         url=BIGQUERY_MCP_URL, 
-        headers={"Authorization": f"Bearer {getattr(credentials, 'token', '')}", "x-goog-user-project": project_id}
+        headers={"x-goog-user-project": project_id},
+        timeout=180
+    ))
+
+def get_maps_mcp_toolset():
+    """Creates a Google Maps MCP toolset."""
+    dotenv.load_dotenv()
+    maps_api_key = os.getenv('MAPS_API_KEY')
+    return MCPToolset(connection_params=StreamableHTTPConnectionParams(
+        url=MAPS_MCP_URL, 
+        headers={"X-Goog-Api-Key": maps_api_key},
+        timeout=180
+    ))
+
+def get_maps_mcp_toolset():
+    """Creates a Google Maps MCP toolset."""
+    dotenv.load_dotenv()
+    maps_api_key = os.getenv('MAPS_API_KEY')
+    return MCPToolset(connection_params=StreamableHTTPConnectionParams(
+        url=MAPS_MCP_URL, 
+        headers={"X-Goog-Api-Key": maps_api_key},
+        timeout=180
     ))
 __TOOLS_EOF__
 
-cat <<'__AGENT_EOF__' > adk_agent/mcp_app/agent.py
+cat <<__AGENT_EOF__ > adk_agent/mcp_app/agent.py
 import os
+
+# =============================================================================
+# Environment Configuration
+# Force project ID and location BEFORE importing ADK/genai
+# =============================================================================
+os.environ["GOOGLE_CLOUD_PROJECT"] = "$PROJECT_ID"
+os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
+
 import dotenv
+dotenv.load_dotenv()
+
 from mcp_app import tools
 from google.adk.agents import LlmAgent
 
-dotenv.load_dotenv()
-
-PROJECT_ID = os.getenv('GOOGLE_CLOUD_PROJECT', 'project_not_set')
+PROJECT_ID = "$PROJECT_ID"
 
 maps_toolset = tools.get_maps_mcp_toolset()
 bigquery_toolset = tools.get_bigquery_mcp_toolset()
@@ -651,7 +826,7 @@ instruction = base_instruction\
     .replace("[GENERATED_SYSTEM_INSTRUCTION]", """${escapedInstruction}""")
 
 root_agent = LlmAgent(
-    model=f"projects/{PROJECT_ID}/locations/global/publishers/google/models/gemini-3-pro-preview",
+    model="gemini-3-pro-preview",
     name='root_agent',
     instruction=instruction,
     tools=[maps_toolset, bigquery_toolset]
@@ -663,8 +838,19 @@ echo "========================================================="
 echo "🎉 Setup Complete!"
 echo "========================================================="
 echo ""
+echo "📂 Project directory: ${dirName}"
 echo "🚀 Launching the Agent UI..."
 echo "   (Pre-configured for project: $PROJECT_ID)"
+echo ""
+echo "========================================================="
+echo "💡 TIPS:"
+echo "   • To STOP the UI:    Press Ctrl+C"
+echo "   • To RESTART the UI: Run the following commands:"
+echo ""
+echo "     cd ~/${dirName}/adk_agent"
+echo "     ../.venv/bin/adk web"
+echo ""
+echo "========================================================="
 echo ""
 
 cd adk_agent
