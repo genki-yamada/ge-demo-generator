@@ -26,6 +26,12 @@ Generates a complete `setup.sh` script that:
 - Configures ADK agent with MCP servers (BigQuery + Google Maps)
 - Launches the agent UI automatically
 
+### 📖 Interactive Walkthrough
+Includes a built-in Cloud Shell tutorial (`tutorial.md`) that guides users through the deployment and demo execution.
+
+### ✅ Production Readiness
+Integrated with `agent-starter-pack` for rapid deployment to Vertex AI Agent Engine and Gemini Enterprise.
+
 ## Project Structure
 
 ```
@@ -33,7 +39,8 @@ ge-demo-generator/
 ├── Code.gs           # Backend logic (Apps Script)
 ├── index.html        # Frontend UI
 ├── appsscript.json   # Apps Script manifest
-└── tutorial.md       # Cloud Shell tutorial
+├── tutorial.md       # Cloud Shell tutorial
+└── README.md         # Documentation
 ```
 
 ## Setup

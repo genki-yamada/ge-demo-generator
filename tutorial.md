@@ -53,7 +53,7 @@ You must be in the `adk_agent` folder inside your new demo directory. Replace `[
 cd [YOUR_DEMO_DIR]/examples/launchmybakery/adk_agent
 
 # Tip: You can use this to find and enter the latest demo folder automatically:
-cd $(ls -d my-ge-demo-*/ | head -n 1)examples/launchmybakery/adk_agent
+cd $(ls -d my-ge-demo-*/ | head -n 1)adk_agent
 ```
 
 #### 2. Start the Server
@@ -77,7 +77,7 @@ Once you see `Uvicorn running on http://127.0.0.1:8000`:
 
 ## Step 4: Try the Scenarios
 
-Use the **Step 2: Recommended Demo Flow** section in your Demo Generator for tailored prompts.
+Use the **Step 4: Run Live Demo** section in your Demo Generator for tailored prompts.
 
 **Example Prompts:**
 - "Analyze sales trends using the BigQuery tool."
@@ -91,7 +91,7 @@ Use the **Step 2: Recommended Demo Flow** section in your Demo Generator for tai
 Ready to take your demo further? Deploy it to **Vertex AI Agent Engine** and register it as an official agent within **Gemini Enterprise**.
 
 ### 1. Enhance Your Project
-Run this in the your agent root directory (`adk_agent`):
+Run this in your agent root directory (`adk_agent`):
 
 ```bash
 uvx agent-starter-pack enhance
@@ -109,7 +109,20 @@ uvx agent-starter-pack enhance
 make deploy
 ```
 
-### 3. Register to Gemini Enterprise
+### 3. Grant Execution Permissions
+If your agent encounters a 403 error when calling BigQuery, run these commands to grant the necessary roles to the Agent Engine service account:
+
+```bash
+PI=$(gcloud config get-value project)
+PN=$(gcloud projects list --filter="projectId:$PI" --format="value(projectNumber)")
+SA="service-$PN@gcp-sa-aiplatform-re.iam.gserviceaccount.com"
+
+gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/mcp.toolUser" --condition=None
+gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/bigquery.jobUser" --condition=None
+gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/bigquery.dataViewer" --condition=None
+```
+
+### 4. Register to Gemini Enterprise
 ```bash
 make register-gemini-enterprise
 ```
