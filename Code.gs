@@ -523,6 +523,17 @@ if [ -z "$PROJECT_ID" ]; then
   exit 1
 fi
 
+# --- 1.1 Authentication & Permissions Check ---
+echo "🔐 Checking authentication..."
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null || echo "")
+if [ -z "$PROJECT_NUMBER" ]; then
+  echo "❌ Error: Could not retrieve project details. This usually means you are not authenticated or the project ID is invalid."
+  echo "Please run the following commands and try again:"
+  echo "  1. gcloud auth login"
+  echo "  2. gcloud auth application-default login"
+  exit 1
+fi
+
 echo "💾 Checking disk space..."
 FREE_SPACE=$(df -k . | awk 'NR==2 {print $4}')
 if [ "$FREE_SPACE" -lt 524288 ]; then
@@ -563,12 +574,44 @@ echo "🔐 Configuring IAM permissions for Agent Engine..."
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
 RE_SA="service-\${PROJECT_NUMBER}@gcp-sa-aiplatform-re.iam.gserviceaccount.com"
 
+# Helper function to grant and verify roles with retries
+check_and_grant_role() {
+  local project=$1
+  local member=$2
+  local role=$3
+  local max_retries=3
+  local retry_count=0
+  
+  while [ \$retry_count -lt \$max_retries ]; do
+    echo "  Checking/Granting \$role..."
+    gcloud projects add-iam-policy-binding "\$project" \
+      --member="serviceAccount:\$member" \
+      --role="\$role" --condition=None >/dev/null 2>&1
+    
+    # Wait a moment for propagation before verification
+    sleep 2
+    
+    # Verify the binding exists
+    if gcloud projects get-iam-policy "\$project" \
+        --flatten="bindings[].members" \
+        --format="value(bindings.role)" \
+        --filter="bindings.members:serviceAccount:\$member AND bindings.role:\$role" | grep -q "\$role"; then
+      echo "    ✅ Core role confirmed."
+      return 0
+    fi
+    
+    retry_count=\$((retry_count + 1))
+    echo "    ⚠️ Verification failed, retrying (\$retry_count/\$max_retries)..."
+    sleep 3
+  done
+  echo "    ❌ ERROR: Failed to verify \$role after \$max_retries attempts."
+  echo "       Please manually grant \$role to \$member in the Cloud Console."
+  return 1
+}
+
 # Grant specific roles required for MCP tool execution and BigQuery access
-echo "  Granting roles to \${RE_SA}..."
 for ROLE in "roles/mcp.toolUser" "roles/bigquery.jobUser" "roles/bigquery.dataViewer"; do
-  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-    --member="serviceAccount:\${RE_SA}" \
-    --role="\${ROLE}" --condition=None >/dev/null 2>&1 || true
+  check_and_grant_role "$PROJECT_ID" "\$RE_SA" "\$ROLE"
 done
 
 # Enable MCP services

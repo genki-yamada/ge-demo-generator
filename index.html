@@ -609,34 +609,49 @@
 
           <!-- Templates & Language -->
           <div class="mb-8 p-6 bg-white/5 rounded-2xl border border-white/10 shadow-inner">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-4 mb-4">
               <label class="text-[10px] font-bold text-sky-400 uppercase tracking-widest flex items-center gap-2">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                     d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                 </svg>
-                Industry Templates
+                Template Hub
               </label>
-              <div class="flex items-center gap-2 bg-black/20 rounded-lg p-1 border border-white/5 shadow-sm">
-                <svg class="w-3 h-3 text-gray-500 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="flex items-center gap-1 bg-black/20 rounded-lg p-1 border border-white/5 shadow-sm">
+                <svg class="w-2.5 h-2.5 text-gray-500 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129">
                   </path>
                 </svg>
                 <select id="langSelector" onchange="updateSamples()"
-                  class="bg-transparent text-[10px] outline-none text-sky-400 font-bold px-1 py-0.5 cursor-pointer hover:text-sky-300 transition-colors">
+                  class="bg-transparent text-[9px] outline-none text-sky-400/80 font-bold px-1 py-0.5 cursor-pointer hover:text-sky-300 transition-colors">
                   <option value="en">English</option>
                   <option value="ja">日本語</option>
-                  <option value="zh">中文</option>
-                  <option value="fr">Français</option>
-                  <option value="de">Deutsch</option>
-                  <option value="es">Español</option>
                 </select>
               </div>
             </div>
 
-            <div id="sampleChips" class="flex flex-wrap gap-2.5">
-              <!-- Samples will be injected here -->
+            <!-- Industry Filter -->
+            <div class="mb-5">
+              <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-3">1. Select Industry</p>
+              <div id="industryFilters" class="flex flex-wrap gap-2">
+                <!-- Industry filters will be injected here -->
+              </div>
+            </div>
+
+            <!-- Job Function Filter -->
+            <div class="mb-6">
+              <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-3">2. Filter by Job Function</p>
+              <div id="jobFunctionFilters" class="flex flex-wrap gap-2">
+                <!-- Job function filters will be injected here -->
+              </div>
+            </div>
+
+            <div class="border-t border-white/5 pt-6 mt-6">
+              <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-4">3. Select a Template</p>
+              <div id="templateGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Templates will be injected here -->
+              </div>
             </div>
           </div>
 
@@ -848,28 +863,50 @@
               </div>
             </div>
 
-            <!-- Step 0: Prerequisites -->
-            <div class="mb-10 p-6 bg-amber-500/10 rounded-2xl border border-amber-500/20">
-              <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <span class="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-[10px]">0</span>
-                Setup Authentication (Prerequisite)
-              </h3>
-              <p class="text-[13px] text-gray-300 mb-4">
-                Cloud Shell users <b>must</b> run this once to ensure local agents have Vertex AI access.
-              </p>
-              <div class="relative group">
-                <pre id="authCommand"
-                  class="bg-black/60 rounded-xl p-4 text-[12px] font-mono text-amber-200 border border-white/5 overflow-x-auto">gcloud auth application-default login</pre>
-                <button onclick="copyRaw('gcloud auth application-default login')"
-                  class="absolute top-3 right-3 p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white transition-all opacity-0 group-hover:opacity-100 shadow-xl border border-gray-700">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
-                    </path>
-                  </svg>
-                </button>
+            <!-- Auth Requirement Warning -->
+            <div class="mb-10 p-4 bg-red-500/10 rounded-2xl border border-red-500/20 flex items-start gap-4">
+              <div class="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center text-red-500 shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                  </path>
+                </svg>
+              </div>
+              <div class="flex-1">
+                <h4 class="text-[12px] font-bold text-red-400 uppercase tracking-widest mb-1">Authentication Required
+                </h4>
+                <p class="text-[13px] text-red-300/80 leading-relaxed mb-4">
+                  Before proceeding, ensure you have executed <b>both</b> commands below in your terminal.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div class="relative group/cmd">
+                    <code
+                      class="block bg-black/40 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-200 font-mono">gcloud auth login</code>
+                    <button onclick="copyRaw('gcloud auth login')"
+                      class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                        </path>
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="relative group/cmd">
+                    <code
+                      class="block bg-black/40 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-200 font-mono">gcloud auth application-default login</code>
+                    <button onclick="copyRaw('gcloud auth application-default login')"
+                      class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                        </path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
+
 
             <!-- Step 1: Initialization -->
             <div class="mb-0">
@@ -895,8 +932,21 @@
 
               <div class="relative group mb-6">
                 <div id="setupScriptContainer" class="relative">
-                  <pre id="setupCommand"
-                    class="bg-black/80 rounded-2xl p-6 text-[12px] font-mono text-emerald-400 overflow-x-auto overflow-y-auto border border-sky-500/20 group-hover:border-sky-500/50 transition-all shadow-2xl leading-relaxed max-h-52"></pre>
+                  <pre id="setupCommand" ondblclick="if(this.classList.contains('max-h-none')) toggleScriptExpansion()"
+                    class="bg-black/80 rounded-2xl p-6 text-[12px] font-mono text-emerald-400 overflow-x-auto overflow-y-auto border border-sky-500/20 group-hover:border-sky-500/50 transition-all shadow-2xl leading-relaxed max-h-52 cursor-pointer"
+                    title="Double-click to collapse when expanded"></pre>
+
+                  <!-- Sticky Collapse Button (Visible only when expanded) -->
+                  <div id="stickyCollapseWrapper"
+                    class="sticky bottom-6 flex justify-center w-full pointer-events-none transition-all duration-300 opacity-0 translate-y-4 hidden z-20">
+                    <button onclick="toggleScriptExpansion()"
+                      class="pointer-events-auto px-6 py-2.5 bg-sky-500 hover:bg-sky-400 text-white font-bold rounded-full shadow-2xl shadow-sky-500/40 flex items-center gap-2 text-[10px] uppercase tracking-widest transition-all hover:scale-105 active:scale-95 border border-white/20">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                      </svg>
+                      Collapse Script
+                    </button>
+                  </div>
                 </div>
                 <div class="absolute top-3 right-3 flex gap-2 z-10">
                   <button onclick="downloadScript()" title="Download as .sh file"
@@ -932,6 +982,86 @@
                 </svg>
                 This command will install the ADK, configure BigQuery and Maps MCP servers, and push generated datasets.
               </p>
+
+              <!-- ADK Web Instructions -->
+              <div class="mt-12 pt-8 border-t border-white/10">
+                <h3 class="text-xs font-bold text-sky-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                    </path>
+                  </svg>
+                  Managing the Agent UI (adk web)
+                </h3>
+
+                <p class="text-[12px] text-gray-400 mb-6 leading-relaxed">
+                  Open your terminal and navigate to the <strong>adk_agent</strong> folder inside the generated demo
+                  directory (<code id="adkDirPlaceholder" class="text-sky-300 font-mono">demo-directory</code>) before
+                  running the commands below.
+                </p>
+
+                <!-- New Step: Click Terminal Link -->
+                <div
+                  class="mb-6 px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+                  <div
+                    class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 class="text-[11px] font-bold text-emerald-400 uppercase tracking-widest">Step 1: Open Local
+                      Server</h4>
+                    <p class="text-[12px] text-emerald-300/80">When the script completes, click the <span
+                        class="font-mono text-white">http://127.0.0.1:8000</span> link in your terminal to open the UI.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div
+                    class="p-5 bg-black/40 rounded-2xl border border-white/5 hover:border-sky-500/30 transition-all shadow-inner group/cmd relative">
+                    <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">To START Agent UI</p>
+                    <code
+                      class="text-[12px] text-sky-300 font-mono bg-sky-950/30 px-2 py-1 rounded">../.venv/bin/adk web</code>
+                    <button onclick="copyRaw('../.venv/bin/adk web')"
+                      class="absolute top-4 right-4 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                        </path>
+                      </svg>
+                    </button>
+                  </div>
+                  <div
+                    class="p-5 bg-black/40 rounded-2xl border border-white/5 hover:border-sky-500/30 transition-all shadow-inner">
+                    <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">To STOP</p>
+                    <div class="flex items-center gap-2 text-[12px] text-gray-300">
+                      <kbd
+                        class="px-2 py-1 bg-gray-800 border-b-2 border-gray-900 rounded-lg font-mono text-white text-[10px]">Ctrl</kbd>
+                      <span>+</span>
+                      <kbd
+                        class="px-2 py-1 bg-gray-800 border-b-2 border-gray-900 rounded-lg font-mono text-white text-[10px]">C</kbd>
+                    </div>
+                  </div>
+                  <div
+                    class="p-5 bg-black/40 rounded-2xl border border-white/5 hover:border-sky-500/30 transition-all shadow-inner group/cmd relative">
+                    <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">To RESTART</p>
+                    <p class="text-[11px] text-gray-400 leading-relaxed mb-2">Stop (Ctrl+C), then run:</p>
+                    <code
+                      class="text-sky-300 font-mono bg-sky-950/30 px-1 rounded block mt-1 text-[12px]">../.venv/bin/adk web</code>
+                    <button onclick="copyRaw('../.venv/bin/adk web')"
+                      class="absolute top-4 right-4 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                        </path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Step 2: Interactive Guide -->
@@ -942,6 +1072,50 @@
                 <div>
                   <h2 class="text-2xl font-bold text-white uppercase tracking-tight">Step 4: Run Live Demo</h2>
                   <p class="text-[11px] text-gray-500">Engage with your agent using personalized scenarios</p>
+                </div>
+              </div>
+
+              <!-- Auth Requirement Warning -->
+              <div class="mb-10 p-4 bg-red-500/10 rounded-2xl border border-red-500/20 flex items-start gap-4">
+                <div class="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center text-red-500 shrink-0">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                    </path>
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <h4 class="text-[12px] font-bold text-red-400 uppercase tracking-widest mb-1">Authentication Required
+                  </h4>
+                  <p class="text-[13px] text-red-300/80 leading-relaxed mb-4">
+                    Before proceeding, ensure you have executed <b>both</b> commands below in your terminal.
+                  </p>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div class="relative group/cmd">
+                      <code
+                        class="block bg-black/40 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-200 font-mono">gcloud auth login</code>
+                      <button onclick="copyRaw('gcloud auth login')"
+                        class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                          </path>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="relative group/cmd">
+                      <code
+                        class="block bg-black/40 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-200 font-mono">gcloud auth application-default login</code>
+                      <button onclick="copyRaw('gcloud auth application-default login')"
+                        class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                          </path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -972,6 +1146,49 @@
             <div>
               <h2 class="text-xl font-bold text-white uppercase tracking-tight">Step 5: Deploy to Gemini Enterprise</h2>
               <p class="text-[11px] text-gray-500">Scale your demo by deploying to Vertex AI Agent Engine</p>
+            </div>
+          </div>
+
+          <!-- Auth Requirement Warning -->
+          <div class="mb-10 p-4 bg-red-500/10 rounded-2xl border border-red-500/20 flex items-start gap-4">
+            <div class="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center text-red-500 shrink-0">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                </path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h4 class="text-[12px] font-bold text-red-400 uppercase tracking-widest mb-1">Authentication Required</h4>
+              <p class="text-[13px] text-red-300/80 leading-relaxed mb-4">
+                Before proceeding, ensure you have executed <b>both</b> commands below in your terminal.
+              </p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="relative group/cmd">
+                  <code
+                    class="block bg-black/40 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-200 font-mono">gcloud auth login</code>
+                  <button onclick="copyRaw('gcloud auth login')"
+                    class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                      </path>
+                    </svg>
+                  </button>
+                </div>
+                <div class="relative group/cmd">
+                  <code
+                    class="block bg-black/40 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-200 font-mono">gcloud auth application-default login</code>
+                  <button onclick="copyRaw('gcloud auth application-default login')"
+                    class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                      </path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1268,6 +1485,7 @@
       const pre = document.getElementById('setupCommand');
       const icon = document.getElementById('scriptExpandIcon');
       const text = document.getElementById('scriptExpandText');
+      const stickyBtn = document.getElementById('stickyCollapseWrapper');
       const isExpanded = pre.classList.contains('max-h-none');
 
       if (isExpanded) {
@@ -1275,11 +1493,22 @@
         pre.classList.add('max-h-52');
         icon.style.transform = 'rotate(0deg)';
         text.textContent = 'Show Full Script';
+
+        // Hide sticky button
+        stickyBtn.classList.add('opacity-0', 'translate-y-4');
+        setTimeout(() => stickyBtn.classList.add('hidden'), 300);
+
+        // Scroll back to the top of the script area if we were far down
+        pre.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } else {
         pre.classList.remove('max-h-52');
         pre.classList.add('max-h-none');
         icon.style.transform = 'rotate(180deg)';
         text.textContent = 'Collapse Script';
+
+        // Show sticky button
+        stickyBtn.classList.remove('hidden');
+        setTimeout(() => stickyBtn.classList.remove('opacity-0', 'translate-y-4'), 10);
       }
     }
 
@@ -1290,74 +1519,231 @@
       chevron.classList.toggle('rotated');
     }
 
-    const SAMPLES = {
-      en: [
-        { label: "📉 SaaS Churn", text: "Global SaaS churn analysis and customer retention strategy using historical usage patterns." },
-        { label: "🏙️ NY Retail", text: "Retail optimization for Manhattan stores by correlating foot traffic, sales, and local weather." },
-        { label: "📦 Supply Chain", text: "Factory downtime prediction and inventory optimization based on parts failure history." },
-        { label: "🏥 Health Tech", text: "Predicting patient readmission rates and optimizing hospital staffing based on historical health data." },
-        { label: "⚡ Smart Grid", text: "Optimizing energy distribution and predicting peak load demands for a city-scale smart grid." }
-      ],
-      ja: [
-        { label: "🏪 小売店売上", text: "東京都内の小売店売上分析と、気象データを組み合わせた在庫最適化および需要予測デモ。" },
-        { label: "🏨 ホテル需要", text: "観光都市におけるホテルの稼働率予測と、周辺イベントデータを活用した価格動向分析。" },
-        { label: "🚚 物流効率化", text: "配送ルートの遅延予測と、トラフィックパターンに基づいた燃料効率の最適化デモ。" },
-        { label: "🚜 農業DX", text: "収穫量の予測と、気候データおよび市場価格を組み合わせた営農計画の最適化デモ。" },
-        { label: "🏭 製造ライン", text: "製造工程のボトルネック検知と、センサーデータに基づいた保守タイミングの予測最適化。" }
-      ],
-      zh: [
-        { label: "🛒 零售分析", text: "零售销售分析和结合天气数据的库存优化" },
-        { label: "📉 客户流失", text: "全球化产品的SaaS订阅流失分析和收入予測" },
-        { label: "🏗️ 供应链", text: "全球制造企业的供应链优化和库存管理" },
-        { label: "🏦 金融风险", text: "基于交易历史和信用评分的金融欺诈检测和风险评估デモ。" },
-        { label: "🚗 智慧交通", text: "城市交通流量预测和基于实时数据的路网优化方案。" }
-      ],
-      fr: [
-        { label: "📊 Ventes Détail", text: "Analyse des ventes au détail et optimisation des stocks combinée aux données météorologiques" },
-        { label: "🚛 Chaîne Logistique", text: "Optimisation de la chaîne logistique et gestion des stocks pour un fabricant mondial" },
-        { label: "💎 Luxe & Trends", text: "Analyse des sentiments sur les réseaux sociaux et découverte de trends pour une marque de luxe" },
-        { label: "🏥 Santé Connectée", text: "Prédiction des taux de réadmission des patients et optimisation du personnel hospitalier." },
-        { label: "🔌 Énergie Verte", text: "Optimisation de la distribution d'énergie et prédiction de la demande pour un réseau intelligent." }
-      ],
-      de: [
-        { label: "📈 Einzelhandel", text: "Einzelhandelsumsatzanalyse und Bestandsoptimierung kombiniert mit Wetterdaten" },
-        { label: "🏭 Produktion", text: "Vorausschauende Wartung und Ausfallzeitprognose basierend auf Produktionsdaten" },
-        { label: "🏦 Fintech Risiko", text: "Finanzielle Risikobewertung und Optimierung von Anlageportfolios" },
-        { label: "🏥 Medizintechnik", text: "Vorhersage von Patienten-Wiederaufnahmeraten und Optimierung der Personalbesetzung in Krankenhäusern." },
-        { label: "🌐 Smart City", text: "Optimierung des Verkehrsflusses und Vorhersage der Luftqualität basierend auf Sensordaten." }
-      ],
-      es: [
-        { label: "🏪 Venta Minorista", text: "Análisis de ventas minoristas y optimización de inventario combinados con datos meteorológicos" },
-        { label: "📦 Cadena de Suministro", text: "Optimización de la cadena de suministro y gestion de inventario para un fabricante global" },
-        { label: "🍷 Exportación", text: "Análisis de mercados internacionales y predicción de demanda para exportación agrícola" },
-        { label: "🚜 AgroTech", text: "Predicción del rendimiento de cultivos y optimización de la planificación agrícola basada en el clima." },
-        { label: "🏥 Salud Digital", text: "Predicción de reingresos de pacientes y optimización del personal sanitario en hospitales." }
-      ]
+    const TEMPLATE_DATA = {
+      industries: {
+        en: [
+          { id: 'retail', label: '🏪 Retail', icon: 'shopping_bag' },
+          { id: 'finance', label: '🏦 Finance', icon: 'account_balance' },
+          { id: 'manufacturing', label: '🏭 Manufacturing', icon: 'precision_manufacturing' },
+          { id: 'healthcare', label: '🏥 Healthcare', icon: 'medical_services' },
+          { id: 'logistics', label: '🚚 Logistics', icon: 'local_shipping' },
+          { id: 'tech', label: '💻 Tech & SaaS', icon: 'cloud_queue' }
+        ],
+        ja: [
+          { id: 'retail', label: '🏪 小売', icon: 'shopping_bag' },
+          { id: 'finance', label: '🏦 金融', icon: 'account_balance' },
+          { id: 'manufacturing', label: '🏭 製造', icon: 'precision_manufacturing' },
+          { id: 'healthcare', label: '🏥 ヘルスケア', icon: 'medical_services' },
+          { id: 'logistics', label: '🚚 物流', icon: 'local_shipping' },
+          { id: 'tech', label: '💻 IT・SaaS', icon: 'cloud_queue' }
+        ]
+      },
+      jobFunctions: {
+        en: [
+          { id: 'all', label: 'All Functions' },
+          { id: 'sales', label: 'Sales & Revenue' },
+          { id: 'marketing', label: 'Marketing' },
+          { id: 'ops', label: 'Operations' },
+          { id: 'supply_chain', label: 'Supply Chain' },
+          { id: 'finance_dept', label: 'Finance' },
+          { id: 'hr', label: 'HR & People' }
+        ],
+        ja: [
+          { id: 'all', label: 'すべて' },
+          { id: 'sales', label: '営業・収益' },
+          { id: 'marketing', label: 'マーケティング' },
+          { id: 'ops', label: 'オペレーション' },
+          { id: 'supply_chain', label: 'サプライチェーン' },
+          { id: 'finance_dept', label: '財務・経理' },
+          { id: 'hr', label: '人事・採用' }
+        ]
+      },
+      templates: {
+        en: [
+          // Retail
+          { industry: 'retail', function: 'sales', label: "Manhattan Store Optimization", text: "Retail optimization for Manhattan stores by correlating foot traffic, sales, and local weather patterns to optimize staffing and inventory levels." },
+          { industry: 'retail', function: 'marketing', label: "Customer Loyalty Analysis", text: "Analyze customer purchase history and demographic data to identify high-value segments and design targeted loyalty campaigns for regional malls." },
+          { industry: 'retail', function: 'ops', label: "Shelf Availability Tracking", text: "Real-time shelf inventory monitoring using computer vision and IoT weight sensors to automate restock triggers and minimize lost sales." },
+          { industry: 'retail', function: 'supply_chain', label: "Fresh Food Inventory", text: "Optimize fresh food inventory in grocery stores by analyzing historical spoilage rates, peak shopping hours, and delivery schedules." },
+          { industry: 'retail', function: 'finance_dept', label: "Dynamic Pricing Analysis", text: "Competitor price monitoring and elastic demand modeling to automate real-time price adjustments for high-volume consumer electronics." },
+          { industry: 'retail', function: 'hr', label: "Staffing Demand Prediction", text: "Forecast seasonal staffing requirements by analyzing historical store traffic peaks, local holidays, and workforce availability data." },
+          // Finance
+          { industry: 'finance', function: 'sales', label: "Wealth Management Growth", text: "Identify cross-selling opportunities for premium wealth management services based on transaction patterns and market volatility sensitivity." },
+          { industry: 'finance', function: 'marketing', label: "Next Best Offer Engine", text: "Predicting the most relevant financial product for individual banking customers using behavioral data and spending life-cycle analysis." },
+          { industry: 'finance', function: 'ops', label: "Fraud Detection Patterns", text: "Analyze credit card transaction streams to identify emerging fraud patterns and optimize detection rules for high-risk regions." },
+          { industry: 'finance', function: 'supply_chain', label: "Cash Logistics Optimization", text: "Optimizing ATM cash replenishment schedules and secure transport routes based on historical withdrawal trends and operational costs." },
+          { industry: 'finance', function: 'finance_dept', label: "ALM Sensitivity Testing", text: "Asset-Liability Management (ALM) modeling to simulate balance sheet impact from interest rate shocks and liquidity stress scenarios." },
+          { industry: 'finance', function: 'hr', label: "Advisor Performance Metrics", text: "Analyze advisor-client engagement data and conversion rates to identify training gaps and optimize performance-based incentive structures." },
+          // Manufacturing
+          { industry: 'manufacturing', function: 'sales', label: "B2B Demand Forecasting", text: "Aggregate dealer orders and market sentiment data to predict production demand and optimize regional inventory distribution." },
+          { industry: 'manufacturing', function: 'marketing', label: "Aftermarket Upsell Discovery", text: "Analyzing industrial equipment telemetry to identify machines reaching maintenance thresholds and promote relevant parts or service contracts." },
+          { industry: 'manufacturing', function: 'ops', label: "Factory Downtime Zero", text: "Factory downtime prediction and maintenance optimization based on machine sensor data and historical parts failure history." },
+          { industry: 'manufacturing', function: 'supply_chain', label: "Global Parts Logistics", text: "Optimize global component sourcing by analyzing shipping lead times, port congestion data, and regional supplier performance." },
+          { industry: 'manufacturing', function: 'finance_dept', label: "Unit Cost Variance Analysis", text: "Real-time production cost tracking by correlating raw material prices, energy usage, and labor efficiency across multiple assembly lines." },
+          { industry: 'manufacturing', function: 'hr', label: "Safety Hazard Prevention", text: "Analyze workplace accident reports and machine usage logs to identify patterns indicating fatigue or safety protocol breaches." },
+          // Healthcare
+          { industry: 'healthcare', function: 'sales', label: "Patient Service Growth", text: "Identify high-potential regions for specialized medical services by analyzing demographic health trends and competitor facility distribution." },
+          { industry: 'healthcare', function: 'marketing', label: "Preventive Care Engagement", text: "Segment patient populations by health risk factors to automate personalized outreach for annual screenings and preventive health programs." },
+          { industry: 'healthcare', function: 'ops', label: "ER Wait Time Management", text: "Predicting ER patient influx and optimizing nurse staffing based on historical admission data and regional flu trends." },
+          { industry: 'healthcare', function: 'supply_chain', label: "Medical Supply Tracking", text: "Optimize pharmaceutical inventory levels in hospital networks by analyzing usage spikes during historical seasonal peaks." },
+          { industry: 'healthcare', function: 'finance_dept', label: "Claims Denials Analytics", text: "Reduce insurance claim rejection rates by analyzing historical denial patterns and identifying common coding errors before submission." },
+          { industry: 'healthcare', function: 'hr', label: "Burnout Risk Assessment", text: "Monitor nurse shifts and overtime patterns to proactively identify departments at high risk of staff burnout and turnover." },
+          // Logistics
+          { industry: 'logistics', function: 'sales', label: "Freight Rate Optimization", text: "Dynamic shipping rate modeling based on capacity availability, seasonal peak demand, and fuel price volatility for enterprise accounts." },
+          { industry: 'logistics', function: 'marketing', label: "Customer Churn Mitigation", text: "Identifying at-risk freight customers by analyzing service level trends, delay frequency, and competitive price benchmarking." },
+          { industry: 'logistics', function: 'ops', label: "Last-Mile Efficiency", text: "Delivery route delay prediction and fuel efficiency optimization based on real-time traffic patterns and historical urban density data." },
+          { industry: 'logistics', function: 'supply_chain', label: "Multi-Modal Sourcing", text: "Identify the most cost-effective transportation mix (land, sea, air) by analyzing global port delays and varying lead times." },
+          { industry: 'logistics', function: 'finance_dept', label: "Asset Lifecycle Costing", text: "Predicting total cost of ownership for vehicle fleets by correlating maintenance logs, age, and mileage to optimize replacement cycles." },
+          { industry: 'logistics', function: 'hr', label: "Driver Safety Governance", text: "Analyzing telematics data for speed, braking, and idle time to design driver training programs and safety-based performance bonuses." },
+          // Tech & SaaS
+          { industry: 'tech', function: 'sales', label: "SaaS Churn Prediction", text: "Global SaaS churn analysis and customer retention strategy using historical usage patterns, support ticket volume, and contract renewal dates." },
+          { industry: 'tech', function: 'marketing', label: "Growth Loop Analysis", text: "Analyzing user onboarding friction and feature adoption rates to optimize self-serve conversion funnels for a cloud-native platform." },
+          { industry: 'tech', function: 'ops', label: "Cloud Spend Governance", text: "Analyze cloud infrastructure utilization and billing anomalies to provide cost-optimization recommendations across different product teams." },
+          { industry: 'tech', function: 'supply_chain', label: "Hardware Sourcing Resilience", text: "Mitigating server component shortages by analyzing tier-2 supplier lead times and regional geopolitical risk factors for manufacturing centers." },
+          { industry: 'tech', function: 'finance_dept', label: "Rule of 40 Benchmark", text: "Correlating revenue growth and EBITDA margins across product lines to identify areas requiring strategic investment or cost reduction." },
+          { industry: 'tech', function: 'hr', label: "Skills Gap Inventory", text: "Analyzing internal project assignments and certification data to identify emerging tech skill gaps and plan targeted recruitment or training." }
+        ],
+        ja: [
+          // 小売
+          { industry: 'retail', function: 'sales', label: "都内店舗の売上最適化", text: "東京都内の小売店売上分析と、気象データを組み合わせた在庫最適化および需要予測デモ。" },
+          { industry: 'retail', function: 'marketing', label: "会員ランク移行分析", text: "顧客の購買履歴とデモグラフィックデータを分析し、高価値顧客セグメントの特定とパーソナライズされた施策の立案。" },
+          { industry: 'retail', function: 'ops', label: "棚割り・欠品防止", text: "コンピュータビジョンと重量センサーを用いた棚在庫のリアルタイム監視。自動補充トリガーにより、販売機会損失を最小化。" },
+          { industry: 'retail', function: 'supply_chain', label: "食品ロス削減", text: "消費期限、過去の廃棄率、および来店客数予測に基づいた、スーパーマーケットでの生鮮食品在庫管理の最適化。" },
+          { industry: 'retail', function: 'finance_dept', label: "ダイナミック・プライシング", text: "競合価格のモニタリングと需要弾力性モデルに基づく。家電量販店向けに、売れ筋商品の適正価格をリアルタイムで自動更新。" },
+          { industry: 'retail', function: 'hr', label: "シフト配置の最適化", text: "過去の来店客数ピーク、祝祭日、スタッフの稼働データを分析。過不足のない人員配置を予測し、人件費を効率化。" },
+          // 金融
+          { industry: 'finance', function: 'sales', label: "富裕層向け提案の強化", text: "取引パターンと市場動向への感応度に基づいた、ウェルスマネジメントサービスのクロスセル機会の特定。" },
+          { industry: 'finance', function: 'marketing', label: "ネクスト・ベスト・オファー", text: "行動データとライフステージ分析を用いた、パーソナライズされた金融商品提案。既存顧客のエンゲージメントを最大化。" },
+          { industry: 'finance', function: 'ops', label: "不正利用検知", text: "クレジットカード取引ストリームの分析。新たに出現した不正パターンを特定し、高リスク地域での検知ルールを最適化。" },
+          { industry: 'finance', function: 'supply_chain', label: "現金輸送ルートの最適化", text: "ATMの現金補充スケジュールと輸送ルートの改善。過去の引き出し傾向と運用コストに基づき、資金効率を向上。" },
+          { industry: 'finance', function: 'finance_dept', label: "ALM感応度テスト", text: "資産負債管理（ALM）モデル。金利ショックや流動性ストレスシナリオがバランスシートに与える影響をシミュレーション。" },
+          { industry: 'finance', function: 'hr', label: "アドバイザー実績分析", text: "顧客対応データと成約率の相関分析。教育が必要なスキルの特定と、成果に基づくインセンティブ設計の最適化。" },
+          // 製造
+          { industry: 'manufacturing', function: 'sales', label: "B2B需要予測", text: "販売代理店の発注動向と市場センチメントを統合。生産計画を最適化し、地域ごとの在庫の過不足を解消。" },
+          { industry: 'manufacturing', function: 'marketing', label: "保守サービスの提案強化", text: "産業機器のIoTテレメトリデータを分析。交換時期が近づいた部品やメンテナンス契約の提案を自動化。" },
+          { industry: 'manufacturing', function: 'ops', label: "工場稼働率の最大化", text: "製造ラインの停止予測。センサーデータと過去の故障履歴に基づいた予防保守のタイミングの最適化。" },
+          { industry: 'manufacturing', function: 'supply_chain', label: "部品調達の弾力化", text: "配送リードタイム、港湾の混雑状況、およびサプライヤーのパフォーマンス分析によるグローバル調達の最適化。" },
+          { industry: 'manufacturing', function: 'finance_dept', label: "原価差異のリアルタイム分析", text: "原材料価格、エネルギー使用量、労働効率の変動を監視。製品ごとの原価推移を可視化し、採算管理を高度化。" },
+          { industry: 'manufacturing', function: 'hr', label: "安全管理と事故防止", text: "労働災害報告と機器の使用ログを分析。疲労やプロトコル違反の兆候を特定し、現場の安全レベルを向上。" },
+          // ヘルスケア
+          { industry: 'healthcare', function: 'sales', label: "診療サービスの地域展開", text: "地域の健康トレンドと競合施設の分布を分析。特化型クリニックや専門サービスの需要が高いエリアを特定。" },
+          { industry: 'healthcare', function: 'marketing', label: "予防検診の受診促進", text: "健康リスク要因に基づいた患者のセグメンテーション。パーソナライズされた通知により、定期検診の受診率を向上。" },
+          { industry: 'healthcare', function: 'ops', label: "救急外来の混雑予測", text: "ER（救急外来）への患者流入予測。過去の診察データと季節性疾患のトレンドに基づいた看護師配置の最適化。" },
+          { industry: 'healthcare', function: 'supply_chain', label: "医薬品在庫の適正化", text: "病院ネットワーク内での医薬品在庫レベル。過去の季節的ピーク時の需要急増に基づいた発注タイミングの最適化。" },
+          { industry: 'healthcare', function: 'finance_dept', label: "レセプト査定対策", text: "診療報酬請求の返戻・査定パターンの分析。請求前のコーディングミスを特定し、キャッシュフローを改善。" },
+          { industry: 'healthcare', function: 'hr', label: "バーンアウト防止プログラム", text: "看護師のシフトと残業時間の傾向を監視。離職リスクの高い部署を特定し、メンタルヘルス対策を早期に実施。" },
+          // 物流
+          { industry: 'logistics', function: 'sales', label: "運賃見積のダイナミック化", text: "空き容量、季節的な需要ピーク、燃料価格の変動に基づく価格モデル。大口顧客向けの運賃提案を最適化。" },
+          { industry: 'logistics', function: 'marketing', label: "顧客離反の防止", text: "配送遅延の頻度やサービスレベルの低下を分析。解約リスクの高い荷主を特定し、競合他社への流出を阻止。" },
+          { industry: 'logistics', function: 'ops', label: "ラストワンマイルの効率化", text: "配送ルートの遅延予測。リアルタイムの交通渋滞パターンと都市部の配送密度に基づいた燃料効率の最大化。" },
+          { industry: 'logistics', function: 'supply_chain', label: "マルチモーダル調達", text: "陸・海・空の最適な輸送モードの選定。港湾の混雑状況とリードタイムを分析し、最もコスト効率の高い経路を特定。" },
+          { industry: 'logistics', function: 'finance_dept', label: "車両ライフサイクル管理", text: "保有車両の維持コスト予測。走行距離や修理履歴に基づき、最適な買い替えサイクルを算出して資産効率を向上。" },
+          { industry: 'logistics', function: 'hr', label: "ドライバー安全走行支援", text: "急ブレーキや速度超過などのテレマティクスデータ分析。安全スコアに基づく報酬制度の設計と事故率の低減。" },
+          // IT・SaaS
+          { industry: 'tech', function: 'sales', label: "SaaS解約予測", text: "グローバルSaaS製品の解約分析。利用パターン、サポートチケット数、契約更新日に基づいたリテンション戦略の策定。" },
+          { industry: 'tech', function: 'marketing', label: "プロダクト・レッド・グロース", text: "オンボーディング時のユーザー行動と機能採用率を分析し、セルフサーブ型コンバージョンの最適化を図る。" },
+          { industry: 'tech', function: 'ops', label: "クラウドコスト管理", text: "インフラ利用状況と請求データの異常検知。各開発チームへのコスト最適化推奨事項の自動生成。" },
+          { industry: 'tech', function: 'supply_chain', label: "サーバー部品の調達リスク", text: "サプライヤーのリードタイムと地政学的リスクを分析。重要なサーバーコンポーネントの在庫確保と代替調達先を管理。" },
+          { industry: 'tech', function: 'finance_dept', label: "効率性ベンチマーク", text: "製品ラインごとの収益成長率と利益率の相関分析。投資すべき成長分野と、コスト削減が必要な非効率な事業を特定。" },
+          { industry: 'tech', function: 'hr', label: "ITスキルマップの可視化", text: "社内プロジェクトのアサインデータと保有資格を統合。不足している技術領域を特定し、戦略的な採用やリスキリングを計画。" }
+        ]
+      }
     };
 
+    let selectedIndustry = 'retail';
+    let selectedFunction = 'all';
+
     function updateSamples() {
-      const lang = document.getElementById('langSelector').value;
-      const container = document.getElementById('sampleChips');
-      if (!container) return;
-      container.innerHTML = '';
-      if (SAMPLES[lang]) {
-        SAMPLES[lang].forEach((sample, i) => {
-          const btn = document.createElement('button');
-          btn.onclick = () => setIdea(sample.text);
-          btn.className = "idea-chip px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:text-white hover:bg-sky-500/20 hover:border-sky-500/50 transition-all text-[11px] font-medium shadow-sm hover:shadow-sky-500/20";
-          btn.innerText = sample.label;
-          container.appendChild(btn);
-        });
+      const lang = document.getElementById('langSelector').value || 'en';
+      const industryContainer = document.getElementById('industryFilters');
+      const functionContainer = document.getElementById('jobFunctionFilters');
+      const templateGrid = document.getElementById('templateGrid');
+
+      if (!industryContainer || !functionContainer || !templateGrid) return;
+
+      // 1. Render Industries
+      industryContainer.innerHTML = '';
+      const fallbackLang = TEMPLATE_DATA.industries[lang] ? lang : 'en';
+      TEMPLATE_DATA.industries[fallbackLang].forEach(ind => {
+        const btn = document.createElement('button');
+        btn.onclick = () => { selectedIndustry = ind.id; updateSamples(); };
+        const isActive = selectedIndustry === ind.id;
+        btn.className = `px-4 py-2 rounded-xl text-[10px] font-bold transition-all border ${isActive
+          ? 'bg-sky-500/20 border-sky-500 text-sky-400 shadow-lg shadow-sky-500/20'
+          : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20'
+          }`;
+        btn.innerText = ind.label;
+        industryContainer.appendChild(btn);
+      });
+
+      // 2. Render Job Functions
+      functionContainer.innerHTML = '';
+      const fallbackFuncLang = TEMPLATE_DATA.jobFunctions[lang] ? lang : 'en';
+      TEMPLATE_DATA.jobFunctions[fallbackFuncLang].forEach(func => {
+        const btn = document.createElement('button');
+        btn.onclick = () => { selectedFunction = func.id; updateSamples(); };
+        const isActive = selectedFunction === func.id;
+        btn.className = `px-3 py-1.5 rounded-lg text-[9px] font-medium transition-all border ${isActive
+          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+          : 'bg-white/5 border-white/10 text-gray-500 hover:text-gray-300'
+          }`;
+        btn.innerText = func.label;
+        functionContainer.appendChild(btn);
+      });
+
+      // 3. Render Template Grid
+      templateGrid.innerHTML = '';
+      const fallbackTempLang = TEMPLATE_DATA.templates[lang] ? lang : 'en';
+      const filtered = TEMPLATE_DATA.templates[fallbackTempLang].filter(t =>
+        (t.industry === selectedIndustry) &&
+        (selectedFunction === 'all' || t.function === selectedFunction)
+      );
+
+      if (filtered.length === 0) {
+        templateGrid.innerHTML = `<div class="col-span-full py-10 text-center text-gray-500 text-[10px] italic">No matching templates found for this combination. Try another job function.</div>`;
+        return;
       }
+
+      filtered.forEach(temp => {
+        const card = document.createElement('div');
+        card.onclick = () => setIdea(temp.text);
+        card.className = "group glass p-4 rounded-2xl border border-white/5 hover:border-sky-500/50 cursor-pointer transition-all hover:bg-sky-500/5 flex flex-col justify-between shadow-sm hover:shadow-sky-500/10";
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-[8px] font-bold text-gray-500 uppercase tracking-tighter bg-white/5 px-1.5 py-0.5 rounded border border-white/10">${temp.function}</span>
+            </div>
+            <h4 class="text-[11px] font-bold text-gray-200 group-hover:text-white mb-2 leading-tight">${temp.label}</h4>
+            <p class="text-[10px] text-gray-500 group-hover:text-gray-400 line-clamp-3 leading-relaxed">${temp.text}</p>
+          </div>
+          <div class="mt-4 flex justify-end">
+            <span class="text-[9px] font-bold text-sky-400 opacity-0 group-hover:opacity-100 transition-all uppercase tracking-widest flex items-center gap-1">
+              Select
+              <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </span>
+          </div>
+        `;
+        templateGrid.appendChild(card);
+      });
     }
 
     function setIdea(text) {
       const el = document.getElementById('userGoal');
       el.value = text;
       el.classList.add('highlight-glow');
-      setTimeout(() => el.classList.remove('highlight-glow'), 1000);
-    }
 
+      // Auto-focus the textarea for the user
+      el.focus();
+
+      // Visual feedback
+      const btn = document.getElementById('generateBtn');
+      if (btn) btn.classList.add('animate-pulse');
+      setTimeout(() => { if (btn) btn.classList.remove('animate-pulse'); }, 2000);
+
+      setTimeout(() => el.classList.remove('highlight-glow'), 1000);
+
+      showToast('Template applied!');
+    }
     function generateDemo() {
       const userGoal = document.getElementById('userGoal').value;
       if (!userGoal) return alert('Goal required.');
@@ -1428,6 +1814,9 @@
       document.getElementById('setupCommand').innerText = `cat <<'__SETUP_SH__' > setup.sh\n${res.setupScript}\n__SETUP_SH__\nbash setup.sh`;
       document.getElementById('systemInstruction').value = res.systemInstruction;
       document.getElementById('demoDirName').innerText = res.dirName || 'demo-directory';
+
+      const adkDirPlaceholder = document.getElementById('adkDirPlaceholder');
+      if (adkDirPlaceholder) adkDirPlaceholder.innerText = res.dirName || 'demo-directory';
 
       currentSuffix = res.suffix || '';
       currentDomainName = res.domainName || '';
@@ -1648,7 +2037,9 @@
     function clearHistory() { if (confirm('Clear ALL history?')) google.script.run.withSuccessHandler(loadHistory).clearHistory(); }
 
     window.onload = () => {
-      loadHistory();
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        loadHistory();
+      }
       updateSamples();
 
       // Scroll Spy Implementation
