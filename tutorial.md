@@ -132,5 +132,24 @@ make register-gemini-enterprise
 
 ---
 
+## 🛠️ Troubleshooting: Reliability in Agent Engine
+
+If your agent occasionally stops responding or feels slow in Agent Engine:
+
+### 1. Handling "Cold Starts"
+Vertex AI Agent Engine (Reasoning Engine) may spin down containers after inactivity. The first request after a break might take longer as it loads heavy libraries (like `pandas` or `scikit-learn`). 
+- **Tip**: Sending the same prompt again usually works as the container is then "warm."
+- **Solution**: For production, consider using a warmer service or reducing the number of heavy dependencies in your `requirements.txt`.
+
+### 2. BigQuery Token Lags
+Retrieving fresh auth tokens for BigQuery can sometimes add latency.
+- **Fix Applied**: Our generated `tools.py` now includes stability patches that cache tokens for 30 minutes to ensure smooth tool execution.
+
+### 3. Execution Timeouts
+The default timeout for Agent Engine is 60 seconds. If your agent performs many sequential tool calls, it might hit this limit.
+- **Optimization**: Use `gemini-1.5-flash` for high-speed reasoning, and try to keep tool queries efficient.
+
+---
+
 ### Need Help?
 Contact [ryotat@google.com](mailto:ryotat@google.com) or refer to the [LaunchMyBakery](https://github.com/google/mcp/tree/main/examples/launchmybakery) documentation.

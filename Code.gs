@@ -21,15 +21,24 @@ const CONFIG = {
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',
-  MAX_HISTORY: 10
+  MAX_HISTORY: 10,
+  APP_VERSION: 'v1.1.0',
+  UPDATE_LOG: [
+    { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
+  ]
 };
 
 // ===========================================
 // Web App Entry Point
 // ===========================================
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('index')
+  const template = HtmlService.createTemplateFromFile('index');
+  template.appVersion = CONFIG.APP_VERSION;
+  template.updateLog = JSON.stringify(fetchGitLogs());
+  
+  return template.evaluate()
     .setTitle('GE Demo Generator (go/ge-demo-generator)')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
@@ -672,14 +681,18 @@ if [ -z "$API_KEY" ]; then
 fi
 
 # Create .env
-cat <<__ENV_EOF__ > adk_agent/mcp_app/.env
+cat <<__ENV_EOF__ > adk_agent/.env
 GOOGLE_GENAI_USE_VERTEXAI=1
 GOOGLE_CLOUD_PROJECT="$PROJECT_ID"
 GOOGLE_CLOUD_LOCATION="global"
 DEMO_DATASET="${datasetId}"
 MAPS_API_KEY="$API_KEY"
 PYTHONUNBUFFERED=1
+GRPC_ENABLE_FORK_SUPPORT=1
 __ENV_EOF__
+
+# Symlink .env to mcp_app for backward compatibility/legacy imports if needed
+ln -sf ../.env adk_agent/mcp_app/.env
 
 # Create __init__.py files for proper Python package structure
 touch adk_agent/__init__.py
@@ -699,6 +712,7 @@ from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
 import httpx
 import anyio
+import time
 
 # =============================================================================
 # 🛡️ Stability Patches for Reasoning Engine (Mandatory)
@@ -734,32 +748,40 @@ def _log_identity():
             _identity_logged = True
         except: pass
 
+_token_cache = {"token": None, "expiry": 0}
+
 def _get_fresh_bq_token():
-    """Retrieves a fresh access token, prioritizing direct metadata server hits in GCP."""
+    """Retrieves a fresh access token with caching (30 min)."""
+    global _token_cache
+    now = time.time()
+    if _token_cache["token"] and now < _token_cache["expiry"]:
+        return _token_cache["token"]
+
+    token = None
     # Try direct Metadata Server hit first (most reliable in Reasoning Engine)
     import httpx
     try:
         url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
         r = httpx.get(url, headers={"Metadata-Flavor": "Google"}, timeout=2)
         if r.status_code == 200:
-            return r.json().get("access_token")
-    except:
-        pass
+            token = r.json().get("access_token")
+    except: pass
 
-    # Fallback to google-auth
-    import google.auth
-    import google.auth.transport.requests
-    scopes = ["https://www.googleapis.com/auth/bigquery", "https://www.googleapis.com/auth/cloud-platform"]
-    try:
-        credentials, _ = google.auth.default(scopes=scopes)
-        credentials.refresh(google.auth.transport.requests.Request())
-        return credentials.token
-    except:
-        # Final fallback to gcloud CLI
-        import subprocess
+    if not token:
+        # Fallback to google-auth
+        import google.auth
+        import google.auth.transport.requests
+        scopes = ["https://www.googleapis.com/auth/bigquery", "https://www.googleapis.com/auth/cloud-platform"]
         try:
-            return subprocess.check_output(["gcloud", "auth", "print-access-token"], text=True).strip()
-        except: return ""
+            credentials, _ = google.auth.default(scopes=scopes)
+            credentials.refresh(google.auth.transport.requests.Request())
+            token = credentials.token
+        except: pass
+
+    if token:
+        _token_cache = {"token": token, "expiry": now + 1800} # Cache for 30 mins
+        return token
+    return ""
 
 # Force HTTP/1.1 and inject fresh tokens for BigQuery MCP
 _orig_send = httpx.AsyncClient.send
@@ -780,6 +802,7 @@ async def _patched_send(self, request, *args, **kwargs):
         try:
             body = await response.aread()
             print(f"  [DEBUG ERROR] {request.method} {request.url}")
+            print(f"  [DEBUG ERROR] x-goog-user-project: {request.headers.get('x-goog-user-project')}")
             print(f"  [DEBUG ERROR] Status: {response.status_code}")
             print(f"  [DEBUG ERROR] Body: {body.decode('utf-8', errors='ignore')}")
             response._content = body 
@@ -816,15 +839,25 @@ except: pass
 # =============================================================================
 # 🔧 MCP Toolset Configuration
 # =============================================================================
-BIGQUERY_MCP_URL = "https://bigquery.googleapis.com/mcp" 
 MAPS_MCP_URL = "https://mapstools.googleapis.com/mcp" 
 
-def get_bigquery_mcp_toolset():
-    """Creates a BigQuery MCP toolset. Dynamic refresh is handled by the patch."""
+def get_bigquery_mcp_url():
+    """Returns the project-scoped BigQuery MCP URL using a query parameter."""
     dotenv.load_dotenv()
     project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+    # Using ?project= query parameter as the header alone was insufficient for public datasets
+    return f"https://bigquery.googleapis.com/mcp?project={project_id}"
+
+def get_bigquery_mcp_toolset():
+    """Creates a BigQuery MCP toolset. URL is project-scoped to ensure quota/perms."""
+    dotenv.load_dotenv()
+    project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+    url = get_bigquery_mcp_url()
+    if not project_id:
+        print("  [CRITICAL] GOOGLE_CLOUD_PROJECT is missing! MCP calls will likely fail.")
+        
     return MCPToolset(connection_params=StreamableHTTPConnectionParams(
-        url=BIGQUERY_MCP_URL, 
+        url=url, 
         headers={"x-goog-user-project": project_id},
         timeout=180
     ))
@@ -1106,7 +1139,42 @@ function deleteLargeData(props, baseKey) {
   props.deleteProperty(`${baseKey}_meta`);
 }
 
+/**
+ * Fetches recent commit history from GitHub API as update logs.
+ * Fallbacks to static CONFIG.UPDATE_LOG if API fails.
+ */
+function fetchGitLogs() {
+  const repoUrl = 'https://api.github.com/repos/ryotat7/ge-demo-generator/commits';
+  try {
+    const response = UrlFetchApp.fetch(repoUrl + '?per_page=10', {
+      muteHttpExceptions: true,
+      headers: { 'Accept': 'application/vnd.github.v3+json' }
+    });
+    
+    if (response.getResponseCode() === 200) {
+      const commits = JSON.parse(response.getContentText());
+      return commits.map(c => {
+        // Extract version from commit message if it follows "v1.0.0: message" or "feat(v1.0.0): message"
+        // Otherwise use short SHA
+        const msg = c.commit.message.split('\n')[0];
+        const versionMatch = msg.match(/v\d+\.\d+\.\d+/);
+        const version = versionMatch ? versionMatch[0] : c.sha.substring(0, 7);
+        
+        return {
+          version: version,
+          date: c.commit.author.date.split('T')[0],
+          note: msg
+        };
+      });
+    }
+  } catch (e) {
+    // console.log('GitHub API Error:', e.message);
+  }
+  return CONFIG.UPDATE_LOG; // Fallback
+}
+
 function updateSystemInstruction(setupScript, newInstruction) {
   const escaped = newInstruction.replace(/\\/g, '\\\\').replace(/'/g, "'\\''").replace(/\n/g, '\\n');
   return setupScript.replace(/(1\.\s+\*\*BigQuery toolset:\*\*.*?\n)([\s\S]*?)(\n\s+2\.\s+\*\*Maps Toolset:\*\*)/, `$1${escaped}$3`);
 }
+
