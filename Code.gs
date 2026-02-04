@@ -22,7 +22,7 @@ const CONFIG = {
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',
   MAX_HISTORY: 10,
-  APP_VERSION: 'v1.1.0',
+  APP_VERSION: 'v2.1',
   UPDATE_LOG: [
     { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
   ]
@@ -33,7 +33,11 @@ const CONFIG = {
 // ===========================================
 function doGet() {
   const template = HtmlService.createTemplateFromFile('index');
+  
+  // Use manual versioning for the sidebar display label
   template.appVersion = CONFIG.APP_VERSION;
+  
+  // Update log remains dynamic (What's New)
   template.updateLog = JSON.stringify(fetchGitLogs());
   
   return template.evaluate()
@@ -1155,7 +1159,7 @@ function fetchGitLogs() {
       const commits = JSON.parse(response.getContentText());
       return commits.map(c => {
         // Extract version from commit message if it follows "v1.0.0: message" or "feat(v1.0.0): message"
-        // Otherwise use short SHA
+        // Otherwise use short SHA. This allows the UI version to auto-update on every commit.
         const msg = c.commit.message.split('\n')[0];
         const versionMatch = msg.match(/v\d+\.\d+\.\d+/);
         const version = versionMatch ? versionMatch[0] : c.sha.substring(0, 7);
