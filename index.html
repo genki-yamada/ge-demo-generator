@@ -386,7 +386,7 @@
           </div>
           <h1
             class="text-4xl lg:text-5xl font-bold tracking-tight mb-4 py-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-            Build and run your custom agent demo
+            Build and Run Your Custom Agent
           </h1>
           <p
             class="text-gray-400 text-lg max-w-2xl text-center lg:text-left mx-auto lg:mx-0 leading-relaxed font-light">
@@ -1038,20 +1038,39 @@
                 </div>
               </div>
             </section>
-
-            <div class="p-6 bg-white/5 rounded-2xl border border-white/10">
-              <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <!-- Important Note: Execution Context -->
+            <div class="p-4 mb-6 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex items-start gap-4">
+              <div
+                class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
-                  </path>
+                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
                 </svg>
-                1. Enhance with Infrastructure
-              </h3>
-              <p class="text-[13px] text-gray-300 mb-4">
-                Run this in the agent root directory (<code
-                  class="text-emerald-400 bg-emerald-400/10 px-1 rounded">.../adk_agent</code>) to add production
-                templates.
+              </div>
+              <div>
+                <h4 class="text-[12px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Execution Context</h4>
+                <p class="text-[13px] text-emerald-300/80 leading-relaxed">
+                  Open your terminal and navigate to the <strong>adk_agent</strong> folder inside the generated demo
+                  directory (<strong><span id="demoDirName">...</span></strong>) before running the commands below.
+                </p>
+              </div>
+            </div>
+
+            <!-- Step 1: Enhance -->
+            <div
+              class="p-6 bg-white/5 rounded-2xl border border-white/10 group hover:border-emerald-500/30 transition-all">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+                  <span
+                    class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-bold">1</span>
+                  Enhance with Infrastructure
+                </h3>
+                <span
+                  class="text-[9px] font-mono text-gray-500 bg-white/5 px-2 py-1 rounded-lg border border-white/5">DIR:
+                  adk_agent</span>
+              </div>
+              <p class="text-[12px] text-gray-400 mb-4 leading-relaxed">
+                Add production-ready templates and configurations to your agent.
               </p>
               <div class="relative group">
                 <pre
@@ -1065,51 +1084,67 @@
                   </svg>
                 </button>
               </div>
-              <p class="text-[11px] text-gray-500 mt-2 italic">Accept all default values when prompted.</p>
+              <p class="text-[10px] text-gray-500 mt-2 flex items-center gap-1.5">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                Hint: Accept all default values by pressing Enter during the process.
+              </p>
             </div>
 
             <div class="grid grid-cols-1 gap-6">
-              <div class="p-6 bg-white/5 rounded-2xl border border-white/10">
-                <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <span class="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px]">2</span>
-                  Deploy to Agent Engine
-                </h3>
+              <!-- Step 2: Deploy -->
+              <div
+                class="p-6 bg-white/5 rounded-2xl border border-white/10 group hover:border-emerald-500/30 transition-all">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+                    <span
+                      class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-bold">2</span>
+                    Deploy to Agent Engine
+                  </h3>
+                  <span
+                    class="text-[9px] font-mono text-gray-500 bg-white/5 px-2 py-1 rounded-lg border border-white/5">DIR:
+                    adk_agent</span>
+                </div>
 
-                <!-- Deployment Options -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <p class="text-[12px] text-gray-400 mb-6 leading-relaxed">
+                  Upload and deploy your agent to Vertex AI Reasoning Engine.
+                </p>
+
+                <!-- Deployment Options (Compact) -->
+                <div
+                  class="bg-black/20 rounded-2xl p-4 border border-white/5 mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label class="block text-[10px] text-gray-500 mb-2 font-bold uppercase tracking-widest">Deployment
-                      Mode</label>
+                    <label class="block text-[9px] text-gray-500 mb-2 font-bold uppercase tracking-widest">Mode</label>
                     <div class="flex gap-2">
                       <label class="flex-1 cursor-pointer">
                         <input type="radio" name="deployMode" value="update" checked onchange="updateDeployCommand()"
                           class="hidden peer">
                         <div
-                          class="px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-[10px] font-bold text-center text-gray-400 peer-checked:bg-emerald-500/10 peer-checked:border-emerald-500/50 peer-checked:text-emerald-400 transition-all">
-                          Update Existing
-                        </div>
+                          class="px-3 py-1.5 rounded-lg border border-white/5 bg-white/5 text-[9px] font-bold text-center text-gray-400 peer-checked:bg-emerald-500/10 peer-checked:border-emerald-500/30 peer-checked:text-emerald-400 transition-all">
+                          Update</div>
                       </label>
                       <label class="flex-1 cursor-pointer">
                         <input type="radio" name="deployMode" value="new" onchange="updateDeployCommand()"
                           class="hidden peer">
                         <div
-                          class="px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-[10px] font-bold text-center text-gray-400 peer-checked:bg-emerald-500/10 peer-checked:border-emerald-500/50 peer-checked:text-emerald-400 transition-all">
-                          Create New
-                        </div>
+                          class="px-3 py-1.5 rounded-lg border border-white/5 bg-white/5 text-[9px] font-bold text-center text-gray-400 peer-checked:bg-emerald-500/10 peer-checked:border-emerald-500/30 peer-checked:text-emerald-400 transition-all">
+                          New</div>
                       </label>
                     </div>
                   </div>
                   <div>
-                    <label class="block text-[10px] text-gray-500 mb-2 font-bold uppercase tracking-widest">Agent
+                    <label class="block text-[9px] text-gray-500 mb-2 font-bold uppercase tracking-widest">Agent
                       Name</label>
                     <input type="text" id="deployAgentName" value="adk-agent" oninput="updateDeployCommand()"
-                      class="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-mono text-emerald-400 focus:ring-1 focus:ring-emerald-500/50 transition-all shadow-inner outline-none">
+                      class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] font-mono text-emerald-400 focus:ring-1 focus:ring-emerald-500/50 outline-none">
                   </div>
                 </div>
 
                 <div class="relative group">
                   <pre id="deployCommandBlock"
-                    class="bg-black/60 rounded-xl p-4 text-[12px] font-mono text-white/80 border border-white/5 overflow-x-auto">make deploy</pre>
+                    class="bg-black/60 rounded-xl p-4 text-[12px] font-mono text-white/80 border border-white/5 overflow-x-auto whitespace-pre-wrap">make deploy</pre>
                   <button onclick="copy('deployCommandBlock')"
                     class="absolute top-3 right-3 p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white transition-all opacity-0 group-hover:opacity-100 shadow-xl border border-gray-700">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1119,14 +1154,31 @@
                     </svg>
                   </button>
                 </div>
+                <p class="text-[10px] text-gray-500 mt-2 flex items-center gap-1.5">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linecap="round"
+                      stroke-linejoin="round"></path>
+                  </svg>
+                  Hint: Deployment usually takes 3-5 minutes. Look for the "Reasoning Engine link" in the output.
+                </p>
               </div>
 
-
-              <div class="p-6 bg-white/5 rounded-2xl border border-white/10">
-                <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <span class="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px]">4</span>
-                  Register Agent
-                </h3>
+              <!-- Step 3: Register -->
+              <div
+                class="p-6 bg-white/5 rounded-2xl border border-white/10 group hover:border-emerald-500/30 transition-all">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+                    <span
+                      class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-bold">3</span>
+                    Register Agent
+                  </h3>
+                  <span
+                    class="text-[9px] font-mono text-gray-500 bg-white/5 px-2 py-1 rounded-lg border border-white/5">DIR:
+                    adk_agent</span>
+                </div>
+                <p class="text-[12px] text-gray-400 mb-4 leading-relaxed">
+                  Enable the agent for use within your Gemini Enterprise organization.
+                </p>
                 <div class="relative group">
                   <pre
                     class="bg-black/60 rounded-xl p-4 text-[12px] font-mono text-white/80 border border-white/5 overflow-x-auto">make register-gemini-enterprise</pre>
@@ -1139,18 +1191,17 @@
                     </svg>
                   </button>
                 </div>
+                <div class="mt-4 p-3 bg-sky-500/10 rounded-xl border border-sky-500/20 flex items-start gap-3">
+                  <svg class="w-4 h-4 text-sky-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <p class="text-[11px] text-sky-300 leading-relaxed">
+                    Once registered, toggle the agent to <strong>ON</strong> in the Gemini Enterprise Admin Console to
+                    make it available to your organization.
+                  </p>
+                </div>
               </div>
-            </div>
-
-            <div class="p-4 bg-sky-500/10 rounded-xl border border-sky-500/20 flex items-start gap-3">
-              <svg class="w-5 h-5 text-sky-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <p class="text-[12px] text-sky-300 leading-relaxed">
-                After registration, the agent will appear in the <strong>Gemini Enterprise Admin Console</strong>. You
-                can then toggle it on to make it available to all users in your organization.
-              </p>
             </div>
 
 
@@ -1376,6 +1427,7 @@
       document.getElementById('section-step5').classList.remove('hidden');
       document.getElementById('setupCommand').innerText = `cat <<'__SETUP_SH__' > setup.sh\n${res.setupScript}\n__SETUP_SH__\nbash setup.sh`;
       document.getElementById('systemInstruction').value = res.systemInstruction;
+      document.getElementById('demoDirName').innerText = res.dirName || 'demo-directory';
 
       currentSuffix = res.suffix || '';
       currentDomainName = res.domainName || '';

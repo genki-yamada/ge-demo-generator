@@ -94,6 +94,7 @@ function generateDemo(userGoal, options = {}) {
     result.steps.push({ step: 4, status: 'running', message: 'Generating portable setup script...' });
     result.suffix = suffix;
     result.domainName = baseName.substring(0, baseName.lastIndexOf('-' + suffix));
+    result.dirName = dirName;
     result.systemInstruction = planResult.systemInstruction;
     result.referenceDate = planResult.referenceDate;
     result.publicDatasetId = planResult.publicDatasetId;
@@ -125,7 +126,10 @@ function generateDemo(userGoal, options = {}) {
         referenceDate: result.referenceDate,
         demoGuide: result.demoGuide,
         setupScript: result.setupScript,
-        rawTables: result.rawTables
+        rawTables: result.rawTables,
+        suffix: result.suffix,
+        domainName: result.domainName,
+        dirName: result.dirName
       }
     });
     
