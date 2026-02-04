@@ -31,8 +31,8 @@ Includes a built-in Cloud Shell tutorial (`tutorial.md`) that guides users throu
 
 ### ✅ Targeted Production Deployment
 Step 5 allows flexible transition to Vertex AI Agent Engine with:
-- **Deployment Mode Choice**: Overwrite existing agent or create a brand new one.
-- **Custom Agent Naming**: Set a unique name for your agent in Agent Engine.
+- **Deployment Mode Choice**: Choose between **Update Existing** (default) to refresh current resources or **Create New** to provision a brand-new agent.
+- **Custom Agent Naming**: Set a unique name for your agent in Agent Engine, which automatically updates project configuration.
 - **Permission Automation**: Ready-to-use IAM commands for BigQuery/Maps access.
 
 ## Naming Conventions
@@ -93,6 +93,7 @@ const CONFIG = {
 3. Click **Generate Setup Script & Assets**
 4. Copy the generated script to Google Cloud Shell
 5. Run the script to deploy your personalized demo
+6. Use the **New Demo** button at any time to reset the form and start a fresh synthesis.
 
 ## Advanced Settings
 
