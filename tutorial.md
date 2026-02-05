@@ -123,6 +123,7 @@ SA="service-$PN@gcp-sa-aiplatform-re.iam.gserviceaccount.com"
 gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/mcp.toolUser" --condition=None
 gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/bigquery.jobUser" --condition=None
 gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/bigquery.dataViewer" --condition=None
+gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/serviceusage.serviceUsageConsumer" --condition=None
 ```
 
 ### 4. Register to Gemini Enterprise

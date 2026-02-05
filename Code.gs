@@ -22,7 +22,7 @@ const CONFIG = {
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',
   MAX_HISTORY: 10,
-  APP_VERSION: 'v2.1',
+  APP_VERSION: 'v2.2',
   UPDATE_LOG: [
     { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
   ]
@@ -60,9 +60,15 @@ function generateDemo(userGoal, options = {}) {
   const defaultOptions = {
     rowCount: 100,
     tableCount: 3,
-    publicDatasetId: null
+    publicDatasetId: null,
+    usePublicDataset: false
   };
   options = { ...defaultOptions, ...options };
+  
+  // If not using public dataset, ignore any ID or discovery
+  if (!options.usePublicDataset) {
+    options.publicDatasetId = null;
+  }
   
   const result = {
     success: false,
@@ -265,8 +271,8 @@ function verifyAndResolveTable(candidateId) {
 
 
 function planAndGenerateData(userGoal, options) {
-  // Step 0: If no public dataset specified, discover one using search grounding
-  if (!options.publicDatasetId) {
+  // Step 0: If using public dataset and no ID specified, discover one using search grounding
+  if (options.usePublicDataset && !options.publicDatasetId) {
     options.publicDatasetId = discoverPublicDataset(userGoal);
   }
   
@@ -318,6 +324,9 @@ function planAndGenerateData(userGoal, options) {
 
 function buildPlanningPrompt(userGoal, options) {
   const maxRows = Math.min(options.rowCount, 50); // Cap at 50 for stability
+  const publicDatasetInfo = options.usePublicDataset && options.publicDatasetId 
+    ? `- Related Public Dataset for JOINs: ${options.publicDatasetId}`
+    : `- IMPORTANT: NO public dataset should be used for this demo. Focus ONLY on synthetic tables below. Do NOT attempt to JOIN with external public-data.`;
   
   return `You are a data analyst and BigQuery expert.
 Design and generate a demo dataset based on the following business problem.
@@ -328,7 +337,7 @@ ${userGoal}
 ## Requirements
 - Number of tables: ${options.tableCount}
 - Rows per table: **Target exactly ${maxRows} diverse rows** per table.
-- Related Public Dataset for JOINs: ${options.publicDatasetId}
+${publicDatasetInfo}
 
 ## Output Format (JSON)
 Output in the following JSON format. Output **pure JSON only without code blocks**.
@@ -582,6 +591,13 @@ gcloud services enable \\
   telemetry.googleapis.com \\
   --project="$PROJECT_ID"
 
+# --- 2.1 Ensure Service Agent Ready ---
+echo "🛡 Ensuring Reasoning Engine Service Agent exists..."
+# Creating the service identity for AI Platform often triggers the specific RE SA as well
+gcloud beta services identity create --service=aiplatform.googleapis.com --project="$PROJECT_ID" || true
+# Give it a moment to stabilize
+sleep 3
+
 # --- 2.1 IAM Configuration for Reasoning Engine ---
 echo "🔐 Configuring IAM permissions for Agent Engine..."
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
@@ -597,9 +613,9 @@ check_and_grant_role() {
   
   while [ \$retry_count -lt \$max_retries ]; do
     echo "  Checking/Granting \$role..."
-    gcloud projects add-iam-policy-binding "\$project" \
-      --member="serviceAccount:\$member" \
-      --role="\$role" --condition=None >/dev/null 2>&1
+    gcloud projects add-iam-policy-binding "\$project" \\
+      --member="serviceAccount:\$member" \\
+      --role="\$role" --condition=None >/dev/null 2>&1 || true
     
     # Wait a moment for propagation before verification
     sleep 2
@@ -618,12 +634,13 @@ check_and_grant_role() {
     sleep 3
   done
   echo "    ❌ ERROR: Failed to verify \$role after \$max_retries attempts."
-  echo "       Please manually grant \$role to \$member in the Cloud Console."
+  echo "       Please manually grant the role using this command:"
+  echo "       gcloud projects add-iam-policy-binding \"\$project\" --member=\"serviceAccount:\$member\" --role=\"\$role\" --condition=None"
   return 1
 }
 
 # Grant specific roles required for MCP tool execution and BigQuery access
-for ROLE in "roles/mcp.toolUser" "roles/bigquery.jobUser" "roles/bigquery.dataViewer"; do
+for ROLE in "roles/mcp.toolUser" "roles/bigquery.jobUser" "roles/bigquery.dataViewer" "roles/serviceusage.serviceUsageConsumer"; do
   check_and_grant_role "$PROJECT_ID" "\$RE_SA" "\$ROLE"
 done
 
@@ -684,8 +701,8 @@ if [ -z "$API_KEY" ]; then
     API_KEY="REPLACE_ME"
 fi
 
-# Create .env
-cat <<__ENV_EOF__ > adk_agent/.env
+# Create .env in the root
+cat <<__ENV_EOF__ > .env
 GOOGLE_GENAI_USE_VERTEXAI=1
 GOOGLE_CLOUD_PROJECT="$PROJECT_ID"
 GOOGLE_CLOUD_LOCATION="global"
@@ -695,8 +712,9 @@ PYTHONUNBUFFERED=1
 GRPC_ENABLE_FORK_SUPPORT=1
 __ENV_EOF__
 
-# Symlink .env to mcp_app for backward compatibility/legacy imports if needed
-ln -sf ../.env adk_agent/mcp_app/.env
+# Symlink .env to packages for visibility
+ln -sf ../.env adk_agent/.env
+ln -sf ../../.env adk_agent/mcp_app/.env
 
 # Create __init__.py files for proper Python package structure
 touch adk_agent/__init__.py
@@ -718,6 +736,24 @@ import httpx
 import anyio
 import time
 
+def get_project_id():
+    """Robustly retrieves the project ID from env, .env, or credentials."""
+    # 1. Direct env
+    pid = os.getenv("GOOGLE_CLOUD_PROJECT")
+    if pid: return pid
+    
+    # 2. Try loading .env from root or package
+    dotenv.load_dotenv()
+    pid = os.getenv("GOOGLE_CLOUD_PROJECT")
+    if pid: return pid
+    
+    # 3. Fallback to auth default
+    try:
+        _, pid = google.auth.default()
+        if pid: return pid
+    except: pass
+    return "UNKNOWN"
+
 # =============================================================================
 # 🛡️ Stability Patches for Reasoning Engine (Mandatory)
 # =============================================================================
@@ -729,28 +765,6 @@ def _patched_client_init(self, *args, **kwargs):
     return _orig_client_init(self, *args, **kwargs)
 httpx.AsyncClient.__init__ = _patched_client_init
 
-# Global flag to ensure identity is logged only once
-_identity_logged = False
-
-def _log_identity():
-    """Logs the current executing identity for debugging permissions."""
-    global _identity_logged
-    if _identity_logged: return
-    try:
-        import httpx
-        # Check metadata server for the service account email
-        r = httpx.get("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email", 
-                      headers={"Metadata-Flavor": "Google"}, timeout=1)
-        print(f"  [REAL IDENTITY] {r.text.strip()}")
-        _identity_logged = True
-    except:
-        # Fallback to standard check
-        try:
-            import google.auth
-            creds, _ = google.auth.default()
-            print(f"  [DETECTED IDENTITY] {getattr(creds, 'service_account_email', 'unknown')}")
-            _identity_logged = True
-        except: pass
 
 _token_cache = {"token": None, "expiry": 0}
 
@@ -762,41 +776,47 @@ def _get_fresh_bq_token():
         return _token_cache["token"]
 
     token = None
-    # Try direct Metadata Server hit first (most reliable in Reasoning Engine)
     import httpx
+    
+    # 1. Try Metadata Server (Best for Reasoning Engine/Cloud Shell)
     try:
         url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
-        r = httpx.get(url, headers={"Metadata-Flavor": "Google"}, timeout=2)
+        r = httpx.get(url, headers={"Metadata-Flavor": "Google"}, timeout=1.0)
         if r.status_code == 200:
             token = r.json().get("access_token")
-    except: pass
+    except Exception as e:
+        pass # Metadata server might be unreachable in local environments
 
+    # 2. Try google-auth (Best for Local/Application Default Credentials)
     if not token:
-        # Fallback to google-auth
-        import google.auth
-        import google.auth.transport.requests
-        scopes = ["https://www.googleapis.com/auth/bigquery", "https://www.googleapis.com/auth/cloud-platform"]
         try:
+            import google.auth
+            import google.auth.transport.requests
+            scopes = ["https://www.googleapis.com/auth/bigquery", "https://www.googleapis.com/auth/cloud-platform"]
             credentials, _ = google.auth.default(scopes=scopes)
             credentials.refresh(google.auth.transport.requests.Request())
             token = credentials.token
-        except: pass
+        except Exception as e:
+            print(f"  [AUTH ERROR] Failed to fetch token via google-auth: {e}")
 
     if token:
         _token_cache = {"token": token, "expiry": now + 1800} # Cache for 30 mins
         return token
+    
+    print("  [AUTH ERROR] No valid access token found. BigQuery MCP calls will likely fail with 401.")
     return ""
 
 # Force HTTP/1.1 and inject fresh tokens for BigQuery MCP
 _orig_send = httpx.AsyncClient.send
 async def _patched_send(self, request, *args, **kwargs):
-    _log_identity()
     
     # If the URL is for BigQuery MCP, ensure a fresh token is injected
     if "bigquery.googleapis.com/mcp" in str(request.url):
         token = _get_fresh_bq_token()
         if token:
             request.headers['Authorization'] = f"Bearer {token}"
+        else:
+            print("  [AUTH WARNING] Skipping token injection for BigQuery MCP (token not found)")
             
     # Execute the actual request
     response = await _orig_send(self, request, *args, **kwargs)
@@ -805,8 +825,11 @@ async def _patched_send(self, request, *args, **kwargs):
     if response.status_code >= 400 and "googleapis.com/mcp" in str(request.url):
         try:
             body = await response.aread()
+            project_id = get_project_id()
             print(f"  [DEBUG ERROR] {request.method} {request.url}")
-            print(f"  [DEBUG ERROR] x-goog-user-project: {request.headers.get('x-goog-user-project')}")
+            print(f"  [DEBUG ERROR] Header x-goog-user-project: {request.headers.get('x-goog-user-project')}")
+            print(f"  [DEBUG ERROR] Header Authorization: {'PRESENT' if 'Authorization' in request.headers else 'MISSING'}")
+            print(f"  [DEBUG ERROR] Detected project_id at runtime: {project_id}")
             print(f"  [DEBUG ERROR] Status: {response.status_code}")
             print(f"  [DEBUG ERROR] Body: {body.decode('utf-8', errors='ignore')}")
             response._content = body 
@@ -843,21 +866,22 @@ except: pass
 # =============================================================================
 # 🔧 MCP Toolset Configuration
 # =============================================================================
-MAPS_MCP_URL = "https://mapstools.googleapis.com/mcp" 
+def get_maps_mcp_url():
+    """Returns the project-scoped Maps MCP URL using a query parameter."""
+    project_id = get_project_id()
+    return f"https://mapstools.googleapis.com/mcp?project={project_id}"
 
 def get_bigquery_mcp_url():
     """Returns the project-scoped BigQuery MCP URL using a query parameter."""
-    dotenv.load_dotenv()
-    project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+    project_id = get_project_id()
     # Using ?project= query parameter as the header alone was insufficient for public datasets
     return f"https://bigquery.googleapis.com/mcp?project={project_id}"
 
 def get_bigquery_mcp_toolset():
     """Creates a BigQuery MCP toolset. URL is project-scoped to ensure quota/perms."""
-    dotenv.load_dotenv()
-    project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+    project_id = get_project_id()
     url = get_bigquery_mcp_url()
-    if not project_id:
+    if project_id == "UNKNOWN":
         print("  [CRITICAL] GOOGLE_CLOUD_PROJECT is missing! MCP calls will likely fail.")
         
     return MCPToolset(connection_params=StreamableHTTPConnectionParams(
@@ -870,9 +894,14 @@ def get_maps_mcp_toolset():
     """Creates a Google Maps MCP toolset."""
     dotenv.load_dotenv()
     maps_api_key = os.getenv('MAPS_API_KEY')
+    project_id = get_project_id()
+    url = get_maps_mcp_url()
     return MCPToolset(connection_params=StreamableHTTPConnectionParams(
-        url=MAPS_MCP_URL, 
-        headers={"x-goog-api-key": maps_api_key},
+        url=url, 
+        headers={
+            "x-goog-api-key": maps_api_key,
+            "x-goog-user-project": project_id
+        },
         timeout=180
     ))
 __TOOLS_EOF__
@@ -931,12 +960,12 @@ CRITICAL OPERATIONAL RULES:
 ---------------------------------------------------
 """
 
-public_info = "- Additional Dataset: Use [PUBLIC_DATASET_ID] for context." if "${publicDatasetId}" else ""
+public_info = "- Additional Dataset: Use [PUBLIC_DATASET_ID] for context." if "[PUBLIC_DATASET_ID]" else ""
 instruction = base_instruction\
     .replace("[PROJECT_ID]", PROJECT_ID)\
     .replace("[DATASET_ID]", "${datasetId}")\
     .replace("[REFERENCE_DATE]", "${referenceDate}")\
-    .replace("[PUBLIC_DATASET_INFO]", public_info.replace("[PUBLIC_DATASET_ID]", "${publicDatasetId}"))\
+    .replace("[PUBLIC_DATASET_INFO]", public_info.replace("[PUBLIC_DATASET_ID]", "${publicDatasetId || ''}"))\
     .replace("[GENERATED_SYSTEM_INSTRUCTION]", """${escapedInstruction}""")
 
 root_agent = LlmAgent(
