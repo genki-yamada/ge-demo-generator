@@ -22,7 +22,7 @@ const CONFIG = {
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',
   MAX_HISTORY: 5,
-  APP_VERSION: 'v2.6',
+  APP_VERSION: 'v3.0',
   UPDATE_LOG: [
     { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
   ]
@@ -1144,7 +1144,7 @@ function executeWithRetry(fn) {
 }
 
 function saveHistory(entry) {
-  const props = PropertiesService.getUserProperties();
+  const props = PropertiesService.getScriptProperties();
   const historyKey = CONFIG.HISTORY_KEY;
   let history = JSON.parse(props.getProperty(historyKey) || '[]');
   
@@ -1182,14 +1182,14 @@ function saveHistory(entry) {
 }
 
 function getHistory() { 
-  return JSON.parse(PropertiesService.getUserProperties().getProperty(CONFIG.HISTORY_KEY) || '[]'); 
+  return JSON.parse(PropertiesService.getScriptProperties().getProperty(CONFIG.HISTORY_KEY) || '[]'); 
 }
 
 /**
  * Retrieves a full history item including its chunked result data
  */
 function getHistoryItem(timestamp) {
-  const props = PropertiesService.getUserProperties();
+  const props = PropertiesService.getScriptProperties();
   const history = JSON.parse(props.getProperty(CONFIG.HISTORY_KEY) || '[]');
   const entry = history.find(h => h.timestamp === timestamp);
   
@@ -1240,7 +1240,7 @@ function getHistoryItem(timestamp) {
  * Deletes a specific history item and its chunked data
  */
 function deleteHistoryItem(timestamp) {
-  const props = PropertiesService.getUserProperties();
+  const props = PropertiesService.getScriptProperties();
   let history = JSON.parse(props.getProperty(CONFIG.HISTORY_KEY) || '[]');
   
   const index = history.findIndex(h => h.timestamp === timestamp);
@@ -1256,7 +1256,7 @@ function deleteHistoryItem(timestamp) {
 }
 
 function clearHistory() { 
-  const props = PropertiesService.getUserProperties();
+  const props = PropertiesService.getScriptProperties();
   const history = JSON.parse(props.getProperty(CONFIG.HISTORY_KEY) || '[]');
   
   // Clear all chunked data associated with history items
