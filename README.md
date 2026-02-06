@@ -8,7 +8,7 @@ This tool helps you:
 - **Generate synthetic datasets** tailored to any business scenario
 - **Auto-discover BigQuery public datasets** using Google Search grounding
 - **Create ready-to-run setup scripts** for Google Cloud Shell
-- **Configure AI agents** with custom system instructions and demo guides
+- **Configure AI agents** with custom system instructions and demo guides (uses `gemini-3-pro-preview`)
 
 ## Features
 

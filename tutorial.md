@@ -147,7 +147,7 @@ Retrieving fresh auth tokens for BigQuery can sometimes add latency.
 
 ### 3. Execution Timeouts
 The default timeout for Agent Engine is 60 seconds. If your agent performs many sequential tool calls, it might hit this limit.
-- **Optimization**: Use `gemini-1.5-flash` for high-speed reasoning, and try to keep tool queries efficient.
+- **Optimization**: Use `gemini-3-flash-preview` for high-speed reasoning, and try to keep tool queries efficient.
 
 ### 4. 403 Insufficient Scope Errors
 If you see "Request had insufficient authentication scopes" in the logs:

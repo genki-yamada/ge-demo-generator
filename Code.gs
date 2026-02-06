@@ -21,7 +21,7 @@ const CONFIG = {
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',
-  MAX_HISTORY: 10,
+  MAX_HISTORY: 5,
   APP_VERSION: 'v2.2',
   UPDATE_LOG: [
     { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
@@ -1028,8 +1028,9 @@ CRITICAL OPERATIONAL RULES:
 - SQL SELF-CORRECTION: If a SQL query fails, analyze the error message, re-check the schema if necessary, and attempt to fix the query.
 - DATA HONESTY: If a tool returns no data (empty result), do not hallucinate results. Inform the user and suggest an alternative inquiry.
 - MAPS SPECIFICITY: Always include specific geographical context (city, state, etc.) from BigQuery data in your Google Maps search queries to ensure accuracy.
-- SEQUENTIAL EXECUTION: Always perform tool calls one at a time. Do not attempt multiple tool calls in a single response turn.
-- RESULT BLOCKING: Wait for a tool's output before deciding on the next tool call.
+- SEQUENTIAL EXECUTION: Always perform tool calls one at a time. Do not attempt multiple tool calls in a single response turn. Wait for the tool's output before deciding on the next action.
+- NO PARALLELISM: Reasoning Engine stability is sensitive to parallel tool calls. If you need data from multiple sources, fetch them one by one.
+- RESULT BLOCKING: Strictly wait for a tool's output before deciding on the next tool call.
 ---------------------------------------------------
 """
 
@@ -1139,7 +1140,14 @@ function saveHistory(entry) {
   // To keep history light, we store only metadata in the main list
   // The heavy result data is stored in separate chunked keys
   const storageId = `demo_data_${new Date(entry.timestamp).getTime()}`;
-  const dataToStore = JSON.stringify(entry.result);
+  
+  // OPTIMIZATION: Remove large, redundant fields before storing result chunks.
+  // setupScript and dataPreview can be reconstructed from rawTables.
+  const optimizedResult = { ...entry.result };
+  delete optimizedResult.setupScript;
+  delete optimizedResult.dataPreview;
+
+  const dataToStore = JSON.stringify(optimizedResult);
   
   // Store the payload in chunks
   saveLargeData(props, storageId, dataToStore);
@@ -1178,6 +1186,40 @@ function getHistoryItem(timestamp) {
     const dataStr = getLargeData(props, entry.storageId);
     if (dataStr) {
       entry.result = JSON.parse(dataStr);
+      
+      // RECONSTRUCTION: Restore setupScript and dataPreview on the fly
+      if (entry.result.rawTables && !entry.result.setupScript) {
+        entry.result.setupScript = generateSetupScript({
+          datasetId: entry.datasetId,
+          systemInstruction: entry.result.systemInstruction,
+          referenceDate: entry.result.referenceDate,
+          publicDatasetId: entry.publicDatasetId,
+          suffix: entry.result.suffix,
+          dirName: entry.result.dirName,
+          tables: entry.result.rawTables,
+          userGoal: entry.userGoal
+        });
+        
+        // Re-generate preview if missing
+        if (!entry.result.dataPreview) {
+          entry.result.dataPreview = entry.result.rawTables.map(table => {
+            const lines = table.csvData.trim().split('\n');
+            const headers = parseCSVLine(lines[0]);
+            const previewRows = lines.slice(1, 6).map(line => {
+              const values = parseCSVLine(line);
+              const row = {};
+              headers.forEach((h, i) => { row[h.trim()] = values[i] || ''; });
+              return row;
+            });
+            return {
+              tableName: table.tableName,
+              headers: headers,
+              rows: previewRows,
+              totalRows: lines.length - 1
+            };
+          });
+        }
+      }
     }
   }
   return entry;
