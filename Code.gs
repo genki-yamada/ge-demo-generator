@@ -22,7 +22,7 @@ const CONFIG = {
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',
   MAX_HISTORY: 5,
-  APP_VERSION: 'v2.5',
+  APP_VERSION: 'v2.6',
   UPDATE_LOG: [
     { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
   ]
@@ -1062,14 +1062,25 @@ root_agent = LlmAgent(
 )
 __AGENT_EOF__
 
+# --- Final Launch & Tips ---
+find_free_port() {
+  local port=\$1
+  while lsof -Pi :\$port -sTCP:LISTEN -t >/dev/null 2>&1; do
+    port=\$((port + 1))
+  done
+  echo "\$port"
+}
+
+PORT=$(find_free_port 8000)
+
 clear
 echo "========================================================="
 echo "🎉 Setup Complete!"
 echo "========================================================="
 echo ""
 echo "📂 Project directory: ${dirName}"
-echo "🚀 Launching the Agent UI..."
-echo "   (Pre-configured for project: $PROJECT_ID)"
+echo "🚀 Launching the Agent UI on port \$PORT..."
+echo "   (Pre-configured for project: \$PROJECT_ID)"
 echo ""
 echo "========================================================="
 echo "💡 TIPS:"
@@ -1077,13 +1088,13 @@ echo "   • To STOP the UI:    Press Ctrl+C"
 echo "   • To RESTART the UI: Run the following commands:"
 echo ""
 echo "     cd ~/${dirName}/adk_agent"
-echo "     ../.venv/bin/adk web"
+echo "     ../.venv/bin/adk web --port \$PORT"
 echo ""
 echo "========================================================="
 echo ""
 
 cd adk_agent
-../.venv/bin/adk web
+../.venv/bin/adk web --port \$PORT
 `;
 }
 
