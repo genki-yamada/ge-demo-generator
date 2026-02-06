@@ -367,7 +367,11 @@ Output in the following JSON format. Output **pure JSON only without code blocks
 ## Critical Notes
 - **RELATIONAL INTEGRITY**: Tables MUST be designed for joining. Ensure consistent Primary/Foreign keys (e.g., customer_id, product_id) with NO dangling references.
 - **CSV data MUST NOT exceed ${maxRows} rows**.
-- Use double quotes for CSV fields containing commas.
+- **STRICT CSV FORMATTING**:
+    1. **ALWAYS wrap text-based values** (STRING) in double quotes: '"Value"'.
+    2. **DO NOT wrap numeric values** (INTEGER, FLOAT) in quotes: 123.45.
+    3. **NULL Values**: Leave empty between commas: val1,,val3.
+    4. **Escaping**: If a text value contains a double quote, escape it with another double quote: '"He said ""Hello"""'.
 - **LANGUAGE PARITY**: Generate all qualitative content (table/field descriptions, synthetic data values, system instructions, and demo guide) in the **SAME LANGUAGE** as the user's input business problem.
 - **DEMO GUIDE**: Provide exactly 5 steps following this flow: 
     1. USER Greeting (Simple greeting to trigger self-introduction)
@@ -418,6 +422,40 @@ function validateGeneratedData(planResult) {
       table.schema = repairedSchema;
       // console.log(`Repaired schema for "${table.tableName}" to ${repairedSchema.length} columns.`);
     }
+
+    // --- NEW: Robust Data Cleaning & Re-quoting ---
+    const cleanedLines = lines.map((line, lineIdx) => {
+      const parts = parseCSVLine(line);
+      return parts.map((val, colIdx) => {
+        const field = table.schema[colIdx];
+        const type = field ? field.type.toUpperCase() : 'STRING';
+        
+        // 1. Numeric Cleaning: Remove stray quotes/chars from numbers
+        if (['INTEGER', 'FLOAT', 'DOUBLE', 'NUMBER', 'INT64', 'FLOAT64'].includes(type)) {
+          return val.replace(/[^0-9.-]/g, '');
+        }
+        
+        // 2. String/Date Cleaning: Ensure clean quoting and internal quote escaping
+        // Remove existing outer quotes if present
+        let cleanVal = val.replace(/^"|"$/g, '');
+        // For header row, just return as is (but unquoted for now, we'll re-quote below)
+        if (lineIdx === 0) return cleanVal;
+        
+        // For data rows, return clean value
+        return cleanVal;
+      }).map((v, colIdx) => {
+        // 3. Final Re-quoting as per BigQuery requirements
+        const field = table.schema[colIdx];
+        const type = field ? field.type.toUpperCase() : 'STRING';
+        
+        if (['INTEGER', 'FLOAT', 'DOUBLE', 'NUMBER', 'INT64', 'FLOAT64'].includes(type)) {
+          return v; // Numbers stay unquoted
+        }
+        // Strings, Dates, etc. get strictly quoted
+        return `"${v.replace(/"/g, '""')}"`; 
+      }).join(',');
+    });
+    table.csvData = cleanedLines.join('\n');
   }
 }
 
@@ -428,8 +466,16 @@ function parseCSVLine(line) {
   
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
+    const nextChar = line[i + 1];
+    
     if (char === '"') {
-      inQuotes = !inQuotes;
+      if (inQuotes && nextChar === '"') {
+        // Handle escaped double quotes: ""
+        current += '"';
+        i++; // Skip the next quote
+      } else {
+        inQuotes = !inQuotes;
+      }
     } else if (char === ',' && !inQuotes) {
       result.push(current.trim());
       current = '';
@@ -525,7 +571,7 @@ function generateSetupScript(params) {
     const schemaStr = table.schema.map(f => `${f.name}:${f.type}`).join(',');
     bqCommands += `echo "📊 Creating Table: ${table.tableName}..."\n`;
     bqCommands += `cat <<'__CSV_EOF__' > ${table.tableName}.csv\n${table.csvData}\n__CSV_EOF__\n`;
-    bqCommands += `bq load --source_format=CSV --skip_leading_rows=1 ${datasetId}.${table.tableName} ${table.tableName}.csv ${schemaStr}\n`;
+    bqCommands += `bq load --source_format=CSV --skip_leading_rows=1 --allow_quoted_newlines --null_marker="" --quote='"' --encoding=UTF-8 --location=US ${datasetId}.${table.tableName} ${table.tableName}.csv ${schemaStr}\n`;
     bqCommands += `rm ${table.tableName}.csv\n\n`;
   }
 
@@ -649,6 +695,15 @@ echo "🔧 Enabling MCP services..."
 gcloud beta services mcp enable bigquery.googleapis.com --project="$PROJECT_ID" 2>/dev/null || true
 gcloud beta services mcp enable mapstools.googleapis.com --project="$PROJECT_ID" 2>/dev/null || true
 
+# --- 2.2 User-level IAM Configuration (for Cloud Shell users) ---
+echo "🔐 Configuring user permissions for local execution..."
+USER_ACCOUNT=$(gcloud config get-value account)
+for ROLE in "roles/mcp.toolUser" "roles/serviceusage.serviceUsageConsumer"; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \\
+    --member="user:$USER_ACCOUNT" \\
+    --role="$ROLE" --condition=None || true
+done
+
 # Check for BQ permissions (with timeout to prevent hanging on new projects)
 echo "🛡 Checking permissions..."
 CAN_MK_BQ=$(timeout 30 bq ls --project_id="$PROJECT_ID" 2>&1 || echo "timeout_or_error")
@@ -768,7 +823,7 @@ httpx.AsyncClient.__init__ = _patched_client_init
 
 _token_cache = {"token": None, "expiry": 0}
 
-def _get_fresh_bq_token():
+def _get_fresh_mcp_token():
     """Retrieves a fresh access token with caching (30 min)."""
     global _token_cache
     now = time.time()
@@ -778,56 +833,74 @@ def _get_fresh_bq_token():
     token = None
     import httpx
     
-    # 1. Try Metadata Server (Best for Reasoning Engine/Cloud Shell)
-    try:
-        url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
-        r = httpx.get(url, headers={"Metadata-Flavor": "Google"}, timeout=1.0)
-        if r.status_code == 200:
-            token = r.json().get("access_token")
-    except Exception as e:
-        pass # Metadata server might be unreachable in local environments
+    # Define required scopes. Note: 'maps-platform' is invalid as a standalone scope.
+    # We use 'cloud-platform' which is the broad scope covering Managed MCP.
+    scopes = [
+        "https://www.googleapis.com/auth/cloud-platform",
+        "https://www.googleapis.com/auth/bigquery",
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email"
+    ]
 
-    # 2. Try google-auth (Best for Local/Application Default Credentials)
+    # 1. Try google-auth (Best for Cloud Shell with 'gcloud auth application-default login')
+    # We try this first because it respects the user's manual login in Cloud Shell.
+    try:
+        import google.auth
+        import google.auth.transport.requests
+        credentials, _ = google.auth.default(scopes=scopes)
+        credentials.refresh(google.auth.transport.requests.Request())
+        token = credentials.token
+    except Exception as e:
+        pass # Fallback to metadata server if ADC is not set or fails
+
+    # 2. Try Metadata Server (Secondary fallback)
     if not token:
         try:
-            import google.auth
-            import google.auth.transport.requests
-            scopes = ["https://www.googleapis.com/auth/bigquery", "https://www.googleapis.com/auth/cloud-platform"]
-            credentials, _ = google.auth.default(scopes=scopes)
-            credentials.refresh(google.auth.transport.requests.Request())
-            token = credentials.token
+            scopes_param = ",".join(scopes)
+            url = f"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token?scopes={scopes_param}"
+            r = httpx.get(url, headers={"Metadata-Flavor": "Google"}, timeout=1.0)
+            if r.status_code == 200:
+                token = r.json().get("access_token")
         except Exception as e:
-            print(f"  [AUTH ERROR] Failed to fetch token via google-auth: {e}")
+            pass
 
     if token:
         _token_cache = {"token": token, "expiry": now + 1800} # Cache for 30 mins
         return token
     
-    print("  [AUTH ERROR] No valid access token found. BigQuery MCP calls will likely fail with 401.")
+    print("  [AUTH ERROR] No valid access token found. Managed MCP calls will likely fail.")
     return ""
 
 # Force HTTP/1.1 and inject fresh tokens for BigQuery MCP
 _orig_send = httpx.AsyncClient.send
 async def _patched_send(self, request, *args, **kwargs):
     
-    # If the URL is for BigQuery MCP, ensure a fresh token is injected
+    # If the URL is for BigQuery MCP, ensure a fresh token is injected.
+    # Note: Maps MCP uses API Key and should NOT have a Bearer token to avoid scope conflicts.
     if "bigquery.googleapis.com/mcp" in str(request.url):
-        token = _get_fresh_bq_token()
+        token = _get_fresh_mcp_token()
         if token:
             request.headers['Authorization'] = f"Bearer {token}"
         else:
-            print("  [AUTH WARNING] Skipping token injection for BigQuery MCP (token not found)")
+            print(f"  [AUTH WARNING] Skipping token injection for {request.url.host} (token not found)")
             
     # Execute the actual request
     response = await _orig_send(self, request, *args, **kwargs)
     
     # Debug Logging: Capture body for any tool failure
-    if response.status_code >= 400 and "googleapis.com/mcp" in str(request.url):
+    if response.status_code >= 400 and "bigquery.googleapis.com/mcp" in str(request.url):
         try:
             body = await response.aread()
             project_id = get_project_id()
             print(f"  [DEBUG ERROR] {request.method} {request.url}")
             print(f"  [DEBUG ERROR] Header x-goog-user-project: {request.headers.get('x-goog-user-project')}")
+            
+            body_text = body.decode('utf-8', errors='ignore')
+            if "insufficient authentication scopes" in body_text:
+                print("  [AUTH TIP] 403 Scope Error detected. Please run the following command in your terminal TO REFRESH LOCAL CREDENTIALS:")
+                print('             gcloud auth application-default login --scopes="https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/bigquery,openid,https://www.googleapis.com/auth/userinfo.email"')
+                print("             Then restart the agent.")
+            
             print(f"  [DEBUG ERROR] Header Authorization: {'PRESENT' if 'Authorization' in request.headers else 'MISSING'}")
             print(f"  [DEBUG ERROR] Detected project_id at runtime: {project_id}")
             print(f"  [DEBUG ERROR] Status: {response.status_code}")
@@ -867,9 +940,8 @@ except: pass
 # 🔧 MCP Toolset Configuration
 # =============================================================================
 def get_maps_mcp_url():
-    """Returns the project-scoped Maps MCP URL using a query parameter."""
-    project_id = get_project_id()
-    return f"https://mapstools.googleapis.com/mcp?project={project_id}"
+    """Returns the base Maps MCP URL."""
+    return "https://mapstools.googleapis.com/mcp"
 
 def get_bigquery_mcp_url():
     """Returns the project-scoped BigQuery MCP URL using a query parameter."""
@@ -899,8 +971,7 @@ def get_maps_mcp_toolset():
     return MCPToolset(connection_params=StreamableHTTPConnectionParams(
         url=url, 
         headers={
-            "x-goog-api-key": maps_api_key,
-            "x-goog-user-project": project_id
+            "x-goog-api-key": maps_api_key
         },
         timeout=180
     ))
@@ -921,6 +992,8 @@ dotenv.load_dotenv()
 
 from mcp_app import tools
 from google.adk.agents import LlmAgent
+from google.adk.models import Gemini
+from google.genai import types
 
 PROJECT_ID = "$PROJECT_ID"
 
@@ -968,8 +1041,20 @@ instruction = base_instruction\
     .replace("[PUBLIC_DATASET_INFO]", public_info.replace("[PUBLIC_DATASET_ID]", "${publicDatasetId || ''}"))\
     .replace("[GENERATED_SYSTEM_INSTRUCTION]", """${escapedInstruction}""")
 
-root_agent = LlmAgent(
+# Configure the model with automatic retries for 429/5xx errors
+gemini_model = Gemini(
     model="gemini-3-pro-preview",
+    retry_options=types.HttpRetryOptions(
+        attempts=8,              # Increase attempts to handle higher load
+        initial_delay=2.0,       # Initial backoff delay
+        max_delay=60.0,          # Cap wait time at 60s
+        exp_base=2.0,            # Exponential backoff
+        http_status_codes=[429]  # Explicitly retry on Resource Exhausted
+    )
+)
+
+root_agent = LlmAgent(
+    model=gemini_model,
     name='root_agent',
     instruction=instruction,
     tools=[maps_toolset, bigquery_toolset]

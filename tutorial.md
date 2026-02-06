@@ -119,11 +119,10 @@ If your agent encounters a 403 error when calling BigQuery, run these commands t
 PI=$(gcloud config get-value project)
 PN=$(gcloud projects list --filter="projectId:$PI" --format="value(projectNumber)")
 SA="service-$PN@gcp-sa-aiplatform-re.iam.gserviceaccount.com"
-
-gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/mcp.toolUser" --condition=None
-gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/bigquery.jobUser" --condition=None
-gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/bigquery.dataViewer" --condition=None
-gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="roles/serviceusage.serviceUsageConsumer" --condition=None
+# Grant roles to Reasoning Engine Service Agent
+for ROLE in "roles/mcp.toolUser" "roles/bigquery.jobUser" "roles/bigquery.dataViewer" "roles/serviceusage.serviceUsageConsumer"; do
+  gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="$ROLE" --condition=None
+done
 ```
 
 ### 4. Register to Gemini Enterprise
@@ -149,6 +148,12 @@ Retrieving fresh auth tokens for BigQuery can sometimes add latency.
 ### 3. Execution Timeouts
 The default timeout for Agent Engine is 60 seconds. If your agent performs many sequential tool calls, it might hit this limit.
 - **Optimization**: Use `gemini-1.5-flash` for high-speed reasoning, and try to keep tool queries efficient.
+
+### 4. 403 Insufficient Scope Errors
+If you see "Request had insufficient authentication scopes" in the logs:
+- **Solution**: Refresh your local credentials in Cloud Shell with mandatory scopes (Note: `maps-platform` is NOT a valid standalone scope; use `cloud-platform` instead):
+  `gcloud auth application-default login --scopes="https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/bigquery,openid,https://www.googleapis.com/auth/userinfo.email"`
+- **Required Action**: After running the command, you MUST **restart the agent** (Ctrl+C and run the launch command again) to clear the cached tokens.
 
 ---
 
