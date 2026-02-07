@@ -1244,24 +1244,25 @@
                   </div>
 
                   <div class="relative group min-w-0">
-                    <pre id="setupCommand"
-                      class="bg-black/80 rounded-2xl p-6 pb-16 text-[11px] font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap break-all border border-white/5 transition-all max-h-40 cursor-pointer"
-                      onclick="toggleScriptExpansion()"></pre>
-                    <div
-                      class="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none rounded-b-2xl transition-all duration-300 group-hover:h-32"
-                      id="scriptGradient">
-                    </div>
-                    <div class="sticky bottom-16 left-0 right-0 z-10 flex justify-center pointer-events-none"
-                      id="stickyBtnWrapper">
-                      <button onclick="toggleScriptExpansion(); event.stopPropagation();" id="inlineToggleBtn"
-                        class="pointer-events-auto px-6 py-2.5 bg-sky-500 hover:bg-sky-400 text-white font-bold rounded-full shadow-xl shadow-sky-500/20 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border border-white/10 group/btn">
-                        <svg id="inlineToggleIcon" class="w-3.5 h-3.5 transition-transform duration-300" fill="none"
-                          stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
-                          </path>
-                        </svg>
-                        <span id="inlineToggleText" class="text-[10px] uppercase tracking-wider">Show Full Script</span>
-                      </button>
+                    <div id="scriptContainer"
+                      class="bg-black/80 rounded-2xl border border-white/5 transition-all max-h-40 overflow-hidden cursor-pointer"
+                      onclick="toggleScriptExpansion()">
+                      <pre id="setupCommand"
+                        class="p-6 pb-4 text-[11px] font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap break-all"></pre>
+                      <div
+                        class="sticky bottom-0 left-0 right-0 z-10 flex justify-center py-4 bg-gradient-to-t from-black via-black/90 to-transparent pointer-events-none"
+                        id="stickyBtnWrapper">
+                        <button onclick="toggleScriptExpansion(); event.stopPropagation();" id="inlineToggleBtn"
+                          class="pointer-events-auto px-6 py-2.5 bg-sky-500 hover:bg-sky-400 text-white font-bold rounded-full shadow-xl shadow-sky-500/20 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border border-white/10 group/btn">
+                          <svg id="inlineToggleIcon" class="w-3.5 h-3.5 transition-transform duration-300" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
+                            </path>
+                          </svg>
+                          <span id="inlineToggleText" class="text-[10px] uppercase tracking-wider">Show Full
+                            Script</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1803,18 +1804,6 @@
     </aside>
   </div>
 
-  <!-- Fixed Collapse Button (appears when script is expanded) -->
-  <div id="fixedCollapseBtn"
-    class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 hidden opacity-0 transition-all duration-300 ease-out">
-    <button onclick="toggleScriptExpansion()"
-      class="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full shadow-2xl shadow-emerald-500/30 flex items-center gap-3 transition-all hover:scale-105 active:scale-95 ring-4 ring-emerald-500/20">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-      </svg>
-      <span class="text-[11px] uppercase tracking-wider">Collapse Script</span>
-    </button>
-  </div>
-
   <div id="toast">Copied to clipboard!</div>
 
   <script>
@@ -1995,55 +1984,37 @@
     }
 
     function toggleScriptExpansion() {
+      const container = document.getElementById('scriptContainer');
       const pre = document.getElementById('setupCommand');
       const text = document.getElementById('inlineToggleText');
       const icon = document.getElementById('inlineToggleIcon');
-      const gradient = document.getElementById('scriptGradient');
       const btn = document.getElementById('inlineToggleBtn');
-      const fixedBtn = document.getElementById('fixedCollapseBtn');
-      const stickyWrapper = document.getElementById('stickyBtnWrapper');
 
-      const isExpanded = pre.classList.contains('max-h-none');
+      const isExpanded = container.classList.contains('max-h-none');
 
       if (isExpanded) {
         // Collapsing
-        pre.classList.remove('max-h-none');
-        pre.classList.add('max-h-40');
+        container.classList.remove('max-h-none', 'overflow-y-auto');
+        container.classList.add('max-h-40', 'overflow-hidden');
         if (text) text.textContent = 'Show Full Script';
         if (icon) {
           icon.style.transform = 'rotate(0deg)';
           icon.querySelector('path').setAttribute('d', 'M19 9l-7 7-7-7');
         }
-        if (gradient) gradient.classList.remove('opacity-0', 'pointer-events-none');
         if (btn) btn.classList.replace('bg-emerald-600', 'bg-sky-500');
-        if (stickyWrapper) stickyWrapper.classList.remove('hidden');
-
-        // Hide fixed button
-        if (fixedBtn) {
-          fixedBtn.classList.add('opacity-0', 'translate-y-4');
-          setTimeout(() => fixedBtn.classList.add('hidden'), 300);
-        }
 
         // Scroll back to the top of the script area
-        pre.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        container.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } else {
         // Expanding
-        pre.classList.remove('max-h-40');
-        pre.classList.add('max-h-none');
+        container.classList.remove('max-h-40', 'overflow-hidden');
+        container.classList.add('max-h-[70vh]', 'overflow-y-auto');
         if (text) text.textContent = 'Collapse Script';
         if (icon) {
           icon.style.transform = 'rotate(0deg)';
           icon.querySelector('path').setAttribute('d', 'M5 15l7-7 7 7');
         }
-        if (gradient) gradient.classList.add('opacity-0', 'pointer-events-none');
         if (btn) btn.classList.replace('bg-sky-500', 'bg-emerald-600');
-        if (stickyWrapper) stickyWrapper.classList.add('hidden');
-
-        // Show fixed button
-        if (fixedBtn) {
-          fixedBtn.classList.remove('hidden');
-          setTimeout(() => fixedBtn.classList.remove('opacity-0', 'translate-y-4'), 10);
-        }
       }
     }
 
