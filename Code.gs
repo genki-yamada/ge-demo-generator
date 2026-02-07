@@ -15,14 +15,14 @@
 // ===========================================
 const SCRIPT_PROPS = PropertiesService.getScriptProperties();
 const CONFIG = {
-  PROJECT_ID: SCRIPT_PROPS.getProperty('PROJECT_ID') || 'YOUR_PROJECT_ID',
+  PROJECT_ID: SCRIPT_PROPS.getProperty('PROJECT_ID') || 'your-project-id',
   LOCATION: SCRIPT_PROPS.getProperty('LOCATION') || 'global',
   MODEL: SCRIPT_PROPS.getProperty('MODEL') || 'gemini-3-flash-preview',
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',
   MAX_HISTORY: 5,
-  APP_VERSION: 'v3.0',
+  APP_VERSION: 'v3.1',
   UPDATE_LOG: [
     { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
   ]
@@ -36,9 +36,8 @@ function doGet() {
   
   // Use manual versioning for the sidebar display label
   template.appVersion = CONFIG.APP_VERSION;
-  
-  // Update log remains dynamic (What's New)
   template.updateLog = JSON.stringify(fetchGitLogs());
+  template.projectId = CONFIG.PROJECT_ID;
   
   return template.evaluate()
     .setTitle('GE Demo Generator (go/ge-demo-generator)')

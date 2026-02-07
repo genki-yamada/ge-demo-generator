@@ -523,7 +523,7 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto p-6 lg:p-10">
+    <main class="flex-1 overflow-y-auto p-6 lg:p-10 min-w-0">
       <div class="max-w-4xl mx-auto">
         <!-- Header -->
         <header class="mb-10 text-center lg:text-left relative">
@@ -558,7 +558,7 @@
           <div id="architectureContent"
             class="hidden mt-8 text-left bg-black/40 rounded-3xl border border-white/5 overflow-hidden animate-slide-down">
             <div class="p-6 lg:p-8">
-              <div class="flex flex-col gap-12">
+              <div class="flex flex-col gap-8">
                 <div>
                   <h3 class="text-xs font-bold text-sky-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -589,20 +589,13 @@
                 </div>
 
                 <!-- Section 2: Agent Runtime Architecture -->
-                <div class="border-t border-white/5 pt-10">
-                  <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Agent Runtime Architecture
-                    </h3>
-                    <div class="flex items-center gap-2">
-                      <span class="text-[10px] text-gray-500 font-mono bg-white/5 px-2 py-0.5 rounded">Interactive: Pan
-                        &
-                        Zoom</span>
-                    </div>
-                  </div>
+                <div class="pt-6">
+                  <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Agent Runtime Architecture
+                  </h3>
 
                   <div
-                    class="zoom-container min-h-[400px] rounded-2xl bg-black/40 border border-white/5 overflow-hidden shadow-inner flex flex-col">
-                    <div id="archZoomContent" class="zoom-content p-6 flex-1 flex items-center justify-center">
+                    class="min-h-[350px] rounded-2xl bg-black/40 border border-white/5 overflow-hidden shadow-inner flex flex-col">
+                    <div class="p-6 flex-1 flex items-center justify-center">
                       <svg id="archSvg" class="w-full h-auto max-w-[800px] select-none" viewBox="0 0 650 320"
                         fill="none">
                         <!-- Google Cloud Boundary -->
@@ -679,31 +672,11 @@
                           font-weight="700">Maps APIs</text>
                       </svg>
                     </div>
-                    <div class="zoom-controls">
-                      <button onclick="changeZoom(0.2)" class="zoom-btn" title="Zoom In">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4">
-                          </path>
-                        </svg>
-                      </button>
-                      <button onclick="changeZoom(-0.2)" class="zoom-btn" title="Zoom Out">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
-                        </svg>
-                      </button>
-                      <button onclick="resetZoom()" class="zoom-btn" title="Reset View">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
-                          </path>
-                        </svg>
-                      </button>
-                    </div>
                   </div>
                 </div>
 
                 <!-- Section 3: Deep Dive Resources -->
-                <div class="mt-10 pt-10 border-t border-white/5">
+                <div class="pt-6">
                   <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
                     <div class="aspect-video w-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
                       <iframe class="w-full h-full" src="https://www.youtube.com/embed/wzccErUYhTI"
@@ -1131,25 +1104,86 @@
               </div>
             </div>
 
-            <!-- Auth Requirement Warning -->
-            <div class="mb-10 p-4 bg-red-500/10 rounded-2xl border border-red-500/20 flex items-start gap-4">
-              <div class="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center text-red-500 shrink-0">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
-                  </path>
-                </svg>
+            <!-- Step 3.1: Configure Cloud Shell & Project -->
+            <div class="mb-12">
+              <div class="flex items-center gap-3 mb-6">
+                <span
+                  class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm border border-emerald-500/30">3.1</span>
+                <h3 class="text-sm font-bold text-gray-200 uppercase tracking-widest">Configure Cloud Shell & Project
+                </h3>
               </div>
-              <div class="flex-1">
-                <h4 class="text-[12px] font-bold text-red-400 uppercase tracking-widest mb-1">Authentication Required
-                </h4>
-                <p class="text-[13px] text-red-300/80 leading-relaxed mb-4">
-                  Before proceeding, ensure you have executed <b>both</b> commands below in your terminal.
+
+              <div class="space-y-6 max-w-2xl">
+                <div class="space-y-3">
+                  <p class="text-[13px] text-gray-400 leading-relaxed">
+                    1. First, navigate to your <b>Home directory</b> to ensure a clean setup.
+                  </p>
+                  <div class="relative group/cmd">
+                    <code id="homeDirCmd"
+                      class="block bg-black/40 border border-white/10 rounded-xl p-3 text-[11px] text-emerald-400 font-mono">cd ~</code>
+                    <button onclick="copyRaw('cd ~')"
+                      class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                        </path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="space-y-3">
+                  <p class="text-[13px] text-gray-400 leading-relaxed">
+                    2. Set your <b>Active Project ID</b>. Enter your Google Cloud Project ID below, then copy the
+                    command.
+                  </p>
+                  <div
+                    class="bg-black/40 border border-emerald-500/20 rounded-2xl p-4 transition-all hover:bg-black/60 shadow-xl">
+                    <div class="flex items-center gap-3 mb-3">
+                      <div class="relative flex-1">
+                        <input type="text" id="projectIdInput"
+                          class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[11px] font-mono text-emerald-400 focus:outline-none focus:border-emerald-500/50 transition-all placeholder-gray-600"
+                          placeholder="my-project-id" value="<?= projectId ?>" oninput="updateProjectSetCmd()">
+                        <span
+                          class="absolute right-3 top-2 text-[8px] text-gray-500 uppercase tracking-widest font-bold">PROJECT
+                          ID</span>
+                      </div>
+                    </div>
+                    <div class="relative group/cmd">
+                      <code id="projectSetCmdDisplay"
+                        class="block bg-black/30 border border-emerald-500/10 rounded-xl p-3 text-[11px] text-emerald-300 font-mono">gcloud config set project [PROJECT_ID]</code>
+                      <button onclick="copyProjectCmd()"
+                        class="absolute top-2 right-2 p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition-all shadow-lg border border-emerald-400/30">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                          </path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            <!-- Step 3.2: Authentication -->
+            <div class="mb-12">
+              <div class="flex items-center gap-3 mb-6">
+                <span
+                  class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm border border-emerald-500/30">3.2</span>
+                <h3 class="text-sm font-bold text-gray-200 uppercase tracking-widest">Authentication</h3>
+              </div>
+
+              <div class="p-5 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                <p class="text-[13px] text-emerald-300/80 leading-relaxed mb-4">
+                  Run <b>both</b> commands below to ensure your terminal has necessary permissions to deploy
+                  resources.
                 </p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div class="relative group/cmd">
                     <code
-                      class="block bg-black/40 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-200 font-mono">gcloud auth login</code>
+                      class="block bg-black/40 border border-emerald-500/20 rounded-xl p-3 text-[11px] text-emerald-300 font-mono">gcloud auth login</code>
                     <button onclick="copyRaw('gcloud auth login')"
                       class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1161,7 +1195,7 @@
                   </div>
                   <div class="relative group/cmd">
                     <code
-                      class="block bg-black/40 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-200 font-mono">gcloud auth application-default login</code>
+                      class="block bg-black/40 border border-emerald-500/20 rounded-xl p-3 text-[11px] text-emerald-300 font-mono">gcloud auth application-default login</code>
                     <button onclick="copyRaw('gcloud auth application-default login')"
                       class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1175,297 +1209,124 @@
               </div>
             </div>
 
-
-            <!-- Step 1: Initialization -->
-            <div class="mb-0">
-              <div class="flex items-center justify-between mb-4">
-                <label
-                  class="block text-[11px] font-bold text-sky-400 uppercase tracking-widest flex items-center gap-2">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M13 10V3L4 14h7v7l9-11h-7z">
-                    </path>
-                  </svg>
-                  Execute in Google Cloud Shell
-                  <span class="tooltip-container ml-1">
-                    <svg class="w-3 h-3 text-sky-400 group-hover:text-white transition-colors cursor-help" fill="none"
-                      stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span class="tooltip-content">
-                      <strong>Google Cloud Shell</strong> is an interactive shell environment for Google Cloud. It comes
-                      pre-installed with the Google Cloud CLI (gcloud) and other essential tools.
-                    </span>
-                  </span>
-                </label>
-                <div class="flex items-center gap-2">
-                  <button onclick="copy('setupCommand')"
-                    class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-[10px] transition-all shadow-md flex items-center gap-2 uppercase tracking-wider">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
-                      </path>
-                    </svg>
-                    Copy Setup Command
-                  </button>
-                  <a href="https://shell.cloud.google.com/cloudshell/editor?cloudshell_tutorial=tutorial.md&cloudshell_git_repo=https://github.com/ryotat7/ge-demo-generator.git"
-                    target="_blank" rel="noopener noreferrer"
-                    class="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg text-[10px] transition-all shadow-md flex items-center gap-2 uppercase tracking-wider">
-                    LAUNCH TUTORIAL
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                    </svg>
-                  </a>
-                </div>
+            <!-- Step 3.3: Execute & Confirm -->
+            <div>
+              <div class="flex items-center gap-3 mb-6">
+                <span
+                  class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm border border-emerald-500/30">3.3</span>
+                <h3 class="text-sm font-bold text-gray-200 uppercase tracking-widest">Execute & Confirm</h3>
               </div>
 
-              <div class="relative group mb-6">
-                <div id="setupScriptContainer" class="relative">
-                  <pre id="setupCommand" ondblclick="if(this.classList.contains('max-h-none')) toggleScriptExpansion()"
-                    class="bg-black/80 rounded-2xl p-6 text-[12px] font-mono text-emerald-400 overflow-x-auto overflow-y-auto border border-sky-500/20 group-hover:border-sky-500/50 transition-all shadow-2xl leading-relaxed max-h-52 cursor-pointer"
-                    title="Double-click to collapse when expanded"></pre>
-
-                  <!-- Sticky Collapse Button (Visible only when expanded) -->
-                  <div id="stickyCollapseWrapper"
-                    class="sticky bottom-6 flex justify-center w-full pointer-events-none transition-all duration-300 opacity-0 translate-y-4 hidden z-20">
-                    <button onclick="toggleScriptExpansion()"
-                      class="pointer-events-auto px-6 py-2.5 bg-sky-500 hover:bg-sky-400 text-white font-bold rounded-full shadow-2xl shadow-sky-500/40 flex items-center gap-2 text-[10px] uppercase tracking-widest transition-all hover:scale-105 active:scale-95 border border-white/20">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
-                      </svg>
-                      Collapse Script
-                    </button>
-                  </div>
-                </div>
-                <div class="absolute top-3 right-3 flex gap-2 z-10">
-                  <button onclick="downloadScript()" title="Download as .sh file"
-                    class="p-2 rounded-lg bg-gray-800/90 text-gray-400 hover:text-sky-400 border border-gray-700 transition-all shadow-sm">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                    </svg>
-                  </button>
-                </div>
-                <!-- Expand/Collapse button -->
-                <button onclick="toggleScriptExpansion()" id="scriptExpandBtn"
-                  class="w-full mt-2 py-2 text-[10px] font-bold text-sky-400 uppercase tracking-widest hover:text-sky-300 transition-all flex items-center justify-center gap-2 bg-black/40 rounded-xl border border-white/5 hover:border-sky-500/30">
-                  <svg id="scriptExpandIcon" class="w-3 h-3 transition-transform" fill="none" stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                  </svg>
-                  <span id="scriptExpandText">Show Full Script</span>
-                </button>
-              </div>
-              <!-- Open Local Server instruction merged with deployment info -->
-              <div
-                class="mb-6 px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
-                <div
-                  class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6">
-                    </path>
-                  </svg>
-                </div>
-                <div>
-                  <h4 class="text-[11px] font-bold text-emerald-400 uppercase tracking-widest">Next Step: Open Local
-                    Server</h4>
-                  <p class="text-[12px] text-emerald-300/80">
-                    Copy and paste the command above into your Cloud Shell to <strong>deploy demo assets</strong>.
-                    When the script completes, click the <strong>http://127.0.0.1:[PORT]</strong> link shown in your
-                    terminal to open the UI.
+              <div class="space-y-6">
+                <div class="flex-1">
+                  <p class="text-[13px] text-gray-300 leading-relaxed mb-4">
+                    Copy and paste the setup script into your Cloud Shell.
                   </p>
-                </div>
-              </div>
-
-              <!-- ADK Web Instructions -->
-              <div class="mt-12 pt-8 border-t border-white/10">
-                <div class="flex items-center gap-2 mb-4">
-                  <h3 class="text-xs font-bold text-sky-400 uppercase tracking-widest flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
-                      </path>
-                    </svg>
-                    Managing the Agent UI (adk web)
-                  </h3>
-                  <span class="tooltip-container">
-                    <svg class="w-3.5 h-3.5 text-sky-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span class="tooltip-content">
-                      <strong>ADK (Agent Development Kit)</strong> provides a local web interface to test and refine
-                      your agent's reasoning before deploying it to production.
-                    </span>
-                  </span>
-                </div>
-
-                <p class="text-[12px] text-gray-400 mb-6 leading-relaxed">
-                  Open your terminal and navigate to the <strong>adk_agent</strong> folder inside the generated demo
-                  directory (<code id="adkDirPlaceholder" class="text-sky-300 font-mono">demo-directory</code>).
-                </p>
-
-                <div
-                  class="mb-8 p-5 bg-black/40 rounded-2xl border border-white/5 hover:border-sky-500/30 transition-all shadow-inner group/cmd relative">
-                  <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 text-center">Navigate to
-                    Agent Folder</p>
-                  <div class="flex items-center justify-center gap-3">
-                    <code id="cdCommandBlock"
-                      class="text-[13px] text-sky-300 font-mono bg-sky-950/30 px-3 py-1.5 rounded-lg border border-sky-500/20">cd ~/demo-directory/adk_agent</code>
-                    <button onclick="copy('cdCommandBlock')"
-                      class="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white transition-all border border-gray-700 shadow-sm">
+                  <div class="flex items-center gap-2 mb-4">
+                    <button onclick="copy('setupCommand')"
+                      class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-[11px] transition-all shadow-lg flex items-center gap-2 uppercase tracking-wider">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
                         </path>
                       </svg>
+                      Copy Setup Command
                     </button>
-                  </div>
-                </div>
-
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div
-                    class="p-5 bg-black/40 rounded-2xl border border-white/5 hover:border-sky-500/30 transition-all shadow-inner group/cmd relative">
-                    <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">To START Agent UI</p>
-                    <code
-                      class="text-[12px] text-sky-300 font-mono bg-sky-950/30 px-2 py-1 rounded">../.venv/bin/adk web</code>
-                    <button onclick="copyRaw('../.venv/bin/adk web')"
-                      class="absolute top-4 right-4 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                    <a href="https://shell.cloud.google.com/cloudshell/editor?cloudshell_tutorial=tutorial.md&cloudshell_git_repo=https://github.com/ryotat7/ge-demo-generator.git"
+                      target="_blank" rel="noopener noreferrer"
+                      class="px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-[11px] transition-all shadow-lg flex items-center gap-2 uppercase tracking-wider">
+                      LAUNCH TUTORIAL
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
-                        </path>
+                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                       </svg>
-                    </button>
+                    </a>
                   </div>
-                  <div
-                    class="p-5 bg-black/40 rounded-2xl border border-white/5 hover:border-sky-500/30 transition-all shadow-inner">
-                    <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">To STOP</p>
-                    <div class="flex items-center gap-2 text-[12px] text-gray-300">
-                      <kbd
-                        class="px-2 py-1 bg-gray-800 border-b-2 border-gray-900 rounded-lg font-mono text-white text-[10px]">Ctrl</kbd>
-                      <span>+</span>
-                      <kbd
-                        class="px-2 py-1 bg-gray-800 border-b-2 border-gray-900 rounded-lg font-mono text-white text-[10px]">C</kbd>
+
+                  <div class="relative group min-w-0">
+                    <pre id="setupCommand"
+                      class="bg-black/80 rounded-2xl p-6 pb-16 text-[11px] font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap break-all border border-white/5 transition-all max-h-40 cursor-pointer"
+                      onclick="toggleScriptExpansion()"></pre>
+                    <div
+                      class="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none rounded-b-2xl transition-all duration-300 group-hover:h-32"
+                      id="scriptGradient">
+                    </div>
+                    <div class="sticky bottom-16 left-0 right-0 z-10 flex justify-center pointer-events-none"
+                      id="stickyBtnWrapper">
+                      <button onclick="toggleScriptExpansion(); event.stopPropagation();" id="inlineToggleBtn"
+                        class="pointer-events-auto px-6 py-2.5 bg-sky-500 hover:bg-sky-400 text-white font-bold rounded-full shadow-xl shadow-sky-500/20 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border border-white/10 group/btn">
+                        <svg id="inlineToggleIcon" class="w-3.5 h-3.5 transition-transform duration-300" fill="none"
+                          stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
+                          </path>
+                        </svg>
+                        <span id="inlineToggleText" class="text-[10px] uppercase tracking-wider">Show Full Script</span>
+                      </button>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <!-- Important Confirmation Card -->
+              <div class="mt-8 p-5 bg-amber-500/5 rounded-2xl border border-amber-500/20 shadow-lg">
+                <div class="flex items-start gap-4">
                   <div
-                    class="p-5 bg-black/40 rounded-2xl border border-white/5 hover:border-sky-500/30 transition-all shadow-inner group/cmd relative">
-                    <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">To RESTART</p>
-                    <p class="text-[11px] text-gray-400 leading-relaxed mb-2">Stop (Ctrl+C), then run:</p>
-                    <code
-                      class="text-sky-300 font-mono bg-sky-950/30 px-1 rounded block mt-1 text-[12px]">../.venv/bin/adk web</code>
-                    <button onclick="copyRaw('../.venv/bin/adk web')"
-                      class="absolute top-4 right-4 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
-                        </path>
-                      </svg>
-                    </button>
+                    class="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                      </path>
+                    </svg>
+                  </div>
+                  <div class="flex-1">
+                    <h4 class="text-[12px] font-bold text-amber-400 uppercase tracking-widest mb-2">Important
+                      Confirmation</h4>
+                    <p class="text-[13px] text-amber-200/80 leading-relaxed">
+                      After pasting, the terminal will ask: <span
+                        class="text-amber-300 font-mono bg-black/30 px-1.5 py-0.5 rounded">"Do you want to proceed with
+                        this project? (y/n)"</span>.
+                      Verify the project ID and type <kbd
+                        class="px-2 py-1 bg-gray-800 border-b-2 border-gray-900 rounded-lg font-mono text-white text-[10px] mx-1">y</kbd>
+                      then press <kbd
+                        class="px-2 py-1 bg-gray-800 border-b-2 border-gray-900 rounded-lg font-mono text-white text-[10px] mx-1">Enter</kbd>.
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Step 2: Interactive Guide -->
-            <div id="section-step4" class="mt-12 pt-12 border-t border-white/10 scroll-mt-12">
-              <div class="flex items-center gap-4 mb-10">
-                <span
-                  class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white font-bold text-xl shadow-lg shadow-emerald-500/40">4</span>
-                <div>
-                  <h2 class="text-2xl font-bold text-white uppercase tracking-tight">Step 4: Run Live Demo</h2>
-                  <p class="text-[11px] text-gray-500">Engage with your agent using personalized scenarios</p>
-                </div>
+            <!-- Next Step: Open Local Server Banner -->
+            <div class="mt-8 p-5 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex items-start gap-4">
+              <div class="text-emerald-400 mt-0.5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6">
+                  </path>
+                </svg>
               </div>
-
-              <!-- Auth Requirement Warning -->
-              <div class="mb-10 p-4 bg-red-500/10 rounded-2xl border border-red-500/20 flex items-start gap-4">
-                <div class="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center text-red-500 shrink-0">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
-                    </path>
-                  </svg>
-                </div>
-                <div class="flex-1">
-                  <h4 class="text-[12px] font-bold text-red-400 uppercase tracking-widest mb-1">Authentication Required
-                  </h4>
-                  <p class="text-[13px] text-red-300/80 leading-relaxed mb-4">
-                    Before proceeding, ensure you have executed <b>both</b> commands below in your terminal.
-                  </p>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div class="relative group/cmd">
-                      <code
-                        class="block bg-black/40 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-200 font-mono">gcloud auth login</code>
-                      <button onclick="copyRaw('gcloud auth login')"
-                        class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
-                          </path>
-                        </svg>
-                      </button>
-                    </div>
-                    <div class="relative group/cmd">
-                      <code
-                        class="block bg-black/40 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-200 font-mono">gcloud auth application-default login</code>
-                      <button onclick="copyRaw('gcloud auth application-default login')"
-                        class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
-                          </path>
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="flex items-center justify-between mb-6">
-                <label
-                  class="block text-[11px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z">
-                    </path>
-                  </svg>
-                  Recommended Demo Flow (Tailored Prompts)
-                </label>
-              </div>
-              <div id="demoGuideSteps" class="grid grid-cols-1 gap-4">
-                <!-- Prompts will be injected here -->
+              <div class="flex-1">
+                <h4 class="text-[12px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Next Step: Open Local
+                  Server</h4>
+                <p class="text-[13px] text-emerald-300/80 leading-relaxed">
+                  Copy and paste the command above into your Cloud Shell to <b>deploy demo assets</b>. When the script
+                  completes, click the
+                  <code
+                    class="text-emerald-300 font-mono bg-black/30 px-1.5 py-0.5 rounded">http://127.0.0.1:[PORT]</code>
+                  link shown in your terminal to open the UI.
+                </p>
               </div>
             </div>
           </div>
         </section>
 
-        <!-- Step 5: Production Deployment (Optional) -->
-        <section id="section-step5"
-          class="hidden glass rounded-3xl p-6 lg:p-8 mb-10 fade-in shadow-xl ring-2 ring-emerald-500/10">
-          <div class="flex items-center gap-3 mb-8">
+        <!-- Step 4: Run Live Demo -->
+        <div id="section-step4"
+          class="hidden glass rounded-3xl p-10 border border-emerald-500/40 shadow-2xl shadow-emerald-900/20 bg-gradient-to-br from-emerald-900/10 to-transparent scroll-mt-8 mb-10">
+          <div class="flex items-center gap-4 mb-10">
             <span
-              class="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-500/40 text-sm">5</span>
+              class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white font-bold text-xl shadow-lg shadow-emerald-500/40">4</span>
             <div>
-              <div class="flex items-center gap-2">
-                <h2 class="text-xl font-bold text-white uppercase tracking-tight">Step 5: Deploy to Gemini Enterprise
-                </h2>
-                <span class="tooltip-container">
-                  <svg class="w-4 h-4 text-emerald-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <span class="tooltip-content">
-                    <strong>Vertex AI Agent Engine</strong> is the production-ready environment for Gemini Enterprise
-                    agents, providing scale, security, and global endpoints.
-                  </span>
-                </span>
-              </div>
-              <p class="text-[11px] text-gray-500">Scale your demo by deploying to Vertex AI Agent Engine</p>
+              <h2 class="text-2xl font-bold text-white uppercase tracking-tight">Step 4: Run Live Demo</h2>
+              <p class="text-[11px] text-gray-500">Engage with your agent using personalized scenarios</p>
             </div>
           </div>
 
@@ -1479,7 +1340,249 @@
               </svg>
             </div>
             <div class="flex-1">
-              <h4 class="text-[12px] font-bold text-red-400 uppercase tracking-widest mb-1">Authentication Required</h4>
+              <h4 class="text-[12px] font-bold text-red-400 uppercase tracking-widest mb-1">Authentication Required
+              </h4>
+              <p class="text-[13px] text-red-300/80 leading-relaxed mb-4">
+                Before proceeding, ensure you have executed <b>both</b> commands below in your terminal.
+              </p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="relative group/cmd">
+                  <code
+                    class="block bg-black/40 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-200 font-mono">gcloud auth login</code>
+                  <button onclick="copyRaw('gcloud auth login')"
+                    class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                      </path>
+                    </svg>
+                  </button>
+                </div>
+                <div class="relative group/cmd">
+                  <code
+                    class="block bg-black/40 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-200 font-mono">gcloud auth application-default login</code>
+                  <button onclick="copyRaw('gcloud auth application-default login')"
+                    class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                      </path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+          <!-- Managing the Agent UI (ADK Web) -->
+          <div class="mb-10 p-6 bg-black/30 rounded-2xl border border-white/5">
+            <div class="flex items-center gap-2 mb-4">
+              <h3 class="text-xs font-bold text-sky-400 uppercase tracking-widest flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                  </path>
+                </svg>
+                Managing the Agent UI (adk web)
+              </h3>
+              <span class="tooltip-container">
+                <svg class="w-3.5 h-3.5 text-sky-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="tooltip-content">
+                  <strong>ADK (Agent Development Kit)</strong> provides a local web interface to test and refine
+                  your agent's reasoning before deploying it to production.
+                </span>
+              </span>
+            </div>
+
+            <p class="text-[12px] text-gray-400 mb-6 leading-relaxed">
+              Open your terminal and navigate to the <strong>adk_agent</strong> folder inside the generated demo
+              directory (<code id="adkDirPlaceholder2" class="text-sky-300 font-mono">demo-directory</code>).
+            </p>
+
+            <div
+              class="mb-6 p-4 bg-black/40 rounded-xl border border-white/5 hover:border-sky-500/30 transition-all shadow-inner group/cmd relative">
+              <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 text-center">Navigate to
+                Agent Folder</p>
+              <div class="flex items-center justify-center gap-3">
+                <code id="cdCommandBlockStep4"
+                  class="text-[13px] text-sky-300 font-mono bg-sky-950/30 px-3 py-1.5 rounded-lg border border-sky-500/20">cd ~/demo-directory/adk_agent</code>
+                <button onclick="copy('cdCommandBlockStep4')"
+                  class="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white transition-all border border-gray-700 shadow-sm">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                    </path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div
+                class="p-4 bg-black/40 rounded-xl border border-white/5 hover:border-sky-500/30 transition-all shadow-inner group/cmd relative">
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">To START Agent UI</p>
+                <code
+                  class="text-[12px] text-sky-300 font-mono bg-sky-950/30 px-2 py-1 rounded">../.venv/bin/adk web</code>
+                <button onclick="copyRaw('../.venv/bin/adk web')"
+                  class="absolute top-3 right-3 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                    </path>
+                  </svg>
+                </button>
+              </div>
+              <div
+                class="p-4 bg-black/40 rounded-xl border border-white/5 hover:border-sky-500/30 transition-all shadow-inner">
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">To STOP</p>
+                <div class="flex items-center gap-2 text-[12px] text-gray-300">
+                  <kbd
+                    class="px-2 py-1 bg-gray-800 border-b-2 border-gray-900 rounded-lg font-mono text-white text-[10px]">Ctrl</kbd>
+                  <span>+</span>
+                  <kbd
+                    class="px-2 py-1 bg-gray-800 border-b-2 border-gray-900 rounded-lg font-mono text-white text-[10px]">C</kbd>
+                </div>
+              </div>
+              <div
+                class="p-4 bg-black/40 rounded-xl border border-white/5 hover:border-sky-500/30 transition-all shadow-inner group/cmd relative">
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">To RESTART</p>
+                <p class="text-[11px] text-gray-400 leading-relaxed mb-1">Stop (Ctrl+C), then run:</p>
+                <code
+                  class="text-sky-300 font-mono bg-sky-950/30 px-1 rounded block text-[12px]">../.venv/bin/adk web</code>
+                <button onclick="copyRaw('../.venv/bin/adk web')"
+                  class="absolute top-3 right-3 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                    </path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between mb-6">
+            <label
+              class="block text-[11px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z">
+                </path>
+              </svg>
+              Recommended Demo Flow (Tailored Prompts)
+            </label>
+          </div>
+          <div id="demoGuideSteps" class="grid grid-cols-1 gap-4">
+            <!-- Prompts will be injected here -->
+          </div>
+        </div>
+
+        <!-- Step 5: Production Deployment (Optional) -->
+        <section id="section-step5"
+          class="hidden glass rounded-3xl p-6 lg:p-8 mb-10 fade-in shadow-xl ring-2 ring-emerald-500/10">
+          <div class="flex items-center gap-3 mb-8">
+            <span
+              class="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-500/40 text-sm">5</span>
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-xl font-bold text-white uppercase tracking-tight">Step 5: Deploy to Gemini
+                  Enterprise
+                </h2>
+                <span class="tooltip-container">
+                  <svg class="w-4 h-4 text-emerald-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="tooltip-content">
+                    <strong>Vertex AI Agent Engine</strong> is the production-ready environment for Gemini
+                    Enterprise
+                    agents, providing scale, security, and global endpoints.
+                  </span>
+                </span>
+              </div>
+              <p class="text-[11px] text-gray-500">Scale your demo by deploying to Vertex AI Agent Engine</p>
+            </div>
+          </div>
+
+          <!-- Video Deep Dive & Link (Collapsible) -->
+          <section class="glass rounded-2xl overflow-hidden border border-white/5 shadow-lg bg-black/20 mb-6">
+            <button onclick="toggleStep5Resources()"
+              class="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-all text-left group">
+              <div class="flex items-center gap-3">
+                <!-- Icon -->
+                <div
+                  class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z">
+                    </path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-xs font-bold text-gray-200">Watch Tutorial</h3>
+                  <p class="text-[10px] text-gray-500 mt-0.5">Learn how to register to Gemini Enterprise</p>
+                </div>
+              </div>
+              <svg id="step5Chevron" class="w-4 h-4 text-gray-600 transition-transform duration-300" fill="none"
+                stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+
+            <div id="step5ResourcesContent" class="hidden border-t border-white/5 p-6 bg-black/20">
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <!-- Video -->
+                <div class="aspect-video w-full rounded-xl overflow-hidden border border-white/10 shadow-lg">
+                  <iframe class="w-full h-full" src="https://www.youtube.com/embed/dhT2dAbRwVk"
+                    title="Advent of Agents: Register to Gemini Enterprise" frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen></iframe>
+                </div>
+                <!-- Text & Link -->
+                <div>
+                  <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Deep Dive Resources
+                  </h3>
+                  <p class="text-[12px] text-gray-300 leading-relaxed mb-4">
+                    For a step-by-step guide on how to register your agent to Gemini Enterprise and enable it for
+                    your
+                    organization, check out Day 19 of Advent of Agents.
+                  </p>
+                  <a href="https://adventofagents.com/day/19" target="_blank"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-[11px] font-bold text-emerald-400 transition-all">
+                    <span>Open Guide: Gemini Enterprise Registration</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Auth Requirement Warning -->
+          <div class="mb-10 p-4 bg-red-500/10 rounded-2xl border border-red-500/20 flex items-start gap-4">
+            <div class="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center text-red-500 shrink-0">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                </path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h4 class="text-[12px] font-bold text-red-400 uppercase tracking-widest mb-1">Authentication Required
+              </h4>
               <p class="text-[13px] text-red-300/80 leading-relaxed mb-4">
                 Before proceeding, ensure you have executed <b>both</b> commands below in your terminal.
               </p>
@@ -1513,83 +1616,23 @@
           </div>
 
           <div class="space-y-6">
-            <!-- Video Deep Dive & Link (Collapsible) -->
-            <section class="glass rounded-2xl overflow-hidden border border-white/5 shadow-lg bg-black/20 mb-6">
-              <button onclick="toggleStep5Resources()"
-                class="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-all text-left group">
-                <div class="flex items-center gap-3">
-                  <!-- Icon -->
-                  <div
-                    class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z">
-                      </path>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 class="text-xs font-bold text-gray-200">Watch Tutorial</h3>
-                    <p class="text-[10px] text-gray-500 mt-0.5">Learn how to register to Gemini Enterprise</p>
-                  </div>
-                </div>
-                <svg id="step5Chevron" class="w-4 h-4 text-gray-600 transition-transform duration-300" fill="none"
-                  stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </button>
-
-              <div id="step5ResourcesContent" class="hidden border-t border-white/5 p-6 bg-black/20">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                  <!-- Video -->
-                  <div class="aspect-video w-full rounded-xl overflow-hidden border border-white/10 shadow-lg">
-                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/dhT2dAbRwVk"
-                      title="Advent of Agents: Register to Gemini Enterprise" frameborder="0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowfullscreen></iframe>
-                  </div>
-                  <!-- Text & Link -->
-                  <div>
-                    <h3
-                      class="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
-                      Deep Dive Resources
-                    </h3>
-                    <p class="text-[12px] text-gray-300 leading-relaxed mb-4">
-                      For a step-by-step guide on how to register your agent to Gemini Enterprise and enable it for your
-                      organization, check out Day 19 of Advent of Agents.
-                    </p>
-                    <a href="https://adventofagents.com/day/19" target="_blank"
-                      class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-[11px] font-bold text-emerald-400 transition-all">
-                      <span>Open Guide: Gemini Enterprise Registration</span>
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                      </svg>
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </section>
             <!-- Important Note: Execution Context -->
-            <div class="p-4 mb-6 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex items-start gap-4">
-              <div
-                class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-                </svg>
-              </div>
-              <div>
-                <h4 class="text-[12px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Execution Context</h4>
-                <p class="text-[13px] text-emerald-300/80 leading-relaxed">
-                  Open your terminal and navigate to the <strong>adk_agent</strong> folder inside the generated demo
-                  directory (<strong><span id="demoDirName">...</span></strong>) before running the commands below.
-                </p>
+            <div
+              class="mb-8 p-5 bg-black/40 rounded-2xl border border-white/5 hover:border-emerald-500/30 transition-all shadow-inner group/cmd relative">
+              <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 text-center">Navigate to
+                Agent
+                Folder</p>
+              <div class="flex items-center justify-center gap-3">
+                <code id="cdCommandBlockStep5"
+                  class="text-[13px] text-emerald-400 font-mono bg-emerald-950/30 px-3 py-1.5 rounded-lg border border-emerald-500/20">cd ~/demo-directory/adk_agent</code>
+                <button onclick="copy('cdCommandBlockStep5')"
+                  class="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white transition-all border border-gray-700 shadow-sm">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                    </path>
+                  </svg>
+                </button>
               </div>
             </div>
 
@@ -1609,9 +1652,9 @@
               <p class="text-[12px] text-gray-400 mb-4 leading-relaxed">
                 Add production-ready templates and configurations to your agent.
               </p>
-              <div class="relative group">
+              <div class="relative group min-w-0">
                 <pre
-                  class="bg-black/60 rounded-xl p-4 text-[12px] font-mono text-emerald-400 border border-white/5 overflow-x-auto">uvx agent-starter-pack enhance</pre>
+                  class="bg-black/60 rounded-xl p-4 text-[12px] font-mono text-emerald-400 border border-white/5 overflow-x-auto whitespace-pre-wrap break-all">uvx agent-starter-pack enhance</pre>
                 <button onclick="copyRaw('uvx agent-starter-pack enhance')"
                   class="absolute top-3 right-3 p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white transition-all opacity-0 group-hover:opacity-100 shadow-xl border border-gray-700">
                   <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1679,9 +1722,9 @@
                   </div>
                 </div>
 
-                <div class="relative group">
+                <div class="relative group min-w-0">
                   <pre id="deployCommandBlock"
-                    class="bg-black/60 rounded-xl p-4 text-[12px] font-mono text-white/80 border border-white/5 overflow-x-auto whitespace-pre-wrap">make deploy</pre>
+                    class="bg-black/60 rounded-xl p-4 text-[12px] font-mono text-white/80 border border-white/5 overflow-x-auto whitespace-pre-wrap break-all">make deploy</pre>
                   <button onclick="copy('deployCommandBlock')"
                     class="absolute top-3 right-3 p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white transition-all opacity-0 group-hover:opacity-100 shadow-xl border border-gray-700">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1716,9 +1759,9 @@
                 <p class="text-[12px] text-gray-400 mb-4 leading-relaxed">
                   Enable the agent for use within your Gemini Enterprise organization.
                 </p>
-                <div class="relative group">
+                <div class="relative group min-w-0">
                   <pre
-                    class="bg-black/60 rounded-xl p-4 text-[12px] font-mono text-white/80 border border-white/5 overflow-x-auto">make register-gemini-enterprise</pre>
+                    class="bg-black/60 rounded-xl p-4 text-[12px] font-mono text-white/80 border border-white/5 overflow-x-auto whitespace-pre-wrap break-all">make register-gemini-enterprise</pre>
                   <button onclick="copyRaw('make register-gemini-enterprise')"
                     class="absolute top-3 right-3 p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white transition-all opacity-0 group-hover:opacity-100 shadow-xl border border-gray-700">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1734,8 +1777,8 @@
                       d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                   </svg>
                   <p class="text-[11px] text-sky-300 leading-relaxed">
-                    Once registered, toggle the agent to <strong>ON</strong> in the Gemini Enterprise Admin Console to
-                    make it available to your organization.
+                    A <strong>Gemini Enterprise instance</strong> must be created in your project beforehand.
+                    See the tutorial above for setup instructions.
                   </p>
                 </div>
               </div>
@@ -1758,6 +1801,18 @@
         <!-- History items will be injected here -->
       </div>
     </aside>
+  </div>
+
+  <!-- Fixed Collapse Button (appears when script is expanded) -->
+  <div id="fixedCollapseBtn"
+    class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 hidden opacity-0 transition-all duration-300 ease-out">
+    <button onclick="toggleScriptExpansion()"
+      class="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full shadow-2xl shadow-emerald-500/30 flex items-center gap-3 transition-all hover:scale-105 active:scale-95 ring-4 ring-emerald-500/20">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+      </svg>
+      <span class="text-[11px] uppercase tracking-wider">Collapse Script</span>
+    </button>
   </div>
 
   <div id="toast">Copied to clipboard!</div>
@@ -1924,6 +1979,7 @@
 
       // Hide result sections
       document.getElementById('resultSection').classList.add('hidden');
+      document.getElementById('section-step4').classList.add('hidden');
       document.getElementById('section-step5').classList.add('hidden');
       document.getElementById('errorSection').classList.add('hidden');
       document.getElementById('stepsSection').classList.add('hidden');
@@ -1940,32 +1996,54 @@
 
     function toggleScriptExpansion() {
       const pre = document.getElementById('setupCommand');
-      const icon = document.getElementById('scriptExpandIcon');
-      const text = document.getElementById('scriptExpandText');
-      const stickyBtn = document.getElementById('stickyCollapseWrapper');
+      const text = document.getElementById('inlineToggleText');
+      const icon = document.getElementById('inlineToggleIcon');
+      const gradient = document.getElementById('scriptGradient');
+      const btn = document.getElementById('inlineToggleBtn');
+      const fixedBtn = document.getElementById('fixedCollapseBtn');
+      const stickyWrapper = document.getElementById('stickyBtnWrapper');
+
       const isExpanded = pre.classList.contains('max-h-none');
 
       if (isExpanded) {
+        // Collapsing
         pre.classList.remove('max-h-none');
-        pre.classList.add('max-h-52');
-        icon.style.transform = 'rotate(0deg)';
-        text.textContent = 'Show Full Script';
+        pre.classList.add('max-h-40');
+        if (text) text.textContent = 'Show Full Script';
+        if (icon) {
+          icon.style.transform = 'rotate(0deg)';
+          icon.querySelector('path').setAttribute('d', 'M19 9l-7 7-7-7');
+        }
+        if (gradient) gradient.classList.remove('opacity-0', 'pointer-events-none');
+        if (btn) btn.classList.replace('bg-emerald-600', 'bg-sky-500');
+        if (stickyWrapper) stickyWrapper.classList.remove('hidden');
 
-        // Hide sticky button
-        stickyBtn.classList.add('opacity-0', 'translate-y-4');
-        setTimeout(() => stickyBtn.classList.add('hidden'), 300);
+        // Hide fixed button
+        if (fixedBtn) {
+          fixedBtn.classList.add('opacity-0', 'translate-y-4');
+          setTimeout(() => fixedBtn.classList.add('hidden'), 300);
+        }
 
-        // Scroll back to the top of the script area if we were far down
+        // Scroll back to the top of the script area
         pre.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } else {
-        pre.classList.remove('max-h-52');
+        // Expanding
+        pre.classList.remove('max-h-40');
         pre.classList.add('max-h-none');
-        icon.style.transform = 'rotate(180deg)';
-        text.textContent = 'Collapse Script';
+        if (text) text.textContent = 'Collapse Script';
+        if (icon) {
+          icon.style.transform = 'rotate(0deg)';
+          icon.querySelector('path').setAttribute('d', 'M5 15l7-7 7 7');
+        }
+        if (gradient) gradient.classList.add('opacity-0', 'pointer-events-none');
+        if (btn) btn.classList.replace('bg-sky-500', 'bg-emerald-600');
+        if (stickyWrapper) stickyWrapper.classList.add('hidden');
 
-        // Show sticky button
-        stickyBtn.classList.remove('hidden');
-        setTimeout(() => stickyBtn.classList.remove('opacity-0', 'translate-y-4'), 10);
+        // Show fixed button
+        if (fixedBtn) {
+          fixedBtn.classList.remove('hidden');
+          setTimeout(() => fixedBtn.classList.remove('opacity-0', 'translate-y-4'), 10);
+        }
       }
     }
 
@@ -2290,16 +2368,25 @@
 
     function showFinalResult(res) {
       document.getElementById('resultSection').classList.remove('hidden');
+      document.getElementById('section-step4').classList.remove('hidden');
       document.getElementById('section-step5').classList.remove('hidden');
       document.getElementById('setupCommand').innerText = `cat <<'__SETUP_SH__' > setup.sh\n${res.setupScript}\n__SETUP_SH__\nbash setup.sh`;
       document.getElementById('systemInstruction').value = res.systemInstruction;
-      document.getElementById('demoDirName').innerText = res.dirName || 'demo-directory';
 
       const adkDirPlaceholder = document.getElementById('adkDirPlaceholder');
       if (adkDirPlaceholder) adkDirPlaceholder.innerText = res.dirName || 'demo-directory';
 
+      const projectIdInput = document.getElementById('projectIdInput');
+      if (projectIdInput) {
+        projectIdInput.value = res.projectId || '<?= projectId ?>';
+        updateProjectSetCmd();
+      }
+
       const cdCommandBlock = document.getElementById('cdCommandBlock');
       if (cdCommandBlock) cdCommandBlock.innerText = `cd ~/${res.dirName}/adk_agent`;
+
+      const cdCommandBlockStep5 = document.getElementById('cdCommandBlockStep5');
+      if (cdCommandBlockStep5) cdCommandBlockStep5.innerText = `cd ~/${res.dirName}/adk_agent`;
 
       currentSuffix = res.suffix || '';
       currentDomainName = res.domainName || '';
@@ -2325,8 +2412,8 @@
                   <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 w-6 h-6 rounded-lg flex items-center justify-center shadow-inner">${i + 1}</span>
                   <p class="text-[11px] font-bold text-gray-400 uppercase tracking-tight">${title}</p>
                </div>
-               <div class="relative bg-black/40 rounded-xl p-4 border border-white/5 group-hover:border-emerald-500/20 transition-all">
-                  <p class="text-[13px] text-sky-200 select-all leading-relaxed font-mono">${prompt}</p>
+                <div class="relative bg-black/40 rounded-xl p-4 border border-white/5 group-hover:border-emerald-500/20 transition-all min-w-0">
+                  <p class="text-[13px] text-sky-200 select-all leading-relaxed font-mono break-all whitespace-pre-wrap">${prompt}</p>
                   <button onclick="copyText('${prompt.replace(/'/g, "\\'")}')" class="absolute top-2 right-2 p-2 rounded-lg bg-white/5 text-gray-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                   </button>
@@ -2437,6 +2524,22 @@
 
       const block = document.getElementById('deployCommandBlock');
       if (block) block.innerText = cmd;
+    }
+
+    function updateProjectSetCmd() {
+      const input = document.getElementById('projectIdInput');
+      const display = document.getElementById('projectSetCmdDisplay');
+      if (input && display) {
+        const val = input.value.trim() || '[PROJECT_ID]';
+        display.innerText = `gcloud config set project ${val}`;
+      }
+    }
+
+    function copyProjectCmd() {
+      const input = document.getElementById('projectIdInput');
+      const val = input ? input.value.trim() : '';
+      if (!val) return alert('Please enter a Project ID first.');
+      copyText(`gcloud config set project ${val}`);
     }
 
     function updateScriptLocally() {
@@ -2594,6 +2697,7 @@
         loadHistory();
       }
       updateSamples();
+      updateProjectSetCmd();
 
       // Scroll Spy Implementation
       const sections = document.querySelectorAll('section[id], div[id^="section-"]');
