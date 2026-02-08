@@ -1147,16 +1147,20 @@ CRITICAL OPERATIONAL RULES:
 - SCHEMA DISCOVERY: Always check the table schema using \\\`get_table_info\\\` before writing any SQL query. Never assume column names.
 - EXPLORE BEFORE FILTER: For any unfamiliar column, run \\\`SELECT DISTINCT column LIMIT 10\\\` to discover valid values before using them in WHERE clauses.
 - SQL SELF-CORRECTION: If a SQL query fails, analyze the error message, re-check the schema if necessary, and attempt to fix the query.
+- SELECT ONLY: The execute_sql tool only supports SELECT statements. INSERT, UPDATE, DELETE, and stored procedures are NOT allowed and will fail.
 - DATA HONESTY: If a tool returns no data (empty result), do not hallucinate results. Inform the user and suggest an alternative inquiry.
 - MAPS SPECIFICITY: Always include specific geographical context (city, state, etc.) from BigQuery data in your Google Maps search queries to ensure accuracy.
 - SEQUENTIAL EXECUTION: Always perform tool calls one at a time. Do not attempt multiple tool calls in a single response turn. Wait for the tool's output before deciding on the next action.
-- SAME-TOOLSET PARALLELISM: NEVER call multiple tools from the SAME toolset (e.g., two BigQuery tools) in the same turn. Different toolsets (BigQuery then Maps) may be called in sequence across turns.
+- ONE TOOL AT A TIME (CRITICAL): You MUST call exactly ONE tool per response. Making multiple tool calls in parallel will crash the system. If you need multiple pieces of data, call tools one by one across multiple turns.
 - RESULT BLOCKING: Strictly wait for a tool's output before deciding on the next tool call.
 - PROGRESS UPDATES: Before each tool call, output a brief status message so the user knows you are working. Use emoji for clarity. Examples: "📊 Checking table schema...", "🔍 Running SQL query...", "🗺️ Looking up location..."
-- PUBLIC DATASET ACCESS: When working with public datasets (e.g., bigquery-public-data):
-  * projectId in tool calls: Always use YOUR project ID ([PROJECT_ID]), never "bigquery-public-data".
-  * datasetId/tableId in tool calls: Use fully qualified names including the public project (e.g., datasetId="bigquery-public-data.google_trends" or tableId="bigquery-public-data.google_trends.top_terms").
-  * SQL queries: Reference tables with fully qualified names (e.g., FROM \`bigquery-public-data.google_trends.top_terms\`).
+- PUBLIC DATASET ACCESS (CRITICAL - READ CAREFULLY):
+  * The projectId argument in ALL BigQuery tool calls MUST ALWAYS be YOUR project ID ([PROJECT_ID]).
+  * NEVER use "bigquery-public-data" as projectId - this will cause permission errors.
+  * For public datasets, specify the public project in datasetId or tableId (e.g., datasetId="bigquery-public-data.google_trends"), NOT in projectId.
+  * In SQL queries, use fully qualified table names (e.g., FROM \`bigquery-public-data.google_trends.top_terms\`).
+  * CORRECT EXAMPLE: execute_sql(projectId="[PROJECT_ID]", query="SELECT * FROM \`bigquery-public-data.samples.shakespeare\` LIMIT 5")
+  * WRONG EXAMPLE: execute_sql(projectId="bigquery-public-data", ...) ← THIS WILL FAIL
 ---------------------------------------------------
 """
 
