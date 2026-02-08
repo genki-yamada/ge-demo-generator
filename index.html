@@ -1307,7 +1307,7 @@
                       <!-- Download Button -->
                       <button onclick="downloadSetupScript(); event.stopPropagation();"
                         class="absolute top-3 right-3 p-2 rounded-xl bg-gray-900/80 text-gray-400 hover:text-white hover:bg-emerald-500/20 opacity-0 group-hover/script:opacity-100 transition-all border border-white/5 z-20 shadow-xl backdrop-blur-sm"
-                        title="Download setup.sh">
+                        title="Download setup script">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -1873,6 +1873,7 @@
     let currentData = null;
     let currentSuffix = '';
     let currentSetupScript = '';
+    let currentScriptFilename = 'setup.sh';
 
     function selectMethod(method) {
       const selection = document.getElementById('methodSelection');
@@ -2417,8 +2418,10 @@
       document.getElementById('resultSection').classList.remove('hidden');
       document.getElementById('section-step4').classList.remove('hidden');
       document.getElementById('section-step5').classList.remove('hidden');
-      document.getElementById('setupCommand').innerText = `cat <<'__SETUP_SH__' > setup.sh\n${res.setupScript}\n__SETUP_SH__\nbash setup.sh`;
+      const scriptFilename = `setup-${res.dirName || 'demo'}.sh`;
+      document.getElementById('setupCommand').innerText = `cat <<'__SETUP_SH__' > ${scriptFilename}\n${res.setupScript}\n__SETUP_SH__\nbash ${scriptFilename}`;
       currentSetupScript = res.setupScript;
+      currentScriptFilename = scriptFilename;
       document.getElementById('systemInstruction').value = res.systemInstruction;
 
       const adkDirPlaceholder = document.getElementById('adkDirPlaceholder');
@@ -2649,7 +2652,7 @@
       google.script.run
         .withSuccessHandler(newScript => {
           currentData.setupScript = newScript;
-          document.getElementById('setupCommand').innerText = `cat <<'__SETUP_SH__' > setup.sh\n${newScript}\n__SETUP_SH__\nbash setup.sh`;
+          document.getElementById('setupCommand').innerText = `cat <<'__SETUP_SH__' > ${currentScriptFilename}\n${newScript}\n__SETUP_SH__\nbash ${currentScriptFilename}`;
         })
         .updateSystemInstruction(currentData.setupScript, instr);
     }
@@ -2699,12 +2702,12 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'setup.sh';
+      a.download = currentScriptFilename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showToast('Downloading setup.sh...');
+      showToast(`Downloading ${currentScriptFilename}...`);
     }
 
     function copyText(text) {

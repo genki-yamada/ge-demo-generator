@@ -29,7 +29,7 @@ The Demo Generator has synthesized a custom setup script for you. This script is
 > [!IMPORTANT]
 > This app does not provision resources directly. Running this script is the required step to create the demo environment in your own project.
 
-> **Note:** This script will create a directory named `demo-[BASE_NAME]-[SUFFIX]` (e.g., `demo-retail-inventory-831afa90`).
+> **Note:** The script is uniquely named (e.g., `setup-demo-retail-inventory-831afa90.sh`) and creates a matching directory.
 
 ```bash
 # Paste your setup command here in the terminal window below
@@ -154,6 +154,24 @@ If you see "Request had insufficient authentication scopes" in the logs:
 - **Solution**: Refresh your local credentials in Cloud Shell with mandatory scopes (Note: `maps-platform` is NOT a valid standalone scope; use `cloud-platform` instead):
   `gcloud auth application-default login --scopes="https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/bigquery,openid,https://www.googleapis.com/auth/userinfo.email"`
 - **Required Action**: After running the command, you MUST **restart the agent** (Ctrl+C and run the launch command again) to clear the cached tokens.
+
+---
+
+## 🧹 Cleanup: Removing Demo Resources
+
+When you're done with your demo, you can easily clean up all created resources by running the setup script with the `--cleanup` flag:
+
+```bash
+# Replace with your actual script name
+bash setup-demo-xxx.sh --cleanup
+```
+
+This will remove:
+- **BigQuery Dataset**: The demo dataset and all its tables
+- **Maps API Key**: The auto-generated API key for Google Maps
+- **Local Directory**: The demo folder in your Cloud Shell home
+
+> **Note:** You'll be prompted for confirmation before any resources are deleted.
 
 ---
 

@@ -648,11 +648,58 @@ function generateSetupScript(params) {
 
   return `#!/bin/bash
 # ===========================================
-# BigQuery MCP Agent Demo - Portable Setup Script
+# BigQuery MCP Agent Demo - Setup Script
 # Generated: ${new Date().toISOString()}
+# Demo: ${dirName}
 # ===========================================
 
 set -e
+
+# --- Cleanup Mode Handler ---
+if [ "$1" = "--cleanup" ] || [ "$1" = "-c" ]; then
+  echo ""
+  echo "========================================================="
+  echo "🧹 DEMO CLEANUP MODE"
+  echo "========================================================="
+  echo ""
+  echo "This will delete the following resources:"
+  echo "  • BigQuery Dataset: ${datasetId}"
+  echo "  • Maps API Key: MCP-Demo-Key-${suffix}"
+  echo "  • Local Directory: ~/${dirName}"
+  echo ""
+  read -p "Are you sure you want to proceed? (y/n) " -n 1 -r
+  echo
+  if [[ ! \\$REPLY =~ ^[Yy]$ ]]; then
+    echo "Cleanup cancelled."
+    exit 0
+  fi
+  
+  PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+  
+  echo ""
+  echo "🗑️  Deleting BigQuery Dataset: ${datasetId}..."
+  bq rm -r -f -d \\$PROJECT_ID:${datasetId} 2>/dev/null && echo "   ✅ Dataset deleted." || echo "   ⚠️  Dataset not found or already deleted."
+  
+  echo ""
+  echo "🔑 Deleting Maps API Key: MCP-Demo-Key-${suffix}..."
+  KEY_NAME=$(gcloud alpha services api-keys list --filter="displayName:MCP-Demo-Key-${suffix}" --format="value(name)" 2>/dev/null || echo "")
+  if [ ! -z "\\$KEY_NAME" ]; then
+    gcloud alpha services api-keys delete "\\$KEY_NAME" --quiet 2>/dev/null && echo "   ✅ API Key deleted." || echo "   ⚠️  Failed to delete API Key."
+  else
+    echo "   ⚠️  API Key not found or already deleted."
+  fi
+  
+  echo ""
+  echo "📂 Deleting local directory: ~/${dirName}..."
+  cd ~
+  rm -rf ~/${dirName} && echo "   ✅ Directory deleted." || echo "   ⚠️  Failed to delete directory."
+  
+  echo ""
+  echo "========================================================="
+  echo "✅ CLEANUP COMPLETE"
+  echo "========================================================="
+  exit 0
+fi
 
 # --- 1. Project Detection & Confirmation ---
 PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
@@ -1160,6 +1207,8 @@ echo "   • To RESTART the UI: Run the following commands:"
 echo ""
 echo "     cd ~/${dirName}/adk_agent"
 echo "     ../.venv/bin/adk web --port \$PORT"
+echo ""
+echo "   • To CLEANUP:        bash setup-${dirName}.sh --cleanup"
 echo ""
 echo "========================================================="
 echo ""

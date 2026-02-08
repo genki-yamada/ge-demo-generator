@@ -21,10 +21,11 @@ This tool helps you:
 Uses Gemini's Google Search grounding to find real BigQuery public datasets, then verifies table existence via BigQuery API.
 
 ### 🚀 One-Click Cloud Shell Deployment
-Generates a complete `setup.sh` script that:
+Generates a uniquely named setup script (e.g., `setup-demo-retail-inventory-831afa90.sh`) that:
 - Creates BigQuery datasets and tables
 - Configures ADK agent with MCP servers (BigQuery + Google Maps)
 - Launches the agent UI automatically
+- Supports `--cleanup` option to remove all deployed resources
 
 ### 📖 Interactive Walkthrough
 Includes a built-in Cloud Shell tutorial (`tutorial.md`) that guides users through the deployment and demo execution.
@@ -97,9 +98,10 @@ const CONFIG = {
 
 ## Advanced Settings
 
-- **Synthesis Volume**: Rows per table (15/25/50)
-- **Dataset Complexity**: Number of tables (1/2/3)
+- **Synthesis Volume**: Rows per table (50/100/150)
+- **Dataset Complexity**: Number of tables (5/6/7/8)
 - **Public Dataset Override**: Manually specify a BigQuery public dataset
+- **Cleanup**: Run `bash setup-demo-xxx.sh --cleanup` to remove all deployed resources
 
 ## License
 
