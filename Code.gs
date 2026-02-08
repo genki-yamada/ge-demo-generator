@@ -22,7 +22,7 @@ const CONFIG = {
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',
   MAX_HISTORY: 5,
-  APP_VERSION: 'v3.45',
+  APP_VERSION: 'v3.5',
   UPDATE_LOG: [
     { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
   ]
@@ -669,7 +669,7 @@ if [ "$1" = "--cleanup" ] || [ "$1" = "-c" ]; then
   echo ""
   read -p "Are you sure you want to proceed? (y/n) " -n 1 -r
   echo
-  if [[ ! \\$REPLY =~ ^[Yy]$ ]]; then
+  if [[ ! \$REPLY =~ ^[Yy]$ ]]; then
     echo "Cleanup cancelled."
     exit 0
   fi
@@ -678,13 +678,13 @@ if [ "$1" = "--cleanup" ] || [ "$1" = "-c" ]; then
   
   echo ""
   echo "🗑️  Deleting BigQuery Dataset: ${datasetId}..."
-  bq rm -r -f -d \\$PROJECT_ID:${datasetId} 2>/dev/null && echo "   ✅ Dataset deleted." || echo "   ⚠️  Dataset not found or already deleted."
+  bq rm -r -f -d \$PROJECT_ID:${datasetId} 2>/dev/null && echo "   ✅ Dataset deleted." || echo "   ⚠️  Dataset not found or already deleted."
   
   echo ""
   echo "🔑 Deleting Maps API Key: MCP-Demo-Key-${suffix}..."
   KEY_NAME=$(gcloud alpha services api-keys list --filter="displayName:MCP-Demo-Key-${suffix}" --format="value(name)" 2>/dev/null || echo "")
-  if [ ! -z "\\$KEY_NAME" ]; then
-    gcloud alpha services api-keys delete "\\$KEY_NAME" --quiet 2>/dev/null && echo "   ✅ API Key deleted." || echo "   ⚠️  Failed to delete API Key."
+  if [ ! -z "\$KEY_NAME" ]; then
+    gcloud alpha services api-keys delete "\$KEY_NAME" --quiet 2>/dev/null && echo "   ✅ API Key deleted." || echo "   ⚠️  Failed to delete API Key."
   else
     echo "   ⚠️  API Key not found or already deleted."
   fi
@@ -815,11 +815,13 @@ gcloud beta services mcp enable mapstools.googleapis.com --project="$PROJECT_ID"
 
 # --- 2.2 User-level IAM Configuration (for Cloud Shell users) ---
 echo "🔐 Configuring user permissions for local execution..."
-USER_ACCOUNT=$(gcloud config get-value account)
+USER_ACCOUNT=$(gcloud config get-value account 2>/dev/null)
 for ROLE in "roles/mcp.toolUser" "roles/serviceusage.serviceUsageConsumer"; do
+  echo "  Granting $ROLE to $USER_ACCOUNT..."
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \\
     --member="user:$USER_ACCOUNT" \\
-    --role="$ROLE" --condition=None || true
+    --role="$ROLE" --condition=None >/dev/null 2>&1 || true
+  echo "    ✅ Done"
 done
 
 # Check for BQ permissions (with timeout to prevent hanging on new projects)
@@ -1143,12 +1145,18 @@ Help the user answer questions by strategically combining insights from BigQuery
 ---------------------------------------------------
 CRITICAL OPERATIONAL RULES:
 - SCHEMA DISCOVERY: Always check the table schema using \\\`get_table_info\\\` before writing any SQL query. Never assume column names.
+- EXPLORE BEFORE FILTER: For any unfamiliar column, run \\\`SELECT DISTINCT column LIMIT 10\\\` to discover valid values before using them in WHERE clauses.
 - SQL SELF-CORRECTION: If a SQL query fails, analyze the error message, re-check the schema if necessary, and attempt to fix the query.
 - DATA HONESTY: If a tool returns no data (empty result), do not hallucinate results. Inform the user and suggest an alternative inquiry.
 - MAPS SPECIFICITY: Always include specific geographical context (city, state, etc.) from BigQuery data in your Google Maps search queries to ensure accuracy.
 - SEQUENTIAL EXECUTION: Always perform tool calls one at a time. Do not attempt multiple tool calls in a single response turn. Wait for the tool's output before deciding on the next action.
-- NO PARALLELISM: Reasoning Engine stability is sensitive to parallel tool calls. If you need data from multiple sources, fetch them one by one.
+- SAME-TOOLSET PARALLELISM: NEVER call multiple tools from the SAME toolset (e.g., two BigQuery tools) in the same turn. Different toolsets (BigQuery then Maps) may be called in sequence across turns.
 - RESULT BLOCKING: Strictly wait for a tool's output before deciding on the next tool call.
+- PROGRESS UPDATES: Before each tool call, output a brief status message so the user knows you are working. Use emoji for clarity. Examples: "📊 Checking table schema...", "🔍 Running SQL query...", "🗺️ Looking up location..."
+- PUBLIC DATASET ACCESS: When working with public datasets (e.g., bigquery-public-data):
+  * projectId in tool calls: Always use YOUR project ID ([PROJECT_ID]), never "bigquery-public-data".
+  * datasetId/tableId in tool calls: Use fully qualified names including the public project (e.g., datasetId="bigquery-public-data.google_trends" or tableId="bigquery-public-data.google_trends.top_terms").
+  * SQL queries: Reference tables with fully qualified names (e.g., FROM \`bigquery-public-data.google_trends.top_terms\`).
 ---------------------------------------------------
 """
 
