@@ -22,7 +22,7 @@ const CONFIG = {
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',
   MAX_HISTORY: 5,
-  APP_VERSION: 'v3.1',
+  APP_VERSION: 'v3.4',
   UPDATE_LOG: [
     { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
   ]
@@ -117,6 +117,8 @@ function generateDemo(userGoal, options = {}) {
     result.referenceDate = planResult.referenceDate;
     result.publicDatasetId = planResult.publicDatasetId;
     result.demoGuide = planResult.demoGuide;
+    result.appliedFactors = planResult.appliedFactors;
+
     result.setupScript = generateSetupScript({
       datasetId: datasetId,
       systemInstruction: planResult.systemInstruction,
@@ -147,9 +149,11 @@ function generateDemo(userGoal, options = {}) {
         rawTables: result.rawTables,
         suffix: result.suffix,
         domainName: result.domainName,
-        dirName: result.dirName
+        dirName: result.dirName,
+        appliedFactors: result.appliedFactors
       }
     });
+
     
   } catch (error) {
     result.error = error.message;
@@ -317,15 +321,20 @@ function planAndGenerateData(userGoal, options) {
     referenceDate: parsed.referenceDate || '2023-11-01',
     publicDatasetId: parsed.publicDatasetId || options.publicDatasetId,
     demoGuide: parsed.demoGuide,
+    appliedFactors: parsed.appliedFactors || null,
     dataPreview: dataPreview
   };
 }
 
 function buildPlanningPrompt(userGoal, options) {
-  const maxRows = Math.min(options.rowCount, 50); // Cap at 50 for stability
+  const maxRows = Math.min(options.rowCount, 150); // Cap at 150 for stability
   const publicDatasetInfo = options.usePublicDataset && options.publicDatasetId 
     ? `- Related Public Dataset for JOINs: ${options.publicDatasetId}`
     : `- IMPORTANT: NO public dataset should be used for this demo. Focus ONLY on synthetic tables below. Do NOT attempt to JOIN with external public-data.`;
+  
+  const anomalyInstruction = options.injectAnomalies 
+    ? `- **INJECT ANOMALIES**: Include realistic "dirty data" such as outlier spikes, missing periods, negative values (returns/refunds), and edge cases that would occur in real-world operations.`
+    : '';
   
   return `You are a data analyst and BigQuery expert.
 Design and generate a demo dataset based on the following business problem.
@@ -336,7 +345,33 @@ ${userGoal}
 ## Requirements
 - Number of tables: ${options.tableCount}
 - Rows per table: **Target exactly ${maxRows} diverse rows** per table.
+- Columns per table: **Target 6-10 descriptive columns** per table to ensure analytical depth.
 ${publicDatasetInfo}
+
+## REALISTIC DATA SYNTHESIS (CRITICAL)
+Generate data that reflects real-world business complexity. Apply the following domain-agnostic principles:
+
+### 1. Temporal Patterns
+Apply cyclical variations appropriate to the business context:
+- **Day-of-week effects**: Weekday vs. weekend behavioral differences
+- **End-of-period spikes**: Month-end, quarter-end, or fiscal year-end concentrations
+- **Holiday/Event impacts**: Peak periods, promotional windows, or seasonal patterns
+Infer relevant cycles based on the stated industry and problem.
+
+### 2. Attribute Correlations
+Ensure realistic correlations between dimensions:
+- **Geography × Behavior**: Regional preferences, local trends, or location-based patterns
+- **Segment × Channel**: Customer type affecting preferred interaction methods
+- **Tier/Rank × Frequency**: Engagement levels varying by loyalty status or classification
+Create statistically plausible distributions — not random noise.
+
+### 3. Business Logic Linkage (Cross-Table Consistency)
+Ensure data across tables is logically consistent:
+- **Constraint-based value linkage**: Capacity limits affecting downstream transactions (e.g., if a resource is exhausted, related activity stops)
+- **Status/State transitions**: Multi-step workflows with valid state progressions
+- **Temporal dependencies**: Lead times between related events (e.g., approval → execution timing)
+Infer appropriate business rules based on the stated industry and challenge.
+${anomalyInstruction}
 
 ## Output Format (JSON)
 Output in the following JSON format. Output **pure JSON only without code blocks**.
@@ -355,6 +390,11 @@ Output in the following JSON format. Output **pure JSON only without code blocks
   "systemInstruction": "Specific instruction for the agent (3-5 sentences).",
   "referenceDate": "YYYY-MM-DD (Choose a realistic anchor date for this demo context, e.g., '2023-11-01')",
   "publicDatasetId": "bigquery-public-data.dataset_name.table_name",
+  "appliedFactors": {
+    "temporalPatterns": ["List of temporal patterns applied, e.g., 'weekend spike', 'month-end surge'"],
+    "correlations": ["List of correlations applied, e.g., 'region×product preference', 'tier×frequency'"],
+    "businessLogic": ["List of business rules enforced, e.g., 'inventory constraint', 'status transitions'"]
+  },
   "demoGuide": [
     {
       "title": "Short title in user's language (e.g., '1. USER Greeting')",
@@ -379,6 +419,7 @@ Output in the following JSON format. Output **pure JSON only without code blocks
     4. Geospatial Context (Location/map analysis)
     5. Strategy & Recommendation (Strategic advice based on data)`;
 }
+
 
 // ===========================================
 // Step 2: Validation
@@ -605,7 +646,7 @@ echo "💾 Checking disk space..."
 FREE_SPACE=$(df -k . | awk 'NR==2 {print $4}')
 if [ "$FREE_SPACE" -lt 524288 ]; then
   echo "⚠️  Warning: Low disk space detected in Cloud Shell ($((FREE_SPACE/1024)) MB left)."
-  echo "To clear space, you can run: rm -rf ~/my-ge-demo-*"
+  echo "To clear space, you can run: rm -rf ~/demo-*"
   echo ""
 fi
 

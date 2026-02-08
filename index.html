@@ -901,9 +901,9 @@
                   Volume</label>
                 <select id="rowCount"
                   class="w-full bg-gray-800/50 border border-gray-600 rounded-xl p-3 text-xs text-gray-200">
-                  <option value="15">Minimal (15 rows)</option>
-                  <option value="25" selected>Standard (25 rows) [Recommended]</option>
-                  <option value="50">Deep (50 rows)</option>
+                  <option value="50">Compact (50 rows)</option>
+                  <option value="100" selected>Standard (100 rows) [Recommended]</option>
+                  <option value="150">Deep (150 rows)</option>
                 </select>
                 <p class="text-[9px] text-gray-500 mt-2 italic">* Rows per generated table.</p>
               </div>
@@ -914,9 +914,9 @@
                   class="w-full bg-gray-800/50 border border-gray-600 rounded-xl p-3 text-xs text-gray-200">
                   <option value="1">Minimal (1 Table)</option>
                   <option value="2">Standard (2 Tables)</option>
-                  <option value="3" selected>Advanced (3 Tables)</option>
+                  <option value="3">Advanced (3 Tables)</option>
                   <option value="4">Complex (4 Tables)</option>
-                  <option value="5">Enterprise (5 Tables)</option>
+                  <option value="5" selected>Enterprise (5 Tables) [Recommended]</option>
                 </select>
                 <p class="text-[9px] text-gray-500 mt-2 italic">* Number of synthetic tables to generate.</p>
               </div>
@@ -934,6 +934,21 @@
                     <span
                       class="text-[10px] font-bold text-gray-400 uppercase tracking-widest group-hover:text-gray-300 transition-colors">Use
                       BigQuery Public Dataset for JOINs</span>
+                  </label>
+                </div>
+
+                <!-- Inject Anomalies Toggle -->
+                <div class="flex items-center justify-between">
+                  <label class="flex items-center gap-3 cursor-pointer group">
+                    <div class="relative">
+                      <input id="injectAnomalies" type="checkbox" class="sr-only peer">
+                      <div
+                        class="w-10 h-5 bg-gray-700 rounded-full peer peer-checked:bg-amber-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5">
+                      </div>
+                    </div>
+                    <span
+                      class="text-[10px] font-bold text-gray-400 uppercase tracking-widest group-hover:text-gray-300 transition-colors">Inject
+                      Real-world Anomalies (Outliers, Edge Cases)</span>
                   </label>
                 </div>
 
@@ -998,9 +1013,18 @@
             </div>
           </div>
 
+          <!-- Estimated Time Notice -->
+          <div class="mt-4 flex items-center gap-2 text-[9px] text-gray-500 italic">
+            <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>Estimated: 1-3 minutes depending on data complexity</span>
+          </div>
+
           <!-- Terminal-style Dynamic Logs -->
-          <div class="mt-8 p-4 bg-black/40 rounded-xl border border-white/5 font-mono overflow-hidden">
-            <div id="generationLogs" class="space-y-1 h-[120px] overflow-y-auto custom-scrollbar">
+          <div class="mt-6 p-4 bg-black/40 rounded-xl border border-white/5 font-mono overflow-hidden">
+            <div id="generationLogs" class="space-y-1 h-[200px] overflow-y-auto custom-scrollbar">
               <div class="text-[9px] text-gray-500 italic opacity-50">Initializing system synthesis engines...</div>
             </div>
           </div>
@@ -1088,20 +1112,55 @@
                   class="text-[9px] text-sky-400 font-bold border-b border-sky-400/30 hover:text-sky-300 transition-colors uppercase font-mono">Download
                   Raw CSVs</button>
               </div>
+
+              <!-- Data DNA Badges -->
+              <div id="dataDnaBadges"
+                class="hidden mb-6 p-4 rounded-xl bg-gradient-to-br from-purple-900/20 to-sky-900/10 border border-purple-500/20">
+                <div class="flex items-center gap-2 mb-3">
+                  <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z">
+                    </path>
+                  </svg>
+                  <span class="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Data DNA — AI-Applied
+                    Realism Factors</span>
+                </div>
+                <div class="flex flex-wrap gap-2" id="dataDnaBadgesContainer"></div>
+              </div>
+
               <div id="dataPreview" class="space-y-4"></div>
+
             </div>
           </div>
 
           <!-- Step 3: Deploy -->
           <div id="section-step3"
             class="glass rounded-3xl p-10 border border-emerald-500/40 shadow-2xl shadow-emerald-900/20 bg-gradient-to-br from-emerald-900/10 to-transparent scroll-mt-8">
-            <div class="flex items-center gap-4 mb-10">
-              <span
-                class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white font-bold text-xl shadow-lg shadow-emerald-500/40">3</span>
-              <div>
-                <h2 class="text-2xl font-bold text-white uppercase tracking-tight">Step 3: Deploy</h2>
-                <p class="text-[11px] text-gray-500">Run the synthesized environment in your own GCP project</p>
+            <div class="flex items-center justify-between gap-4 mb-10">
+              <div class="flex items-center gap-4">
+                <span
+                  class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white font-bold text-xl shadow-lg shadow-emerald-500/40">3</span>
+                <div>
+                  <h2 class="text-2xl font-bold text-white uppercase tracking-tight">Step 3: Deploy</h2>
+                  <p class="text-[11px] text-gray-500">Run the synthesized environment in your own GCP project</p>
+                </div>
               </div>
+              <a href="https://shell.cloud.google.com/cloudshell/editor?cloudshell_tutorial=tutorial.md&cloudshell_git_repo=https://github.com/ryotat7/ge-demo-generator.git"
+                target="_blank" rel="noopener noreferrer"
+                class="px-4 py-2 bg-sky-600/80 hover:bg-sky-500 text-white font-bold rounded-xl text-[10px] transition-all shadow-lg flex items-center gap-2 uppercase tracking-wider border border-sky-400/20 hover:scale-105">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z">
+                  </path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Launch Tutorial
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                </svg>
+              </a>
             </div>
 
             <!-- Step 3.1: Configure Cloud Shell & Project -->
@@ -1113,28 +1172,14 @@
                 </h3>
               </div>
 
-              <div class="space-y-6 max-w-2xl">
+              <div class="space-y-6">
                 <div class="space-y-3">
                   <p class="text-[13px] text-gray-400 leading-relaxed">
-                    1. First, navigate to your <b>Home directory</b> to ensure a clean setup.
-                  </p>
-                  <div class="relative group/cmd">
-                    <code id="homeDirCmd"
-                      class="block bg-black/40 border border-white/10 rounded-xl p-3 text-[11px] text-emerald-400 font-mono">cd ~</code>
-                    <button onclick="copyRaw('cd ~')"
-                      class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
-                        </path>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                <div class="space-y-3">
-                  <p class="text-[13px] text-gray-400 leading-relaxed">
-                    2. Set your <b>Active Project ID</b>. Enter your Google Cloud Project ID below, then copy the
+                    1. <a href="https://console.cloud.google.com?cloudshell=true" target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-emerald-400 hover:text-emerald-300 underline underline-offset-2">Open the Cloud
+                      Shell</a> and set your <b>Active Project ID</b>. Enter your Google Cloud Project ID below, then
+                    copy the
                     command.
                   </p>
                   <div
@@ -1143,7 +1188,7 @@
                       <div class="relative flex-1">
                         <input type="text" id="projectIdInput"
                           class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[11px] font-mono text-emerald-400 focus:outline-none focus:border-emerald-500/50 transition-all placeholder-gray-600"
-                          placeholder="my-project-id" value="<?= projectId ?>" oninput="updateProjectSetCmd()">
+                          placeholder="my-project-id" value="" oninput="updateProjectSetCmd()">
                         <span
                           class="absolute right-3 top-2 text-[8px] text-gray-500 uppercase tracking-widest font-bold">PROJECT
                           ID</span>
@@ -1161,6 +1206,24 @@
                         </svg>
                       </button>
                     </div>
+                  </div>
+                </div>
+
+                <div class="space-y-3">
+                  <p class="text-[13px] text-gray-400 leading-relaxed">
+                    2. Navigate to your <b>Home directory</b> to ensure a clean setup.
+                  </p>
+                  <div class="relative group/cmd">
+                    <code id="homeDirCmd"
+                      class="block bg-black/40 border border-white/10 rounded-xl p-3 text-[11px] text-emerald-400 font-mono">cd ~</code>
+                    <button onclick="copyRaw('cd ~')"
+                      class="absolute top-2 right-2 p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover/cmd:opacity-100 transition-all border border-gray-700">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
+                        </path>
+                      </svg>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1219,12 +1282,12 @@
 
               <div class="space-y-6">
                 <div class="flex-1">
-                  <p class="text-[13px] text-gray-300 leading-relaxed mb-4">
-                    Copy and paste the setup script into your Cloud Shell.
-                  </p>
-                  <div class="flex items-center gap-2 mb-4">
+                  <div class="flex items-center justify-between mb-4">
+                    <p class="text-[13px] text-gray-300 leading-relaxed">
+                      Copy and paste the setup script into your Cloud Shell. And then hit the enter key.
+                    </p>
                     <button onclick="copy('setupCommand')"
-                      class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-[11px] transition-all shadow-lg flex items-center gap-2 uppercase tracking-wider">
+                      class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-[11px] transition-all shadow-lg flex items-center gap-2 uppercase tracking-wider flex-shrink-0 ml-4">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
@@ -1232,23 +1295,24 @@
                       </svg>
                       Copy Setup Command
                     </button>
-                    <a href="https://shell.cloud.google.com/cloudshell/editor?cloudshell_tutorial=tutorial.md&cloudshell_git_repo=https://github.com/ryotat7/ge-demo-generator.git"
-                      target="_blank" rel="noopener noreferrer"
-                      class="px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-[11px] transition-all shadow-lg flex items-center gap-2 uppercase tracking-wider">
-                      LAUNCH TUTORIAL
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                      </svg>
-                    </a>
                   </div>
 
                   <div class="relative group min-w-0">
                     <div id="scriptContainer"
-                      class="bg-black/80 rounded-2xl border border-white/5 transition-all max-h-40 overflow-hidden cursor-pointer"
+                      class="bg-black/80 rounded-2xl border border-white/5 transition-all max-h-40 overflow-hidden cursor-pointer relative group/script"
                       onclick="toggleScriptExpansion()">
                       <pre id="setupCommand"
                         class="p-6 pb-4 text-[11px] font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap break-all"></pre>
+
+                      <!-- Download Button -->
+                      <button onclick="downloadSetupScript(); event.stopPropagation();"
+                        class="absolute top-3 right-3 p-2 rounded-xl bg-gray-900/80 text-gray-400 hover:text-white hover:bg-emerald-500/20 opacity-0 group-hover/script:opacity-100 transition-all border border-white/5 z-20 shadow-xl backdrop-blur-sm"
+                        title="Download setup.sh">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                      </button>
                       <div
                         class="sticky bottom-0 left-0 right-0 z-10 flex justify-center py-4 bg-gradient-to-t from-black via-black/90 to-transparent pointer-events-none"
                         id="stickyBtnWrapper">
@@ -1283,7 +1347,7 @@
                     <h4 class="text-[12px] font-bold text-amber-400 uppercase tracking-widest mb-2">Important
                       Confirmation</h4>
                     <p class="text-[13px] text-amber-200/80 leading-relaxed">
-                      After pasting, the terminal will ask: <span
+                      After pasting the setup script and hitting the enter key, the terminal will ask: <span
                         class="text-amber-300 font-mono bg-black/30 px-1.5 py-0.5 rounded">"Do you want to proceed with
                         this project? (y/n)"</span>.
                       Verify the project ID and type <kbd
@@ -1308,8 +1372,7 @@
                 <h4 class="text-[12px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Next Step: Open Local
                   Server</h4>
                 <p class="text-[13px] text-emerald-300/80 leading-relaxed">
-                  Copy and paste the command above into your Cloud Shell to <b>deploy demo assets</b>. When the script
-                  completes, click the
+                  When the script completes, click the
                   <code
                     class="text-emerald-300 font-mono bg-black/30 px-1.5 py-0.5 rounded">http://127.0.0.1:[PORT]</code>
                   link shown in your terminal to open the UI.
@@ -1809,6 +1872,7 @@
   <script>
     let currentData = null;
     let currentSuffix = '';
+    let currentSetupScript = '';
 
     function selectMethod(method) {
       const selection = document.getElementById('methodSelection');
@@ -1887,7 +1951,8 @@
           { tag: 'info', msg: 'Constructing Gcloud deployment scripts...' },
           { tag: 'ai', msg: 'Optimizing agent reasoning chains...' },
           { tag: 'success', msg: 'Resource bundling complete.' },
-          { tag: 'info', msg: 'Finalizing executable artifact...' }
+          { tag: 'info', msg: 'Finalizing executable artifact...' },
+          { tag: 'wait', msg: 'Waiting for response... (this may take a minute)' }
         ],
         ja: [
           { tag: 'info', msg: 'システム構成を初期化中...' },
@@ -1898,7 +1963,8 @@
           { tag: 'info', msg: 'Gcloud展開スクリプトを構築中...' },
           { tag: 'ai', msg: 'エージェントの推論パスを最適化中...' },
           { tag: 'success', msg: 'リソースのパッケージングが完了しました' },
-          { tag: 'info', msg: '実行可能なアーティファクトを最終調整中...' }
+          { tag: 'info', msg: '実行可能なアーティファクトを最終調整中...' },
+          { tag: 'wait', msg: '応答を待機中... (1分程度かかる場合があります)' }
         ]
       },
       timer: null,
@@ -1962,9 +2028,14 @@
     function resetForm() {
       // Clear form inputs
       document.getElementById('userGoal').value = '';
-      document.getElementById('rowCount').value = '25';
-      document.getElementById('tableCount').value = '3';
+      document.getElementById('rowCount').value = '100';
+      document.getElementById('tableCount').value = '5';
+      document.getElementById('injectAnomalies').checked = false;
       document.getElementById('publicDatasetId').value = '';
+      if (document.getElementById('projectIdInput')) {
+        document.getElementById('projectIdInput').value = '';
+        updateProjectSetCmd();
+      }
 
       // Hide result sections
       document.getElementById('resultSection').classList.add('hidden');
@@ -1975,6 +2046,7 @@
 
       // Reset current data
       currentData = null;
+      currentSetupScript = '';
 
       document.getElementById('usePublicDataset').checked = false;
       togglePublicDatasetOverride();
@@ -2270,11 +2342,15 @@
         rowCount: document.getElementById('rowCount').value,
         tableCount: document.getElementById('tableCount').value,
         publicDatasetId: document.getElementById('publicDatasetId').value,
-        usePublicDataset: document.getElementById('usePublicDataset').checked
+        usePublicDataset: document.getElementById('usePublicDataset').checked,
+        injectAnomalies: document.getElementById('injectAnomalies').checked
       };
 
       const stepsSection = document.getElementById('stepsSection');
       stepsSection.classList.remove('hidden');
+
+      // Auto-scroll to progress section
+      setTimeout(() => stepsSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
       document.getElementById('resultSection').classList.add('hidden');
       document.getElementById('errorSection').classList.add('hidden');
       document.getElementById('section-step5').classList.add('hidden');
@@ -2295,13 +2371,13 @@
       // Start dynamic logs
       GenerationLogger.start();
 
-      // Simulate step 2 animation shortly after start
+      // Simulate step 2 animation with more realistic timing
       setTimeout(() => {
         s1.classList.add('step-completed');
         s1.querySelector('.step-message').innerText = 'Logic synthesis successful';
         s2.querySelector('.step-icon').className = 'step-icon w-6 h-6 rounded bg-sky-500/20 text-sky-400 flex items-center justify-center text-[10px] font-bold animate-pulse';
-        s2.querySelector('.step-message').innerText = 'Bundling assets...';
-      }, 5000);
+        s2.querySelector('.step-message').innerText = 'Bundling assets... (this may take a minute)';
+      }, 25000); // More realistic ~25s timing
 
       google.script.run
         .withSuccessHandler(res => {
@@ -2342,14 +2418,19 @@
       document.getElementById('section-step4').classList.remove('hidden');
       document.getElementById('section-step5').classList.remove('hidden');
       document.getElementById('setupCommand').innerText = `cat <<'__SETUP_SH__' > setup.sh\n${res.setupScript}\n__SETUP_SH__\nbash setup.sh`;
+      currentSetupScript = res.setupScript;
       document.getElementById('systemInstruction').value = res.systemInstruction;
 
       const adkDirPlaceholder = document.getElementById('adkDirPlaceholder');
       if (adkDirPlaceholder) adkDirPlaceholder.innerText = res.dirName || 'demo-directory';
 
+      const adkDirPlaceholder2 = document.getElementById('adkDirPlaceholder2');
+      if (adkDirPlaceholder2) adkDirPlaceholder2.innerText = res.dirName || 'demo-directory';
+
+
       const projectIdInput = document.getElementById('projectIdInput');
       if (projectIdInput) {
-        projectIdInput.value = res.projectId || '<?= projectId ?>';
+        projectIdInput.value = ''; // Clear to show placeholder as example
         updateProjectSetCmd();
       }
 
@@ -2393,6 +2474,48 @@
           guideContainer.appendChild(div);
         });
       }
+
+      // Data DNA Badges
+      const dataDnaBadges = document.getElementById('dataDnaBadges');
+      const dataDnaBadgesContainer = document.getElementById('dataDnaBadgesContainer');
+      if (res.appliedFactors && dataDnaBadges && dataDnaBadgesContainer) {
+        dataDnaBadgesContainer.innerHTML = '';
+        const badgeStyles = {
+          temporalPatterns: { bg: 'bg-sky-500/20', text: 'text-sky-400', border: 'border-sky-500/30', icon: '📅' },
+          correlations: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30', icon: '🔗' },
+          businessLogic: { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30', icon: '⚙️' }
+        };
+        let hasBadges = false;
+        for (const [category, items] of Object.entries(res.appliedFactors)) {
+          if (items && Array.isArray(items) && items.length > 0) {
+            const style = badgeStyles[category] || { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/30', icon: '🏷️' };
+            items.forEach(item => {
+              const badge = document.createElement('span');
+              badge.className = `text-[9px] ${style.bg} ${style.text} border ${style.border} px-2 py-1 rounded-full font-medium flex items-center gap-1`;
+              badge.innerHTML = `<span>${style.icon}</span><span>${item}</span>`;
+              dataDnaBadgesContainer.appendChild(badge);
+              hasBadges = true;
+            });
+          }
+        }
+        dataDnaBadges.classList.toggle('hidden', !hasBadges);
+      } else {
+        dataDnaBadges.classList.add('hidden');
+      }
+
+      // Sparkline SVG generator
+      const renderSparkline = (values, width = 60, height = 16) => {
+        if (!values || values.length < 2) return '';
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const range = max - min || 1;
+        const points = values.map((v, i) => {
+          const x = (i / (values.length - 1)) * width;
+          const y = height - ((v - min) / range) * height;
+          return `${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+        return `<svg class="inline-block ml-2 opacity-60" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><polyline fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="${points}"/></svg>`;
+      };
 
       // Preview
       const getColumnTypeIcon = (value) => {
@@ -2439,13 +2562,21 @@
         table.headers.forEach(h => {
           const firstVal = table.rows[0] ? table.rows[0][h] : '';
           const icon = getColumnTypeIcon(firstVal);
+
+          // Check if column is numeric and generate sparkline
+          const columnValues = table.rows.map(row => parseFloat(row[h])).filter(v => !isNaN(v));
+          const isNumericColumn = columnValues.length >= 2 && columnValues.length === table.rows.length;
+          const sparkline = isNumericColumn ? renderSparkline(columnValues) : '';
+
           html += `<th class="px-4 py-3 font-bold border-r border-white/5 last:border-0 truncate min-w-[120px]">
             <div class="flex items-center gap-1">
               ${icon}
               <span>${h}</span>
+              ${sparkline}
             </div>
           </th>`;
         });
+
 
         html += `</tr></thead><tbody class="divide-y divide-white/5 font-mono">`;
         table.rows.forEach(row => {
@@ -2557,6 +2688,23 @@
       toast.innerText = message;
       toast.className = 'show';
       setTimeout(() => { toast.className = toast.className.replace('show', ''); }, 3000);
+    }
+
+    function downloadSetupScript() {
+      if (!currentSetupScript) {
+        showToast('No script generated yet');
+        return;
+      }
+      const blob = new Blob([currentSetupScript], { type: 'text/x-sh' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'setup.sh';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Downloading setup.sh...');
     }
 
     function copyText(text) {
