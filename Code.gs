@@ -336,8 +336,10 @@ function buildPlanningPrompt(userGoal, options) {
     ? `- **INJECT ANOMALIES**: Include realistic "dirty data" such as outlier spikes, missing periods, negative values (returns/refunds), and edge cases that would occur in real-world operations.`
     : '';
   
-  return `You are a data analyst and BigQuery expert.
+  return `You are a versatile data analyst and BigQuery expert capable of generating realistic datasets for ANY industry or business function.
 Design and generate a demo dataset based on the following business problem.
+
+**DOMAIN ADAPTATION**: Carefully analyze the business problem below to identify the industry, job function, and operational context. Adapt ALL data generation (table structures, column names, values, relationships) to match that specific domain. Do not default to generic examples or assume a particular industry unless explicitly stated.
 
 ## Business Problem
 ${userGoal}
@@ -349,7 +351,7 @@ ${userGoal}
 ${publicDatasetInfo}
 
 ## REALISTIC DATA SYNTHESIS (CRITICAL)
-Generate data that reflects real-world business complexity. Apply the following domain-agnostic principles:
+Generate data that reflects real-world business complexity. Apply the following domain-agnostic principles, **adapting them to the specific industry/function identified above**:
 
 ### 1. Temporal Patterns
 Apply cyclical variations appropriate to the business context:
@@ -371,7 +373,29 @@ Ensure data across tables is logically consistent:
 - **Status/State transitions**: Multi-step workflows with valid state progressions
 - **Temporal dependencies**: Lead times between related events (e.g., approval → execution timing)
 Infer appropriate business rules based on the stated industry and challenge.
+
+### 4. Real-World Content (CRITICAL - Avoid Fictional Data)
+Use **actual real-world data** wherever possible to maximize authenticity:
+- **Products/Brands**: Use real brand names, product lines, and SKUs appropriate to the industry (e.g., "iPhone 15 Pro", "Nike Air Max", "Toyota Camry")
+- **Geographic Locations**: Use real city names, regions, and countries. Match locations to the business context (e.g., major retail markets, manufacturing hubs)
+- **Person Names**: Use culturally appropriate, realistic names for the stated region/language (e.g., Japanese names for Japan-based scenarios)
+- **Numerical Values**: Use realistic price points, quantities, and metrics based on real-world benchmarks (e.g., actual market prices, typical order volumes)
+- **Dates**: Use recent, realistic dates anchored to the referenceDate
+
+**DO NOT invent fictional brands, fake product names, or placeholder values like "Product A" or "Company XYZ".**
+
+### 5. Factual Consistency (CRITICAL - Company/Entity Alignment)
+If the business problem mentions a **specific company, organization, or brand**, ensure ALL generated data is factually consistent with that entity:
+- **Employees/Talents/Staff**: Only use names of people who ACTUALLY belong to that organization. Do NOT mix in people from competing organizations.
+- **Products/Services**: Only use products/services that the specified company ACTUALLY offers. Do NOT include competitor products.
+- **Locations/Facilities**: Only reference facilities that the company ACTUALLY owns or operates. Do NOT use generic placeholder names.
+- **Partnerships/Clients**: Reference realistic business relationships based on publicly known information.
+
+**If you are unsure whether a specific entity belongs to the mentioned company, DO NOT include it. It is better to use fewer but accurate data points than to include factually incorrect associations.**
+
+**If NO specific company/organization is mentioned in the business problem**: Create a COHERENT fictional business context. Choose ONE realistic company profile (industry vertical, size, geography) and generate ALL data as if it belongs to this single hypothetical entity. Ensure internal consistency - all facilities, products, and personnel should belong to the same fictional organization. Do NOT mix data from multiple unrelated real-world companies.
 ${anomalyInstruction}
+
 
 ## Output Format (JSON)
 Output in the following JSON format. Output **pure JSON only without code blocks**.
@@ -412,12 +436,19 @@ Output in the following JSON format. Output **pure JSON only without code blocks
     3. **NULL Values**: Leave empty between commas: val1,,val3.
     4. **Escaping**: If a text value contains a double quote, escape it with another double quote: '"He said ""Hello"""'.
 - **LANGUAGE PARITY**: Generate all qualitative content (table/field descriptions, synthetic data values, system instructions, and demo guide) in the **SAME LANGUAGE** as the user's input business problem.
-- **DEMO GUIDE**: Provide exactly 5 steps following this flow: 
+- **DEMO GUIDE**: Provide exactly 5 steps following this flow:
     1. USER Greeting (Simple greeting to trigger self-introduction)
-    2. Data Discovery (Ask about available tables/schema)
-    3. Multi-table Insight (JOIN between local tables or with public data)
-    4. Geospatial Context (Location/map analysis)
-    5. Strategy & Recommendation (Strategic advice based on data)`;
+    2. Data Discovery (Ask the agent to explore what data is available - **DO NOT mention specific table names**)
+    3. Multi-table Insight (Request analysis that requires joining data - **DO NOT specify table/column names, let the agent discover them**)
+    4. Geospatial Context (Location/map analysis - reference concepts like "regional" or "by area" without naming specific columns)
+    5. Strategy & Recommendation (Strategic advice based on data)
+    
+    **CRITICAL FOR DEMO PROMPTS - DATA ALIGNMENT**: 
+    - Do NOT include any specific table names, column names, or schema details in the prompts.
+    - The AI agent should demonstrate autonomous data discovery capability.
+    - Use business-level language only (e.g., "sales performance by region" instead of SQL).
+    - **DATA GROUNDING**: Prompts should reference realistic business scenarios that the generated data CAN answer. Avoid referencing data that is completely absent (e.g., don't ask about "customer satisfaction scores" if no such data exists).
+    - **ASPIRATIONAL QUERIES ENCOURAGED**: However, 1-2 prompts MAY include "stretch" conditions (e.g., "find talents with score above 80 AND rank C") where exact matches might not exist. This demonstrates the agent's ability to find CLOSE ALTERNATIVES and provide creative recommendations when perfect matches are unavailable.`;
 }
 
 
