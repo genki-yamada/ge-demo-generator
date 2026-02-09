@@ -92,7 +92,8 @@ function generateDemo(userGoal, options = {}) {
     
     // Step 2: Validation
     result.steps.push({ step: 2, status: 'running', message: 'Validating generated data...' });
-    validateGeneratedData(planResult);
+    const maxRows = Math.min(options.rowCount || 100, 150);
+    validateGeneratedData(planResult, maxRows);
     result.steps[1] = { step: 2, status: 'completed', message: 'Validation complete' };
     
     // Step 3: Skipping Server-side Ingestion (For Portability)
@@ -288,7 +289,6 @@ function planAndGenerateData(userGoal, options) {
     jsonStr = repairTruncatedJson(jsonStr);
     parsed = JSON.parse(jsonStr);
   } catch (e) {
-    // Removed raw response log for production cleanup
     throw new Error('Failed to parse AI response. Try reducing the row/table count.');
   }
   
@@ -298,16 +298,16 @@ function planAndGenerateData(userGoal, options) {
     for (const table of parsed.tables) {
       if (table.csvData) {
         const lines = table.csvData.trim().split('\n');
-        const headers = lines[0].split(',');
+        const headers = parseCSVLine(lines[0]);
         const previewRows = lines.slice(1, 6).map(line => {
           const values = parseCSVLine(line);
           const row = {};
-          headers.forEach((h, i) => { row[h.trim()] = values[i] || ''; });
+          headers.forEach((h, i) => { row[h.trim().replace(/^"|"$/g, '')] = values[i] || ''; });
           return row;
         });
         dataPreview.push({
           tableName: table.tableName,
-          headers: headers.map(h => h.trim()),
+          headers: headers.map(h => h.trim().replace(/^"|"$/g, '')),
           rows: previewRows,
           totalRows: lines.length - 1
         });
@@ -315,6 +315,9 @@ function planAndGenerateData(userGoal, options) {
     }
   }
   
+  // Validation and Clean-up
+  validateGeneratedData(parsed, options.rowCount);
+
   return {
     tables: parsed.tables,
     systemInstruction: parsed.systemInstruction,
@@ -327,14 +330,10 @@ function planAndGenerateData(userGoal, options) {
 }
 
 function buildPlanningPrompt(userGoal, options) {
-  const maxRows = Math.min(options.rowCount, 150); // Cap at 150 for stability
+  const maxRows = Math.min(options.rowCount || 100, 150);
   const publicDatasetInfo = options.usePublicDataset && options.publicDatasetId 
     ? `- Related Public Dataset for JOINs: ${options.publicDatasetId}`
     : `- IMPORTANT: NO public dataset should be used for this demo. Focus ONLY on synthetic tables below. Do NOT attempt to JOIN with external public-data.`;
-  
-  const anomalyInstruction = options.injectAnomalies 
-    ? `- **INJECT ANOMALIES**: Include realistic "dirty data" such as outlier spikes, missing periods, negative values (returns/refunds), and edge cases that would occur in real-world operations.`
-    : '';
   
   return `You are a versatile data analyst and BigQuery expert capable of generating realistic datasets for ANY industry or business function.
 Design and generate a demo dataset based on the following business problem.
@@ -394,7 +393,6 @@ If the business problem mentions a **specific company, organization, or brand**,
 **If you are unsure whether a specific entity belongs to the mentioned company, DO NOT include it. It is better to use fewer but accurate data points than to include factually incorrect associations.**
 
 **If NO specific company/organization is mentioned in the business problem**: Create a COHERENT fictional business context. Choose ONE realistic company profile (industry vertical, size, geography) and generate ALL data as if it belongs to this single hypothetical entity. Ensure internal consistency - all facilities, products, and personnel should belong to the same fictional organization. Do NOT mix data from multiple unrelated real-world companies.
-${anomalyInstruction}
 
 
 ## Output Format (JSON)
@@ -412,51 +410,31 @@ Output in the following JSON format. Output **pure JSON only without code blocks
     }
   ],
   "systemInstruction": "Specific instruction for the agent (3-5 sentences).",
-  "referenceDate": "YYYY-MM-DD (Choose a realistic anchor date for this demo context, e.g., '2023-11-01')",
-  "publicDatasetId": "bigquery-public-data.dataset_name.table_name",
-  "appliedFactors": {
-    "temporalPatterns": ["List of temporal patterns applied, e.g., 'weekend spike', 'month-end surge'"],
-    "correlations": ["List of correlations applied, e.g., 'region×product preference', 'tier×frequency'"],
-    "businessLogic": ["List of business rules enforced, e.g., 'inventory constraint', 'status transitions'"]
-  },
-  "demoGuide": [
-    {
-      "title": "Short title in user's language (e.g., '1. USER Greeting')",
-      "prompt": "The actual prompt text in user's language"
-    }
-  ]
+  "referenceDate": "YYYY-MM-DD",
+  "publicDatasetId": "bigquery-public-data.dataset.table",
+  "appliedFactors": { ... },
+  "demoGuide": [ ... ]
 }
 
 ## Critical Notes
-- **RELATIONAL INTEGRITY**: Tables MUST be designed for joining. Ensure consistent Primary/Foreign keys (e.g., customer_id, product_id) with NO dangling references.
-- **CSV data MUST NOT exceed ${maxRows} rows**.
+- **MAXIMUM DATA (CRITICAL)**: You MUST generate **exactly ${maxRows} rows** for every table. Do NOT use "etc.", "...", or any placeholder to truncate data. This is a technical requirement for a simulation.
+- **RELATIONAL INTEGRITY & NAMING**: 
+    1. **Primary/Foreign Keys MUST follow the format \`[entity]_id\`** (e.g., \`talent_id\`, \`theater_id\`).
+    2. **STRICT SYMMETRY**: Foreign Keys MUST have the EXACT same name as the Primary Key they reference. Do NOT use prefixes like \`main_\` or \`ref_\` for ID columns.
+    3. Tables MUST be designed for joining.
+- **ABSTRACT INSTRUCTIONS**: Do NOT mention column names in prompts.
 - **STRICT CSV FORMATTING**:
-    1. **ALWAYS wrap text-based values** (STRING) in double quotes: '"Value"'.
-    2. **DO NOT wrap numeric values** (INTEGER, FLOAT) in quotes: 123.45.
-    3. **NULL Values**: Leave empty between commas: val1,,val3.
-    4. **Escaping**: If a text value contains a double quote, escape it with another double quote: '"He said ""Hello"""'.
-- **LANGUAGE PARITY**: Generate all qualitative content (table/field descriptions, synthetic data values, system instructions, and demo guide) in the **SAME LANGUAGE** as the user's input business problem.
-- **DEMO GUIDE**: Provide exactly 5 steps following this flow:
-    1. USER Greeting (Simple greeting to trigger self-introduction)
-    2. Data Discovery (Ask the agent to explore what data is available - **DO NOT mention specific table names**)
-    3. Multi-table Insight (Request analysis that requires joining data - **DO NOT specify table/column names, let the agent discover them**)
-    4. Geospatial Context (Location/map analysis - reference concepts like "regional" or "by area" without naming specific columns)
-    5. Strategy & Recommendation (Strategic advice based on data)
-    
-    **CRITICAL FOR DEMO PROMPTS - DATA ALIGNMENT**: 
-    - Do NOT include any specific table names, column names, or schema details in the prompts.
-    - The AI agent should demonstrate autonomous data discovery capability.
-    - Use business-level language only (e.g., "sales performance by region" instead of SQL).
-    - **DATA GROUNDING**: Prompts should reference realistic business scenarios that the generated data CAN answer. Avoid referencing data that is completely absent (e.g., don't ask about "customer satisfaction scores" if no such data exists).
-    - **ASPIRATIONAL QUERIES ENCOURAGED**: However, 1-2 prompts MAY include "stretch" conditions (e.g., "find talents with score above 80 AND rank C") where exact matches might not exist. This demonstrates the agent's ability to find CLOSE ALTERNATIVES and provide creative recommendations when perfect matches are unavailable.`;
+    1. **ALWAYS wrap text-based values** (STRING) in double quotes.
+    2. **DO NOT wrap numeric values** (INTEGER, FLOAT) in quotes.
+- **LANGUAGE PARITY**: Use the user's language.
+`;
 }
-
 
 // ===========================================
 // Step 2: Validation
 // ===========================================
 
-function validateGeneratedData(planResult) {
+function validateGeneratedData(planResult, targetRows) {
   if (!planResult.tables || planResult.tables.length === 0) {
     throw new Error('No table definitions generated');
   }
@@ -494,28 +472,89 @@ function validateGeneratedData(planResult) {
       // console.log(`Repaired schema for "${table.tableName}" to ${repairedSchema.length} columns.`);
     }
 
-    // --- NEW: Robust Data Cleaning & Re-quoting ---
-    const cleanedLines = lines.map((line, lineIdx) => {
-      const parts = parseCSVLine(line);
+    const expectedColumnCount = table.schema.length;
+    
+    // --- Row count threshold check ---
+    const dataRowCount = lines.length - 1; // Exclude header
+    const minExpectedRows = Math.min(10, Math.floor(targetRows * 0.2)); // Dynamic minimum threshold
+    
+    if (dataRowCount < minExpectedRows) {
+      console.warn(`[CSV QUALITY] Table "${table.tableName}" has only ${dataRowCount} rows (expected at least ${minExpectedRows}). Data may be sparse.`);
+    }
+
+    // --- Per-row column validation and repair ---
+    const repairedLines = [];
+    let repairCount = 0;
+    
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+      const line = lines[lineIdx];
+      let parts = parseCSVLine(line);
+      
+      // Repair rows with wrong column count
+      if (parts.length !== expectedColumnCount) {
+        if (lineIdx === 0) {
+          // Header row mismatch - this shouldn't happen after schema repair, but handle it
+          console.warn(`[CSV REPAIR] Header row has ${parts.length} columns, expected ${expectedColumnCount}. Skipping repair.`);
+        } else {
+          // Data row mismatch - repair by padding or truncating
+          if (parts.length < expectedColumnCount) {
+            // Pad with empty values
+            while (parts.length < expectedColumnCount) {
+              parts.push('');
+            }
+          } else {
+            // Truncate excess columns
+            parts = parts.slice(0, expectedColumnCount);
+          }
+          repairCount++;
+        }
+      }
+      repairedLines.push(parts);
+    }
+    
+    if (repairCount > 0) {
+      console.warn(`[CSV REPAIR] Repaired ${repairCount} malformed rows in "${table.tableName}".`);
+    }
+
+
+    // --- Row Count Validation ---
+    // Note: We intentionally do NOT pad with generated placeholder data.
+    // It's better to have fewer realistic rows than many fake placeholder values
+    // like "theater_name_13" or "location_prefecture_14".
+    const currentDataRows = repairedLines.length - 1; // Exclude header
+    if (currentDataRows < targetRows) {
+      console.warn(`[ROW COUNT] Table "${table.tableName}" has ${currentDataRows} rows (target: ${targetRows}). AI did not generate enough rows.`);
+    }
+
+    // --- Robust Data Cleaning & Type Validation ---
+    let typeRepairCount = 0;
+    const cleanedLines = repairedLines.map((parts, lineIdx) => {
+      // Skip header row for type validation
+      if (lineIdx === 0) {
+        return parts.map(v => v.replace(/^"|"$/g, '')).map((v, colIdx) => {
+          const field = table.schema[colIdx];
+          const type = field ? field.type.toUpperCase() : 'STRING';
+          if (['INTEGER', 'FLOAT', 'DOUBLE', 'NUMBER', 'INT64', 'FLOAT64'].includes(type)) {
+            return v;
+          }
+          return `"${v.replace(/"/g, '""')}"`;
+        }).join(',');
+      }
+      
+      // Data rows: validate and repair each cell
       return parts.map((val, colIdx) => {
         const field = table.schema[colIdx];
         const type = field ? field.type.toUpperCase() : 'STRING';
+        const columnName = field ? field.name : `col${colIdx}`;
         
-        // 1. Numeric Cleaning: Remove stray quotes/chars from numbers
-        if (['INTEGER', 'FLOAT', 'DOUBLE', 'NUMBER', 'INT64', 'FLOAT64'].includes(type)) {
-          return val.replace(/[^0-9.-]/g, '');
+        // Use the new validation helper
+        const result = validateAndRepairValue(val, type, columnName, lineIdx - 1);
+        if (result.repaired) {
+          typeRepairCount++;
         }
-        
-        // 2. String/Date Cleaning: Ensure clean quoting and internal quote escaping
-        // Remove existing outer quotes if present
-        let cleanVal = val.replace(/^"|"$/g, '');
-        // For header row, just return as is (but unquoted for now, we'll re-quote below)
-        if (lineIdx === 0) return cleanVal;
-        
-        // For data rows, return clean value
-        return cleanVal;
+        return result.value;
       }).map((v, colIdx) => {
-        // 3. Final Re-quoting as per BigQuery requirements
+        // Final Re-quoting as per BigQuery requirements
         const field = table.schema[colIdx];
         const type = field ? field.type.toUpperCase() : 'STRING';
         
@@ -523,10 +562,155 @@ function validateGeneratedData(planResult) {
           return v; // Numbers stay unquoted
         }
         // Strings, Dates, etc. get strictly quoted
-        return `"${v.replace(/"/g, '""')}"`; 
+        return `"${v.replace(/"/g, '""')}"`;
       }).join(',');
     });
+    
+    if (typeRepairCount > 0) {
+      console.warn(`[TYPE REPAIR] Fixed ${typeRepairCount} type violations in "${table.tableName}".`);
+    }
+    
     table.csvData = cleanedLines.join('\n');
+  }
+}
+
+/**
+ * Validates and repairs a cell value based on its declared type.
+ * Returns the repaired value and whether repair was needed.
+ * @param {string} value - The raw value
+ * @param {string} type - The column type (INTEGER, FLOAT, DATE, STRING, etc.)
+ * @param {string} columnName - Column name for context-aware defaults
+ * @param {number} rowIndex - Row index for generating sequential defaults
+ * @returns {{value: string, repaired: boolean}}
+ */
+function validateAndRepairValue(value, type, columnName, rowIndex) {
+  const upperType = type.toUpperCase();
+  const trimmedVal = value.trim();
+  
+  // Empty values are allowed (NULL)
+  if (trimmedVal === '') {
+    return { value: '', repaired: false };
+  }
+  
+  switch(upperType) {
+    case 'INT64':
+    case 'INTEGER':
+      // Check for range expressions like "51-100"
+      const rangeMatch = trimmedVal.match(/^(\d+)\s*[-–—]\s*\d+$/);
+      if (rangeMatch) {
+        return { value: rangeMatch[1], repaired: true };
+      }
+      // Check for valid integer
+      if (/^-?\d+$/.test(trimmedVal)) {
+        return { value: trimmedVal, repaired: false };
+      }
+      // Try to extract a number
+      const intMatch = trimmedVal.match(/-?\d+/);
+      if (intMatch) {
+        return { value: intMatch[0], repaired: true };
+      }
+      // Generate fallback
+      return { value: generateDefaultValue(upperType, columnName, rowIndex), repaired: true };
+      
+    case 'FLOAT64':
+    case 'FLOAT':
+    case 'DOUBLE':
+    case 'NUMBER':
+      // Check for valid float
+      if (/^-?\d*\.?\d+$/.test(trimmedVal)) {
+        return { value: trimmedVal, repaired: false };
+      }
+      // Try to extract a number
+      const floatMatch = trimmedVal.match(/-?\d+\.?\d*/);
+      if (floatMatch) {
+        return { value: floatMatch[0], repaired: true };
+      }
+      // Generate fallback
+      return { value: generateDefaultValue(upperType, columnName, rowIndex), repaired: true };
+      
+    case 'DATE':
+      // Check for valid date format YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmedVal)) {
+        return { value: trimmedVal, repaired: false };
+      }
+      // Try to extract a date pattern
+      const dateMatch = trimmedVal.match(/\d{4}-\d{2}-\d{2}/);
+      if (dateMatch) {
+        return { value: dateMatch[0], repaired: true };
+      }
+      // Generate fallback
+      return { value: generateDefaultValue(upperType, columnName, rowIndex), repaired: true };
+      
+    case 'TIMESTAMP':
+    case 'DATETIME':
+      // Accept ISO format or similar
+      if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(trimmedVal)) {
+        return { value: trimmedVal, repaired: false };
+      }
+      // Generate fallback as date
+      return { value: generateDefaultValue('DATE', columnName, rowIndex), repaired: true };
+      
+    default:
+      // STRING type - accept as-is
+      return { value: trimmedVal, repaired: false };
+  }
+}
+
+/**
+ * Generates a sensible default value for a given type and column.
+ * @param {string} type - The column type
+ * @param {string} columnName - Column name for context-aware generation
+ * @param {number} rowIndex - Row index for sequential IDs
+ * @returns {string} A valid default value
+ */
+function generateDefaultValue(type, columnName, rowIndex) {
+  const upperType = type.toUpperCase();
+  const lowerColName = columnName.toLowerCase();
+  
+  switch(upperType) {
+    case 'INT64':
+    case 'INTEGER':
+      // ID columns get sequential values
+      if (lowerColName.endsWith('_id') || lowerColName === 'id') {
+        return String(rowIndex + 1);
+      }
+      // Count/quantity columns
+      if (lowerColName.includes('count') || lowerColName.includes('quantity') || lowerColName.includes('num')) {
+        return String(Math.floor(Math.random() * 100) + 1);
+      }
+      // Default integer
+      return String(Math.floor(Math.random() * 1000));
+      
+    case 'FLOAT64':
+    case 'FLOAT':
+    case 'DOUBLE':
+    case 'NUMBER':
+      // Price/amount columns
+      if (lowerColName.includes('price') || lowerColName.includes('amount') || lowerColName.includes('cost')) {
+        return (Math.random() * 1000 + 10).toFixed(2);
+      }
+      // Rating/score columns
+      if (lowerColName.includes('rating') || lowerColName.includes('score')) {
+        return (Math.random() * 4 + 1).toFixed(1);
+      }
+      // Default float
+      return (Math.random() * 100).toFixed(2);
+      
+    case 'DATE':
+      // Generate a date within the past year
+      const d = new Date();
+      d.setDate(d.getDate() - Math.floor(Math.random() * 365));
+      return d.toISOString().split('T')[0];
+      
+    case 'TIMESTAMP':
+    case 'DATETIME':
+      const dt = new Date();
+      dt.setDate(dt.getDate() - Math.floor(Math.random() * 365));
+      return dt.toISOString();
+      
+    default:
+      // STRING type
+      return `${columnName}_${rowIndex + 1}`;
   }
 }
 
@@ -856,6 +1040,12 @@ db-dtypes>=1.0.0
 __REQ_EOF__
 
 echo "📦 Installing dependencies..."
+if ! command -v uv >/dev/null 2>&1; then
+    echo "    installing uv via astral.sh..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1 || true
+    # Add to current PATH for the rest of the script
+    export PATH="\$HOME/.cargo/bin:\$PATH"
+fi
 uv venv
 uv pip install -r requirements.txt
 
@@ -1024,7 +1214,15 @@ async def _patched_send(self, request, *args, **kwargs):
             print(f"  [DEBUG ERROR] Header Authorization: {'PRESENT' if 'Authorization' in request.headers else 'MISSING'}")
             print(f"  [DEBUG ERROR] Detected project_id at runtime: {project_id}")
             print(f"  [DEBUG ERROR] Status: {response.status_code}")
-            print(f"  [DEBUG ERROR] Body: {body.decode('utf-8', errors='ignore')}")
+            print(f"  [DEBUG ERROR] Body: {body_text}")
+            
+            # --- Anti-Crash Patch (400 -> 200) ---
+            # If the tool returned a 400 but the body is valid JSON-RPC, 
+            # we change it to 200 so the ADK processes it as a tool error rather than a crash.
+            if response.status_code == 400 and '"jsonrpc":' in body_text:
+                print("  [DEBUG ERROR] Transmuting 400 -> 200 to prevent crash and allow agent self-correction.")
+                response.status_code = 200
+            
             response._content = body 
         except: pass
             
@@ -1131,7 +1329,7 @@ base_instruction = """
 Help the user answer questions by strategically combining insights from BigQuery and Google Maps:
 
 1. **BigQuery Toolset**: Access data in the [PROJECT_ID].[DATASET_ID] dataset.
-   - Available Tools: \\\`execute_sql\\\`, \\\`get_table_info\\\`, \\\`list_table_ids\\\`.
+   - Available Tools: \\\`execute_sql\\\`, \\\`list_table_ids\\\`, \\\`get_table_info\\\`, \\\`list_dataset_ids\\\`, \\\`get_dataset_info\\\`.
 [PUBLIC_DATASET_INFO]
 
 [GENERATED_SYSTEM_INSTRUCTION]
@@ -1144,23 +1342,19 @@ Help the user answer questions by strategically combining insights from BigQuery
 
 ---------------------------------------------------
 CRITICAL OPERATIONAL RULES:
-- SCHEMA DISCOVERY: Always check the table schema using \\\`get_table_info\\\` before writing any SQL query. Never assume column names.
-- EXPLORE BEFORE FILTER: For any unfamiliar column, run \\\`SELECT DISTINCT column LIMIT 10\\\` to discover valid values before using them in WHERE clauses.
-- SQL SELF-CORRECTION: If a SQL query fails, analyze the error message, re-check the schema if necessary, and attempt to fix the query.
-- SELECT ONLY: The execute_sql tool only supports SELECT statements. INSERT, UPDATE, DELETE, and stored procedures are NOT allowed and will fail.
-- DATA HONESTY: If a tool returns no data (empty result), do not hallucinate results. Inform the user and suggest an alternative inquiry.
-- MAPS SPECIFICITY: Always include specific geographical context (city, state, etc.) from BigQuery data in your Google Maps search queries to ensure accuracy.
-- SEQUENTIAL EXECUTION: Always perform tool calls one at a time. Do not attempt multiple tool calls in a single response turn. Wait for the tool's output before deciding on the next action.
-- ONE TOOL AT A TIME (CRITICAL): You MUST call exactly ONE tool per response. Making multiple tool calls in parallel will crash the system. If you need multiple pieces of data, call tools one by one across multiple turns.
-- RESULT BLOCKING: Strictly wait for a tool's output before deciding on the next tool call.
-- PROGRESS UPDATES: Before each tool call, output a brief status message so the user knows you are working. Use emoji for clarity. Examples: "📊 Checking table schema...", "🔍 Running SQL query...", "🗺️ Looking up location..."
-- PUBLIC DATASET ACCESS (CRITICAL - READ CAREFULLY):
-  * The projectId argument in ALL BigQuery tool calls MUST ALWAYS be YOUR project ID ([PROJECT_ID]).
-  * NEVER use "bigquery-public-data" as projectId - this will cause permission errors.
-  * For public datasets, specify the public project in datasetId or tableId (e.g., datasetId="bigquery-public-data.google_trends"), NOT in projectId.
-  * In SQL queries, use fully qualified table names (e.g., FROM \`bigquery-public-data.google_trends.top_terms\`).
-  * CORRECT EXAMPLE: execute_sql(projectId="[PROJECT_ID]", query="SELECT * FROM \`bigquery-public-data.samples.shakespeare\` LIMIT 5")
-  * WRONG EXAMPLE: execute_sql(projectId="bigquery-public-data", ...) ← THIS WILL FAIL
+- DATA DISCOVERY & ACCURACY (HIGHEST PRIORITY): 
+    * MANDATORY: Always use \\\`get_table_info\\\` before your FIRST SQL query to confirm the schema. 
+    * DO NOT ASSUME column names (e.g., 'region', 'category', 'prefecture') exist without checking. Hallucinating columns causes fatal errors.
+    * ERROR RECOVERY: If a SQL query fails, immediately re-run \\\`get_table_info\\\` to verify schema and fix the query based on results.
+    * VALUE EXPLORATION: For unfamiliar columns, run \\\`SELECT DISTINCT column LIMIT 10\\\` to identify valid values.
+- EXECUTION FLOW: 
+    * SEQUENTIAL EXECUTION: Call exactly ONE tool per response and wait for its output. You are encouraged to use BigQuery and Maps tools together in sequence to provide richer insights.
+    * SELECT ONLY: Only SELECT statements are supported. Do not attempt INSERT, UPDATE, or DELETE.
+- GEOSPATIAL CONTEXT: Use specific location data from BigQuery (city, state, etc.) in Maps tool calls to ensure accuracy.
+- PROGRESS UPDATES: Before each tool call, output a brief status message with an emoji (e.g., "📊 Checking schema...", "🔍 Running SQL...").
+- PUBLIC DATASET ACCESS (CRITICAL):
+    * The projectId argument in ALL BigQuery tool calls MUST ALWAYS be YOUR project ID ([PROJECT_ID]). NEVER use "bigquery-public-data" as projectId.
+    * Access public tables ONLY via \\\`execute_sql\\\` using fully qualified names (e.g., \\\`bigquery-public-data.google_trends.top_terms\\\`).
 ---------------------------------------------------
 """
 
@@ -1193,9 +1387,22 @@ root_agent = LlmAgent(
 __AGENT_EOF__
 
 # --- Final Launch & Tips ---
+is_port_busy() {
+  local port=\$1
+  # Method 1: lsof (Standard on Mac)
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -Pi :\$port -sTCP:LISTEN -t >/dev/null 2>&1 && return 0
+  fi
+  # Method 2: Python socket (Reliable fallback)
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c "import socket; s=socket.socket(); s.bind(('127.0.0.1', \$port))" >/dev/null 2>&1 || return 0
+  fi
+  return 1
+}
+
 find_free_port() {
   local port=\$1
-  while lsof -Pi :\$port -sTCP:LISTEN -t >/dev/null 2>&1; do
+  while is_port_busy \$port; do
     port=\$((port + 1))
   done
   echo "\$port"
@@ -1208,9 +1415,23 @@ echo "========================================================="
 echo "🎉 Setup Complete!"
 echo "========================================================="
 echo ""
+START_PORT=8000
+if [ "$CLOUD_SHELL" = "true" ]; then START_PORT=8080; fi
+PORT=$(find_free_port \$START_PORT)
+
+clear
+echo "========================================================="
+echo "🎉 Setup Complete!"
+echo "========================================================="
+echo ""
 echo "📂 Project directory: ${dirName}"
 echo "🚀 Launching the Agent UI on port \$PORT..."
 echo "   (Pre-configured for project: \$PROJECT_ID)"
+if [ "$CLOUD_SHELL" = "true" ]; then
+  echo ""
+  echo "💡 CLOUD SHELL TIP:"
+  echo "   Use the 'Web Preview' button (top right) and select 'Change port' to \$PORT."
+fi
 echo ""
 echo "========================================================="
 echo "💡 TIPS:"

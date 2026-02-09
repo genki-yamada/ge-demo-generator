@@ -937,20 +937,6 @@
                   </label>
                 </div>
 
-                <!-- Inject Anomalies Toggle -->
-                <div class="flex items-center justify-between">
-                  <label class="flex items-center gap-3 cursor-pointer group">
-                    <div class="relative">
-                      <input id="injectAnomalies" type="checkbox" class="sr-only peer">
-                      <div
-                        class="w-10 h-5 bg-gray-700 rounded-full peer peer-checked:bg-amber-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5">
-                      </div>
-                    </div>
-                    <span
-                      class="text-[10px] font-bold text-gray-400 uppercase tracking-widest group-hover:text-gray-300 transition-colors">Inject
-                      Real-world Anomalies (Outliers, Edge Cases)</span>
-                  </label>
-                </div>
 
                 <div id="publicOverrideContainer" class="opacity-50 pointer-events-none transition-all ml-13">
                   <label class="block text-[9px] text-gray-500 mb-2 font-bold uppercase tracking-widest">Optional:
@@ -1499,6 +1485,9 @@
                     </path>
                   </svg>
                 </button>
+                <p class="text-[9px] text-gray-500 mt-2 font-medium italic">
+                  Note: The setup script auto-detects a free port (e.g. 8001) if 8000 is occupied.
+                </p>
               </div>
               <div
                 class="p-4 bg-black/40 rounded-xl border border-white/5 hover:border-sky-500/30 transition-all shadow-inner">
@@ -2031,7 +2020,6 @@
       document.getElementById('userGoal').value = '';
       document.getElementById('rowCount').value = '100';
       document.getElementById('tableCount').value = '5';
-      document.getElementById('injectAnomalies').checked = false;
       document.getElementById('publicDatasetId').value = '';
       if (document.getElementById('projectIdInput')) {
         document.getElementById('projectIdInput').value = '';
@@ -2063,11 +2051,21 @@
       const icon = document.getElementById('inlineToggleIcon');
       const btn = document.getElementById('inlineToggleBtn');
 
-      const isExpanded = container.classList.contains('max-h-none');
+      const isCollapsed = container.classList.contains('max-h-40');
 
-      if (isExpanded) {
+      if (isCollapsed) {
+        // Expanding
+        container.classList.remove('max-h-40', 'overflow-hidden');
+        container.classList.add('max-h-[70vh]', 'overflow-y-auto');
+        if (text) text.textContent = 'Collapse Script';
+        if (icon) {
+          icon.style.transform = 'rotate(0deg)';
+          icon.querySelector('path').setAttribute('d', 'M5 15l7-7 7 7');
+        }
+        if (btn) btn.classList.replace('bg-sky-500', 'bg-emerald-600');
+      } else {
         // Collapsing
-        container.classList.remove('max-h-none', 'overflow-y-auto');
+        container.classList.remove('max-h-[70vh]', 'max-h-none', 'overflow-y-auto');
         container.classList.add('max-h-40', 'overflow-hidden');
         if (text) text.textContent = 'Show Full Script';
         if (icon) {
@@ -2078,16 +2076,6 @@
 
         // Scroll back to the top of the script area
         container.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else {
-        // Expanding
-        container.classList.remove('max-h-40', 'overflow-hidden');
-        container.classList.add('max-h-[70vh]', 'overflow-y-auto');
-        if (text) text.textContent = 'Collapse Script';
-        if (icon) {
-          icon.style.transform = 'rotate(0deg)';
-          icon.querySelector('path').setAttribute('d', 'M5 15l7-7 7 7');
-        }
-        if (btn) btn.classList.replace('bg-sky-500', 'bg-emerald-600');
       }
     }
 
@@ -2344,7 +2332,6 @@
         tableCount: document.getElementById('tableCount').value,
         publicDatasetId: document.getElementById('publicDatasetId').value,
         usePublicDataset: document.getElementById('usePublicDataset').checked,
-        injectAnomalies: document.getElementById('injectAnomalies').checked
       };
 
       const stepsSection = document.getElementById('stepsSection');
