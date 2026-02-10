@@ -2803,24 +2803,53 @@
 
       const network = new vis.Network(container, data, options);
 
+      // Add Zoom Controls UI
+      const controlsDiv = document.createElement('div');
+      controlsDiv.className = 'absolute bottom-4 right-4 flex flex-col gap-2 z-10';
+      controlsDiv.innerHTML = `
+        <button id="zoomIn" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 transition-all shadow-lg backdrop-blur-sm" title="Zoom In">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        </button>
+        <button id="zoomOut" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 transition-all shadow-lg backdrop-blur-sm" title="Zoom Out">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+        </button>
+        <button id="zoomReset" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 transition-all shadow-lg backdrop-blur-sm" title="Reset View">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+        </button>
+      `;
+      container.parentElement.appendChild(controlsDiv);
+
+      // Zoom Button Events
+      document.getElementById('zoomIn').onclick = () => network.moveTo({ scale: network.getScale() * 1.2 });
+      document.getElementById('zoomOut').onclick = () => network.moveTo({ scale: network.getScale() / 1.2 });
+      document.getElementById('zoomReset').onclick = () => network.fit({ animation: true });
+
       network.on("stabilizationIterationsDone", function () {
         network.setOptions({ physics: { enabled: false } });
+        // Tighter initial fit: use smaller padding
         network.fit({
-          animation: {
-            duration: 1000,
-            easingFunction: 'easeInOutQuad'
-          }
+          animation: { duration: 1000, easingFunction: 'easeInOutQuad' }
         });
       });
 
-      // Initial fit after a delay to handle rendering variations
+      // Initial fit after a delay with tighter padding
       setTimeout(() => {
-        network.fit();
+        network.fit({ padding: 30 });
       }, 500);
 
-      // Micro-interaction: Dim unrelated items on hover
-      network.on("hoverNode", function (params) {
-        // Option to implement dimming if needed
+      // Click-to-Zoom on nodes
+      network.on("selectNode", function (params) {
+        if (params.nodes.length > 0) {
+          network.focus(params.nodes[0], {
+            scale: 1.1,
+            animation: { duration: 500, easingFunction: 'easeInOutQuad' }
+          });
+        }
+      });
+
+      // Reset zoom when clicking background
+      network.on("deselectNode", function () {
+        network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
       });
     }
 
