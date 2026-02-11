@@ -793,7 +793,7 @@ Return ONLY the name, nothing else.`;
       .replace(/[^a-z-]/g, '-')     // Replace non-alphabet/non-hyphen with hyphen
       .replace(/-+/g, '-')           // Collapse multiple hyphens
       .replace(/^-|-$/g, '')         // Remove leading/trailing hyphens
-      .substring(0, 20);             // Limit length
+      .substring(0, 15);             // Limit length to 15 to stay under 26 total with suffix
     
     if (cleanName.length < 3) cleanName = 'demo-env';
     return `${cleanName}-${suffix}`;
@@ -853,6 +853,8 @@ set -e
     echo "  • BigQuery Dataset: ${datasetId}"
     echo "  • Maps API Key: MCP-Demo-Key-${suffix}"
     echo "  • Cloud Run Service: ${dirName} (if deployed)"
+    echo "  • Agent Engine (Reasoning Engine) instance: ${dirName}"
+    echo "  • Gemini Enterprise registration (App): ${dirName}"
     echo "  • Local Directory: ~/${dirName}"
     echo ""
     read -p "Are you sure you want to proceed? (y/n) " -n 1 -r
@@ -880,6 +882,34 @@ set -e
     echo ""
     echo "🚀 Deleting Cloud Run service: ${dirName}..."
     gcloud run services delete ${dirName} --region=us-central1 --quiet 2>/dev/null && echo "   ✅ Cloud Run service deleted." || echo "   ⚠️  Service not found or already deleted."
+
+    echo ""
+    echo "🤖 Deleting Agent Engine (Reasoning Engine) instance..."
+    TOKEN=\$(gcloud auth print-access-token)
+    RE_NAME=\$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
+      "https://us-central1-aiplatform.googleapis.com/v1/projects/\$PROJECT_ID/locations/us-central1/reasoningEngines" | \
+      jq -r ".reasoningEngines[] | select(.displayName == \"${dirName}\") | .name" 2>/dev/null | head -n 1)
+    
+    if [ ! -z "\$RE_NAME" ]; then
+      curl -s -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
+        "https://us-central1-aiplatform.googleapis.com/v1/\$RE_NAME" && echo "   ✅ Agent Engine instance deleted." || echo "   ⚠️  Failed to delete Agent Engine instance."
+    else
+      echo "   ⚠️  Agent Engine instance not found."
+    fi
+
+    echo ""
+    echo "🌍 Deleting Gemini Enterprise registration (App)..."
+    TOKEN=\$(gcloud auth print-access-token)
+    ENGINE_NAME=\$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
+      "https://discoveryengine.googleapis.com/v1alpha/projects/\$PROJECT_ID/locations/global/collections/default_collection/engines" | \
+      jq -r ".engines[] | select(.displayName == \"${dirName}\") | .name" 2>/dev/null | head -n 1)
+    
+    if [ ! -z "\$ENGINE_NAME" ]; then
+      curl -s -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
+        "https://discoveryengine.googleapis.com/v1alpha/\$ENGINE_NAME" && echo "   ✅ Gemini Enterprise App deleted." || echo "   ⚠️  Failed to delete Gemini Enterprise App."
+    else
+      echo "   ⚠️  Gemini Enterprise App not found."
+    fi
     
     echo ""
     echo "📂 Deleting local directory: ~/${dirName}..."
@@ -945,8 +975,35 @@ echo "      - Deploys the agent to a public, unauthenticated URL."
 echo "      - Automates API enablement, Docker build, and IAM roles."
 echo "      - Warning: Organization policies may block public ingress."
 echo ""
-read -p "Enter Choice [1 or 2] (Default: 1): " DEPLOY_CHOICE
+echo "  [3] Gemini Enterprise (Vertex AI Agent Engine)"
+echo "      - Automated Production-ready deployment."
+echo "      - Registers your agent to Gemini Enterprise."
+echo ""
+read -p "Enter Choice [1, 2 or 3] (Default: 1): " DEPLOY_CHOICE
 DEPLOY_CHOICE=\${DEPLOY_CHOICE:-1}
+
+# Immediate check for Gemini Enterprise
+if [ "\$DEPLOY_CHOICE" = "3" ]; then
+  echo ""
+  echo "========================================================="
+  echo "🤖 GEMINI ENTERPRISE PRE-DEPLOYMENT CHECK"
+  echo "========================================================="
+  echo "This option will automatically deploy to Agent Engine and"
+  echo "register it to Gemini Enterprise."
+  echo ""
+  echo "⚠️  IMPORTANT: You MUST have a Gemini Enterprise instance"
+  echo "   already created in this project."
+  echo ""
+  echo "If you haven't, please create one here first:"
+  echo "https://console.cloud.google.com/gemini-enterprise/products?project=\$PROJECT_ID"
+  echo ""
+  read -p "Have you confirmed the instance exists? (y/n) " -n 1 -r
+  echo
+  if [[ ! \$REPLY =~ ^[Yy]$ ]]; then
+      echo "Exiting. Please create the instance and run the script again."
+      exit 1
+  fi
+fi
 
 # --- 2. IAM & API Checks ---
 echo "📡 Checking & Enabling APIs..."
@@ -955,6 +1012,7 @@ gcloud services enable \\
   bigquery.googleapis.com \\
   apikeys.googleapis.com \\
   mapstools.googleapis.com \\
+  discoveryengine.googleapis.com \\
   cloudresourcemanager.googleapis.com \\
   serviceusage.googleapis.com \\
   iam.googleapis.com \\
@@ -1113,19 +1171,19 @@ ENV PYTHONUNBUFFERED=1
 CMD ["adk", "web", "adk_agent", "--host", "0.0.0.0", "--port", "8080"]
 __DOCKER_EOF__
 
+# --- 5. Environment Setup ---
 echo "📦 Preparing environment..."
-if [ "$DEPLOY_CHOICE" = "1" ]; then
-  if ! command -v uv >/dev/null 2>&1; then
-      echo "    installing uv via astral.sh..."
-      curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1 || true
-      # Add to current PATH for the rest of the script
-      export PATH="\$HOME/.cargo/bin:\$PATH"
-  fi
-  uv venv
-  uv pip install -r requirements.txt
+# We always prepare the environment regardless of choice to ensure local testing works
+if ! command -v uv >/dev/null 2>&1; then
+    echo "    installing uv via astral.sh..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1 || true
+    # Add to current PATH for the rest of the script
+    export PATH="\$HOME/.cargo/bin:\$PATH"
 fi
+uv venv
+uv pip install -r requirements.txt
 
-# --- 5. Generate Maps API Key ---
+# --- 6. Generate Maps API Key ---
 echo "🔑 Generating Maps API key..."
 API_KEY_JSON=$(gcloud alpha services api-keys create --display-name="MCP-Demo-Key-${suffix}" \\
     --api-target=service=mapstools.googleapis.com \\
@@ -1164,8 +1222,10 @@ from . import agent
 __INIT_EOF__
 
 
-# --- 6. Customizing Agent ---
+# --- 7. Customizing Agent ---
 echo "🔧 Configuring agent..."
+
+
 
 cat <<'__TOOLS_EOF__' > adk_agent/mcp_app/tools.py
 import os
@@ -1200,115 +1260,59 @@ def get_project_id():
 # 🛡️ Stability Patches for Reasoning Engine (Mandatory)
 # =============================================================================
 
-# Force HTTP/1.1 to prevent hangs in streaming responses
+
+# =============================================================================
+# 🛡️ Stability Patches for Reasoning Engine (Mandatory)
+# =============================================================================
+
 _orig_client_init = httpx.AsyncClient.__init__
 def _patched_client_init(self, *args, **kwargs):
     kwargs['http2'] = False 
     return _orig_client_init(self, *args, **kwargs)
-httpx.AsyncClient.__init__ = _patched_client_init
-
 
 _token_cache = {"token": None, "expiry": 0}
-
 def _get_fresh_mcp_token():
-    """Retrieves a fresh access token with caching (30 min)."""
+    """Retrieves a fresh access token with caching."""
     global _token_cache
     now = time.time()
     if _token_cache["token"] and now < _token_cache["expiry"]:
         return _token_cache["token"]
-
-    token = None
-    import httpx
-    
-    # Define required scopes. Note: 'maps-platform' is invalid as a standalone scope.
-    # We use 'cloud-platform' which is the broad scope covering Managed MCP.
-    scopes = [
-        "https://www.googleapis.com/auth/cloud-platform",
-        "https://www.googleapis.com/auth/bigquery",
-        "openid",
-        "https://www.googleapis.com/auth/userinfo.email"
-    ]
-
-    # 1. Try google-auth (Best for Cloud Shell with 'gcloud auth application-default login')
-    # We try this first because it respects the user's manual login in Cloud Shell.
     try:
         import google.auth
         import google.auth.transport.requests
+        scopes = ["https://www.googleapis.com/auth/cloud-platform", "https://www.googleapis.com/auth/bigquery"]
         credentials, _ = google.auth.default(scopes=scopes)
         credentials.refresh(google.auth.transport.requests.Request())
-        token = credentials.token
-    except Exception as e:
-        pass # Fallback to metadata server if ADC is not set or fails
+        _token_cache = {"token": credentials.token, "expiry": now + 1800}
+        return credentials.token
+    except: return ""
 
-    # 2. Try Metadata Server (Secondary fallback)
-    if not token:
-        try:
-            scopes_param = ",".join(scopes)
-            url = f"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token?scopes={scopes_param}"
-            r = httpx.get(url, headers={"Metadata-Flavor": "Google"}, timeout=1.0)
-            if r.status_code == 200:
-                token = r.json().get("access_token")
-        except Exception as e:
-            pass
-
-    if token:
-        _token_cache = {"token": token, "expiry": now + 1800} # Cache for 30 mins
-        return token
-    
-    print("  [AUTH ERROR] No valid access token found. Managed MCP calls will likely fail.")
-    return ""
-
-# Force HTTP/1.1 and inject fresh tokens for BigQuery MCP
 _orig_send = httpx.AsyncClient.send
 async def _patched_send(self, request, *args, **kwargs):
-    
-    # If the URL is for BigQuery MCP, ensure a fresh token is injected.
-    # Note: Maps MCP uses API Key and should NOT have a Bearer token to avoid scope conflicts.
+    # BigQuery MCP Auth Injection
     if "bigquery.googleapis.com/mcp" in str(request.url):
         token = _get_fresh_mcp_token()
-        if token:
-            request.headers['Authorization'] = f"Bearer {token}"
-        else:
-            print(f"  [AUTH WARNING] Skipping token injection for {request.url.host} (token not found)")
+        if token: request.headers['Authorization'] = f"Bearer {token}"
             
-    # Execute the actual request
+    # Execute actual request
     response = await _orig_send(self, request, *args, **kwargs)
     
-    # Debug Logging: Capture body for any tool failure
-    if response.status_code >= 400 and "bigquery.googleapis.com/mcp" in str(request.url):
+    # Error Transmutation (Prevent crash on recoverable tool errors)
+    if response.status_code in [400, 403] and "bigquery.googleapis.com/mcp" in str(request.url):
         try:
             body = await response.aread()
-            project_id = get_project_id()
-            print(f"  [DEBUG ERROR] {request.method} {request.url}")
-            print(f"  [DEBUG ERROR] Header x-goog-user-project: {request.headers.get('x-goog-user-project')}")
-            
-            body_text = body.decode('utf-8', errors='ignore')
-            if "insufficient authentication scopes" in body_text:
-                print("  [AUTH TIP] 403 Scope Error detected. Please run the following command in your terminal TO REFRESH LOCAL CREDENTIALS:")
-                print('             gcloud auth application-default login --scopes="https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/bigquery,openid,https://www.googleapis.com/auth/userinfo.email"')
-                print("             Then restart the agent.")
-            
-            if "Access Denied" in body_text and "bigquery-public-data" in body_text:
-                print("  [AUTH TIP] 403 Permission Error: Targeted project 'bigquery-public-data' is forbidden for MCP tool execution.")
-                print("             You MUST use your own project for 'projectId' and use fully qualified names for public tables in 'execute_sql'.")
-            
-            print(f"  [DEBUG ERROR] Header Authorization: {'PRESENT' if 'Authorization' in request.headers else 'MISSING'}")
-            print(f"  [DEBUG ERROR] Detected project_id at runtime: {project_id}")
-            print(f"  [DEBUG ERROR] Status: {response.status_code}")
-            print(f"  [DEBUG ERROR] Body: {body_text}")
-            
-            # --- Anti-Crash Patch (400/403 -> 200) ---
-            # If the tool returned a 400 or 403 but the body is valid JSON-RPC, 
-            # we change it to 200 so the ADK processes it as a tool error rather than a crash.
-            if response.status_code in [400, 403] and '"jsonrpc":' in body_text:
-                print(f"  [DEBUG ERROR] Transmuting {response.status_code} -> 200 to prevent crash and allow agent self-correction.")
-                response.status_code = 200
-            
-            response._content = body 
+            if b'"jsonrpc":' in body: response.status_code = 200
+            response._content = body
         except: pass
-            
     return response
-httpx.AsyncClient.send = _patched_send
+
+# Apply Stability Patches
+try:
+    httpx.AsyncClient.__init__ = _patched_client_init
+    httpx.AsyncClient.send = _patched_send
+except Exception as e:
+    print(f"  [DEBUG] Stability patches not applied: {e}")
+
 
 # Prevent AnyIO cross-task cancellation errors
 import anyio._backends._asyncio
@@ -1384,12 +1388,13 @@ import os
 # Force project ID and location BEFORE importing ADK/genai
 # =============================================================================
 os.environ["GOOGLE_CLOUD_PROJECT"] = "$PROJECT_ID"
+# Force global location for Gemini 3 models
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 
 import dotenv
 dotenv.load_dotenv()
 
-from mcp_app import tools
+from . import tools
 from google.adk.agents import LlmAgent
 from google.adk.models import Gemini
 from google.genai import types
@@ -1472,9 +1477,68 @@ root_agent = LlmAgent(
     instruction=instruction,
     tools=[maps_toolset, bigquery_toolset]
 )
+
+# Export only the root_agent. 
+# The 'uvx agent-starter-pack enhance' command will automatically wrap this
+# in an App container and generate the entry point for Agent Engine.
+__all__ = ["root_agent"]
 __AGENT_EOF__
 
-# --- Final Launch & Tips ---
+
+# --- 8. Production Infrastructure (Specific to Gemini Enterprise) ---
+if [ "$DEPLOY_CHOICE" = "3" ]; then
+  # Automate 'agent-starter-pack enhance'
+  echo ""
+  echo "🔧 Initializing production infrastructure (enhance)..."
+  # We MUST be in the adk_agent directory for enhance to handle mcp_app correctly
+  cd adk_agent
+  printf '\n\n\n\n\n\n\n' | uvx agent-starter-pack enhance
+  
+  # Apply naming fixes (Robust regex for different quote styles and separators)
+  echo "🔧 Applying project name customizations..."
+  rm -f .resource_name
+  # Replace name in adk_agent/pyproject.toml (Tool normalizes adk_agent -> adk-agent)
+  sed -i "s/name *= *[\\\"']adk[-_]agent[\\\"']/name = \\\"${dirName}\\\"/" pyproject.toml
+  # Replace default name in deploy.py
+  sed -i "s/default *= *[\\\"']adk[-_]agent[\\\"']/default=\\\"${dirName}\\\"/" mcp_app/app_utils/deploy.py 2>/dev/null || true
+  cd ..
+fi
+
+# --- 9. Final Launch & Tips ---
+if [ "$DEPLOY_CHOICE" = "3" ]; then
+  echo ""
+  echo "========================================================="
+  echo "🚀 DEPLOYING TO GEMINI ENTERPRISE"
+  echo "========================================================="
+  
+  echo "🤖 Step 1/2: Deploying to Vertex AI Agent Engine..."
+  cd adk_agent
+  make deploy
+  
+  echo ""
+  echo "🤖 Step 2/2: Registering Agent to Gemini Enterprise..."
+  # This command is interactive for instance selection if multiple exist
+  make register-gemini-enterprise
+  cd ..
+  
+  clear
+  echo "========================================================="
+  echo "🎉 Gemini Enterprise Deployment & Registration Complete!"
+  echo "========================================================="
+  echo ""
+  echo "📂 Project directory: ${dirName}"
+  echo ""
+  echo "🔗 View in Console:"
+  echo "   https://console.cloud.google.com/gemini-enterprise/overview?project=$PROJECT_ID"
+  echo ""
+  echo "========================================================="
+  echo "💡 TIPS:"
+  echo "   • Your agent is now available in your Gemini Enterprise organization."
+  echo "   • To CLEANUP:        bash setup-${dirName}.sh --cleanup"
+  echo "========================================================="
+  exit 0
+fi
+
 if [ "$DEPLOY_CHOICE" = "2" ]; then
   echo "🚀 Deploying to Cloud Run (this will take 2-3 minutes)..."
   # Note: --set-env-vars is used to inject the runtime configuration
