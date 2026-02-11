@@ -1026,13 +1026,19 @@
             </div>
           </div>
 
-          <!-- Estimated Time Notice -->
-          <div class="mt-4 flex items-center gap-2 text-[9px] text-gray-500 italic">
-            <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <span>Estimated: 1-3 minutes depending on data complexity</span>
+          <!-- Estimated Time Notice & Cancel Button -->
+          <div class="mt-6 flex items-center justify-between">
+            <div class="flex items-center gap-2 text-[9px] text-gray-500 italic">
+              <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span>Estimated: 1-3 minutes depending on data complexity</span>
+            </div>
+            <button onclick="cancelGeneration()"
+              class="px-4 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-[9px] font-bold uppercase tracking-widest transition-all active:scale-95">
+              Cancel Generation
+            </button>
           </div>
 
           <!-- Terminal-style Dynamic Logs -->
@@ -1993,35 +1999,23 @@
     const GenerationLogger = {
       phrases: {
         en: [
-          { tag: 'info', msg: 'Initializing synthesis engine...' },
-          { tag: 'ai', msg: 'Analyzing industry specific patterns...' },
+          { tag: 'info', msg: 'Initializing system configuration...' },
+          { tag: 'ai', msg: 'Analyzing industry data models...' },
           { tag: 'ai', msg: 'Designing relational schema structures...' },
-          { tag: 'info', msg: 'Generating synthetic MCP resources...' },
+          { tag: 'info', msg: 'Generating synthetic data and MCP resources...' },
           { tag: 'ai', msg: 'Crafting system instructions for Gemini...' },
           { tag: 'info', msg: 'Constructing Gcloud deployment scripts...' },
           { tag: 'ai', msg: 'Optimizing agent reasoning chains...' },
           { tag: 'success', msg: 'Resource bundling complete.' },
           { tag: 'info', msg: 'Finalizing executable artifact...' },
           { tag: 'wait', msg: 'Waiting for response... (this may take a minute)' }
-        ],
-        ja: [
-          { tag: 'info', msg: 'システム構成を初期化中...' },
-          { tag: 'ai', msg: '業界特有のデータモデルを分析中...' },
-          { tag: 'ai', msg: 'リレーショナルスキーマ構造を設計中...' },
-          { tag: 'info', msg: '合成データとMCPリソースを生成中...' },
-          { tag: 'ai', msg: 'Gemini用のシステムプロンプトを構成中...' },
-          { tag: 'info', msg: 'Gcloud展開スクリプトを構築中...' },
-          { tag: 'ai', msg: 'エージェントの推論パスを最適化中...' },
-          { tag: 'success', msg: 'リソースのパッケージングが完了しました' },
-          { tag: 'info', msg: '実行可能なアーティファクトを最終調整中...' },
-          { tag: 'wait', msg: '応答を待機中... (1分程度かかる場合があります)' }
         ]
       },
       timer: null,
       start: function () {
-        const lang = document.getElementById('langSelector').value;
         const container = document.getElementById('generationLogs');
-        const logs = this.phrases[lang] || this.phrases.en;
+        if (!container) return;
+        const logs = this.phrases.en;
         container.innerHTML = '';
         let index = 0;
 
@@ -2052,6 +2046,22 @@
       }
     };
     let currentDomainName = '';
+    let isCancelled = false;
+    let step2Timer = null;
+
+    function cancelGeneration() {
+      isCancelled = true;
+      GenerationLogger.stop();
+      if (step2Timer) clearTimeout(step2Timer);
+
+      const btn = document.getElementById('generateBtn');
+      btn.disabled = false;
+      document.getElementById('btnSpinner').classList.add('hidden');
+      document.getElementById('btnText').innerText = 'Generate Setup Script & Assets';
+
+      document.getElementById('stepsSection').classList.add('hidden');
+      showToast('Generation cancelled');
+    }
 
     function toggleArchitecture() {
       const content = document.getElementById('architectureContent');
@@ -2262,7 +2272,7 @@
           // 物流
           { industry: 'logistics', function: 'sales', label: "運賃見積のダイナミック化", text: "空き容量、季節的な需要ピーク、燃料価格の変動に基づく価格モデル。大口顧客向けの運賃提案を最適化。" },
           { industry: 'logistics', function: 'marketing', label: "顧客離反の防止", text: "配送遅延の頻度やサービスレベルの低下を分析。解約リスクの高い荷主を特定し、競合他社への流出を阻止。" },
-          { industry: 'logistics', function: 'ops', label: "ラストワンマイルの効率化", text: "配送ルートの遅延予測。リアルタイムの交通渋滞パターンと都市部の配送密度に基づいた燃料効率の最大化。" },
+          { industry: 'logistics', function: 'ops', label: "ラストワンマイルの効率化", text: "配送ルートの遅延予測。リアルタイムの交通渋渋滞パターンと都市部の配送密度に基づいた燃料効率の最大化。" },
           { industry: 'logistics', function: 'supply_chain', label: "マルチモーダル調達", text: "陸・海・空の最適な輸送モードの選定。港湾の混雑状況とリードタイムを分析し、最もコスト効率の高い経路を特定。" },
           { industry: 'logistics', function: 'finance_dept', label: "車両ライフサイクル管理", text: "保有車両の維持コスト予測。走行距離や修理履歴に基づき、最適な買い替えサイクルを算出して資産効率を向上。" },
           { industry: 'logistics', function: 'hr', label: "ドライバー安全走行支援", text: "急ブレーキや速度超過などのテレマティクスデータ分析。安全スコアに基づく報酬制度の設計と事故率の低減。" },
@@ -2281,7 +2291,8 @@
     let selectedFunction = 'all';
 
     function updateSamples() {
-      const lang = document.getElementById('langSelector').value || 'en';
+      const langSelector = document.getElementById('langSelector');
+      const lang = (langSelector && langSelector.value) || 'en';
       const industryContainer = document.getElementById('industryFilters');
       const functionContainer = document.getElementById('jobFunctionFilters');
       const templateGrid = document.getElementById('templateGrid');
@@ -2421,7 +2432,9 @@
       GenerationLogger.start();
 
       // Simulate step 2 animation with more realistic timing
-      setTimeout(() => {
+      isCancelled = false;
+      step2Timer = setTimeout(() => {
+        if (isCancelled) return;
         s1.classList.add('step-completed');
         s1.querySelector('.step-message').innerText = 'Logic synthesis successful';
         s2.querySelector('.step-icon').className = 'step-icon w-6 h-6 rounded bg-sky-500/20 text-sky-400 flex items-center justify-center text-[10px] font-bold animate-pulse';
@@ -2430,6 +2443,7 @@
 
       google.script.run
         .withSuccessHandler(res => {
+          if (isCancelled) return;
           GenerationLogger.stop();
           document.getElementById('generateBtn').disabled = false;
           document.getElementById('btnSpinner').classList.add('hidden');
@@ -2442,13 +2456,17 @@
           s2.querySelector('.step-message').innerText = 'Bundle ready';
 
           setTimeout(() => {
+            if (isCancelled) return;
             stepsSection.classList.add('hidden');
             currentData = res;
             showFinalResult(res);
             loadHistory();
           }, 800);
         })
-        .withFailureHandler(onFailure)
+        .withFailureHandler(err => {
+          if (isCancelled) return;
+          onFailure(err);
+        })
         .generateDemo(userGoal, options);
     }
 
@@ -2504,20 +2522,28 @@
       guideContainer.innerHTML = '';
       if (res.demoGuide && res.demoGuide.length) {
         res.demoGuide.forEach((step, i) => {
-          // New structured data: step.title and step.prompt
-          const title = step.title || `Step ${i + 1}`;
-          const prompt = step.prompt || step; // Fallback for old string format
+          const title = step.title || `Scenario ${i + 1}`;
+          const prompt = step.prompt || step;
 
           const div = document.createElement('div');
           div.className = "flex flex-col gap-3 p-5 rounded-2xl bg-black/40 border border-white/5 group hover:border-emerald-500/30 transition-all shadow-xl";
           div.innerHTML = `
-               <div class="flex items-center gap-3">
-                  <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 w-6 h-6 rounded-lg flex items-center justify-center shadow-inner">${i + 1}</span>
-                  <p class="text-[11px] font-bold text-gray-400 uppercase tracking-tight">${title}</p>
+               <div class="flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-3">
+                    <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 w-6 h-6 rounded-lg flex items-center justify-center shadow-inner tracking-tighter">${i + 1}</span>
+                    <p class="text-[11px] font-bold text-gray-300 uppercase tracking-widest">${title}</p>
+                  </div>
+                  <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/5 border border-emerald-500/10">
+                    <span class="relative flex h-1.5 w-1.5">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                    <span class="text-[9px] font-bold text-emerald-500/80 uppercase tracking-tighter">Recommended</span>
+                  </div>
                </div>
-                <div class="relative bg-black/40 rounded-xl p-4 border border-white/5 group-hover:border-emerald-500/20 transition-all min-w-0">
-                  <p class="text-[13px] text-sky-200 select-all leading-relaxed font-mono break-all whitespace-pre-wrap">${prompt}</p>
-                  <button onclick="copyText('${prompt.replace(/'/g, "\\'")}')" class="absolute top-2 right-2 p-2 rounded-lg bg-white/5 text-gray-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all">
+                <div class="relative bg-black/60 rounded-xl p-4 border border-white/5 group-hover:border-emerald-500/20 transition-all min-w-0">
+                  <p class="text-[13px] text-sky-200 select-all leading-relaxed font-mono">${prompt}</p>
+                  <button onclick="copyText('${prompt.replace(/'/g, "\\'")}')" class="absolute top-2 right-2 p-2 rounded-lg bg-white/5 text-gray-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all" title="Copy prompt">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                   </button>
                </div>
@@ -2526,31 +2552,36 @@
         });
       }
 
-      // Data DNA Badges
+      // Data DNA Badges (Realistic Synthesis Factors)
       const dataDnaBadges = document.getElementById('dataDnaBadges');
       const dataDnaBadgesContainer = document.getElementById('dataDnaBadgesContainer');
       if (res.appliedFactors && dataDnaBadges && dataDnaBadgesContainer) {
         dataDnaBadgesContainer.innerHTML = '';
         const badgeStyles = {
-          temporalPatterns: { bg: 'bg-sky-500/20', text: 'text-sky-400', border: 'border-sky-500/30', icon: '📅' },
+          temporalpatterns: { bg: 'bg-sky-500/20', text: 'text-sky-400', border: 'border-sky-500/30', icon: '📅' },
           correlations: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30', icon: '🔗' },
-          businessLogic: { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30', icon: '⚙️' }
+          businesslogic: { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30', icon: '⚙️' }
         };
         let hasBadges = false;
-        for (const [category, items] of Object.entries(res.appliedFactors)) {
-          if (items && Array.isArray(items) && items.length > 0) {
-            const style = badgeStyles[category] || { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/30', icon: '🏷️' };
-            items.forEach(item => {
-              const badge = document.createElement('span');
-              badge.className = `text-[9px] ${style.bg} ${style.text} border ${style.border} px-2 py-1 rounded-full font-medium flex items-center gap-1`;
-              badge.innerHTML = `<span>${style.icon}</span><span>${item}</span>`;
-              dataDnaBadgesContainer.appendChild(badge);
-              hasBadges = true;
-            });
-          }
+        for (let [category, items] of Object.entries(res.appliedFactors)) {
+          if (!items) continue;
+          // Normalize category key for more robust matching
+          const normalizedCat = category.toLowerCase().replace(/[\s_-]/g, '');
+          const style = badgeStyles[normalizedCat] || { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/30', icon: '💡' };
+
+          const itemList = Array.isArray(items) ? items : [items];
+          itemList.forEach(item => {
+            if (!item) return;
+            const badge = document.createElement('span');
+            badge.className = `text-[9px] ${style.bg} ${style.text} border ${style.border} px-2 py-1 rounded-full font-medium flex items-center gap-1 transition-all hover:scale-105`;
+            badge.innerHTML = `<span>${style.icon}</span><span>${item}</span>`;
+            dataDnaBadgesContainer.appendChild(badge);
+            hasBadges = true;
+          });
         }
         dataDnaBadges.classList.toggle('hidden', !hasBadges);
-      } else {
+      }
+      else {
         dataDnaBadges.classList.add('hidden');
       }
 
@@ -2670,17 +2701,30 @@
       const nodes = [];
       const edges = [];
 
+      // Pre-identify Primary Keys for each table
+      const tablePKs = {};
+      tables.forEach(table => {
+        const tableNameLower = table.tableName.toLowerCase();
+        // Heuristic: xxx_id is PK if table name contains xxx
+        const pk = table.headers.find(h => {
+          const hLower = h.toLowerCase();
+          if (!hLower.endsWith('_id')) return false;
+          const entity = hLower.replace('_id', '');
+          return tableNameLower.includes(entity) || (entity === 'product' && tableNameLower.includes('item'));
+        });
+        tablePKs[table.tableName] = pk;
+      });
+
       // Create Nodes (Tables)
       tables.forEach((table) => {
         const tableId = table.tableName;
+        const pk = tablePKs[tableId];
 
-        // Use supported HTML-like label (<b> and <br> only)
-        // Vis.js multi-html is very limited.
         let label = `<b>${table.tableName.toUpperCase()}</b>\n`;
-        label += `<i>────────────────</i>\n`; // Separator
+        label += `<i>────────────────</i>\n`;
 
         table.headers.forEach(h => {
-          const isPK = h.toLowerCase().endsWith('_id') && (table.tableName.toLowerCase().startsWith(h.toLowerCase().replace('_id', '')) || table.tableName.toLowerCase().includes(h.toLowerCase().replace('_id', '')));
+          const isPK = h === pk;
           const isFK = h.toLowerCase().endsWith('_id') && !isPK;
           let prefix = '  ';
           if (isPK) prefix = '🔑 ';
@@ -2704,7 +2748,7 @@
           },
           color: {
             background: 'rgba(15, 23, 42, 0.9)',
-            border: 'rgba(14, 165, 233, 0.4)',
+            border: 'rgba(14, 165, 233, 0.5)',
             highlight: {
               background: 'rgba(14, 165, 233, 0.2)',
               border: '#0ea5e9'
@@ -2714,7 +2758,7 @@
               border: 'rgba(14, 165, 233, 0.8)'
             }
           },
-          borderWidth: 1.5,
+          borderWidth: 2,
           shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 0, y: 4 },
           margin: 12
         });
@@ -2723,43 +2767,58 @@
       // Create Edges (Relationships)
       tables.forEach(table => {
         table.headers.forEach(h => {
-          if (h.toLowerCase().endsWith('_id')) {
-            const entity = h.toLowerCase().replace('_id', '');
-            const targetTable = tables.find(t =>
-              t.tableName.toLowerCase() === entity + 's' ||
-              t.tableName.toLowerCase() === entity ||
-              (entity === 'item' && t.tableName.toLowerCase() === 'products')
-            );
+          const hLower = h.toLowerCase();
+          if (hLower.endsWith('_id')) {
+            const isPK = h === tablePKs[table.tableName];
+            if (isPK) return; // Don't create edge from table to itself via its own PK
 
-            if (targetTable && targetTable.tableName !== table.tableName) {
-              edges.push({
-                from: table.tableName,
-                to: targetTable.tableName,
-                label: `  ${h}  `,
-                font: {
-                  size: 9,
-                  color: '#94a3b8',
-                  face: 'monospace',
-                  background: 'rgba(15, 23, 42, 0.8)',
-                  strokeWidth: 0,
-                  align: 'top'
-                },
-                arrows: {
-                  to: { enabled: true, scaleFactor: 0.6, type: 'arrow' }
-                },
-                color: {
-                  color: 'rgba(148, 163, 184, 0.25)',
-                  highlight: 'rgba(14, 165, 233, 0.6)',
-                  hover: 'rgba(14, 165, 233, 0.4)'
-                },
-                width: 1.2,
-                selectionWidth: 2,
-                smooth: {
-                  type: 'cubicBezier',
-                  forceDirection: 'horizontal',
-                  roundness: 0.6
-                }
-              });
+            // Find target table that has this h as its PK OR has a matching column name
+            const targetTable = tables.find(t => {
+              if (t.tableName === table.tableName) return false;
+              // Link if it's the PK of the target table
+              if (tablePKs[t.tableName] === h) return true;
+              // Link if the target table has a column with the EXACT SAME name (Semantic Link)
+              // We only do this for _id columns to avoid excessive edges
+              return t.headers.includes(h);
+            });
+
+            if (targetTable) {
+              // Avoid duplicate edges
+              const edgeExists = edges.find(e =>
+                (e.from === table.tableName && e.to === targetTable.tableName && e.label.trim() === h) ||
+                (e.from === targetTable.tableName && e.to === table.tableName && e.label.trim() === h)
+              );
+
+              if (!edgeExists) {
+                edges.push({
+                  from: table.tableName,
+                  to: targetTable.tableName,
+                  label: `  ${h}  `,
+                  font: {
+                    size: 9,
+                    color: '#94a3b8',
+                    face: 'monospace',
+                    background: 'rgba(15, 23, 42, 0.9)',
+                    strokeWidth: 0,
+                    align: 'top'
+                  },
+                  arrows: {
+                    to: { enabled: true, scaleFactor: 0.8, type: 'arrow' }
+                  },
+                  color: {
+                    color: 'rgba(14, 165, 233, 0.4)',
+                    highlight: 'rgba(14, 165, 233, 0.8)',
+                    hover: 'rgba(14, 165, 233, 0.6)'
+                  },
+                  width: 1.5,
+                  selectionWidth: 3,
+                  smooth: {
+                    type: 'cubicBezier',
+                    forceDirection: 'horizontal',
+                    roundness: 0.6
+                  }
+                });
+              }
             }
           }
         });
@@ -2803,8 +2862,14 @@
 
       const network = new vis.Network(container, data, options);
 
-      // Add Zoom Controls UI
-      const controlsDiv = document.createElement('div');
+      // Prevent duplicate Zoom Controls
+      let controlsDiv = document.getElementById('erDiagramControls');
+      if (controlsDiv) {
+        controlsDiv.remove();
+      }
+
+      controlsDiv = document.createElement('div');
+      controlsDiv.id = 'erDiagramControls';
       controlsDiv.className = 'absolute bottom-4 right-4 flex flex-col gap-2 z-10';
       controlsDiv.innerHTML = `
         <button id="zoomIn" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 transition-all shadow-lg backdrop-blur-sm" title="Zoom In">
@@ -2837,19 +2902,20 @@
         network.fit({ padding: 30 });
       }, 500);
 
-      // Click-to-Zoom on nodes
-      network.on("selectNode", function (params) {
+      // Consolidated Unified Click-to-Zoom logic to prevent jerky overlapping animations
+      network.on("click", function (params) {
         if (params.nodes.length > 0) {
+          // Focus on clicked node
           network.focus(params.nodes[0], {
             scale: 1.1,
             animation: { duration: 500, easingFunction: 'easeInOutQuad' }
           });
+        } else {
+          // Reset view when clicking background
+          network.fit({
+            animation: { duration: 500, easingFunction: 'easeInOutQuad' }
+          });
         }
-      });
-
-      // Reset zoom when clicking background
-      network.on("deselectNode", function () {
-        network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
       });
     }
 

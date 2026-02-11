@@ -22,7 +22,7 @@ const CONFIG = {
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',
   MAX_HISTORY: 5,
-  APP_VERSION: 'v3.6',
+  APP_VERSION: 'v4.0',
   UPDATE_LOG: [
     { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
   ]
@@ -81,7 +81,8 @@ function generateDemo(userGoal, options = {}) {
     rawTables: [], // Added to return raw data to the UI
     suffix: null,
     domainName: null,
-    referenceDate: null
+    referenceDate: null,
+    appliedFactors: null
   };
   
   try {
@@ -118,7 +119,7 @@ function generateDemo(userGoal, options = {}) {
     result.referenceDate = planResult.referenceDate;
     result.publicDatasetId = planResult.publicDatasetId;
     result.demoGuide = planResult.demoGuide;
-    result.appliedFactors = planResult.appliedFactors;
+    result.appliedFactors = planResult.appliedFactors || {};
 
     result.setupScript = generateSetupScript({
       datasetId: datasetId,
@@ -146,6 +147,7 @@ function generateDemo(userGoal, options = {}) {
         systemInstruction: result.systemInstruction,
         referenceDate: result.referenceDate,
         demoGuide: result.demoGuide,
+        appliedFactors: result.appliedFactors,
         setupScript: result.setupScript,
         rawTables: result.rawTables,
         suffix: result.suffix,
@@ -205,23 +207,14 @@ Return ONLY the dataset ID, nothing else.`;
     const cleanId = result.trim().replace(/[`'"]/g, '').split('\n')[0];
     
     if (!cleanId.startsWith('bigquery-public-data.') || cleanId.split('.').length < 3) {
-    // console.log('Invalid dataset format, using fallback. Raw:', result);
+      return FALLBACK;
+    }
+  
+    const verifiedId = verifyAndResolveTable(cleanId);
+    return verifiedId || FALLBACK;
+  } catch (e) {
     return FALLBACK;
   }
-  
-  // Verify the table exists using BigQuery API
-  const verifiedId = verifyAndResolveTable(cleanId);
-  if (verifiedId) {
-    // console.log('Verified public dataset:', verifiedId);
-    return verifiedId;
-  }
-  
-  // console.log('Table verification failed, using fallback.');
-  return FALLBACK;
-} catch (e) {
-  // console.log('Dataset discovery failed:', e.message);
-  return FALLBACK;
-}
 }
 
 /**
@@ -236,39 +229,27 @@ function verifyAndResolveTable(candidateId) {
   
   const projectId = parts[0];
   const datasetId = parts[1];
-  const tableId = parts.slice(2).join('.'); // Handle table names with dots
+  const tableId = parts.slice(2).join('.'); 
   
-  // Try to get the exact table first
   try {
     BigQuery.Tables.get(projectId, datasetId, tableId);
-    return candidateId; // Table exists!
-  } catch (e) {
-    // console.log(`Table ${tableId} not found in ${datasetId}. Searching for alternatives...`);
-  }
+    return candidateId;
+  } catch (e) {}
   
-  // Table doesn't exist. List tables in the dataset and pick a suitable one.
   try {
     const tables = BigQuery.Tables.list(projectId, datasetId, { maxResults: 20 });
     if (tables.tables && tables.tables.length > 0) {
-      // Prefer tables with common data-related names
       const preferredPatterns = ['trips', 'orders', 'events', 'data', 'stats', 'records'];
+      let match = null;
       for (const pattern of preferredPatterns) {
-        const match = tables.tables.find(t => t.tableReference.tableId.toLowerCase().includes(pattern));
-        if (match) {
-          const resolvedId = `${projectId}.${datasetId}.${match.tableReference.tableId}`;
-          // console.log('Resolved to alternative table:', resolvedId);
-          return resolvedId;
-        }
+        match = tables.tables.find(t => t.tableReference.tableId.toLowerCase().includes(pattern));
+        if (match) break;
       }
-      // Fallback to the first table
-      const firstTable = tables.tables[0].tableReference.tableId;
-      const resolvedId = `${projectId}.${datasetId}.${firstTable}`;
-      // console.log('Resolved to first available table:', resolvedId);
-      return resolvedId;
+      if (!match) match = tables.tables[0];
+      
+      return `${projectId}.${datasetId}.${match.tableReference.tableId}`;
     }
-  } catch (listError) {
-    // console.log('Failed to list tables in dataset:', listError.message);
-  }
+  } catch (listError) {}
   
   return null;
 }
@@ -394,7 +375,6 @@ If the business problem mentions a **specific company, organization, or brand**,
 
 **If NO specific company/organization is mentioned in the business problem**: Create a COHERENT fictional business context. Choose ONE realistic company profile (industry vertical, size, geography) and generate ALL data as if it belongs to this single hypothetical entity. Ensure internal consistency - all facilities, products, and personnel should belong to the same fictional organization. Do NOT mix data from multiple unrelated real-world companies.
 
-
 ## Output Format (JSON)
 Output in the following JSON format. Output **pure JSON only without code blocks**.
 
@@ -409,19 +389,33 @@ Output in the following JSON format. Output **pure JSON only without code blocks
       "csvData": "column1,column2,...\\nvalue1,value2,...\\n..."
     }
   ],
-  "systemInstruction": "Specific instruction for the agent (3-5 sentences).",
+  "systemInstruction": "Specific instruction for the agent (3-5 sentences). Focus on defining the persona and domain expertise. Instruct the agent to wait for user input before acting, but emphasize autonomous persistence in error recovery once a goal is assigned.",
   "referenceDate": "YYYY-MM-DD",
   "publicDatasetId": "bigquery-public-data.dataset.table",
-  "appliedFactors": { ... },
-  "demoGuide": [ ... ]
+  "appliedFactors": {
+    "temporalPatterns": ["List of 2-3 specific temporal patterns applied (e.g., 'Weekday lunch surge', 'Month-end reconciliation spike')"],
+    "correlations": ["List of 2-3 specific data correlations applied (e.g., 'Region-specific product preference', 'High-tier customer loyalty frequency')"],
+    "businessLogic": ["List of 2-3 specific business logic constraints applied (e.g., 'Inventory threshold triggers', 'Sequential status transition integrity')"]
+  },
+  "demoGuide": [
+    {
+      "title": "Descriptive title of the analysis (e.g., 'Geospatial Delay Root Cause Analysis')",
+      "prompt": "Full prompt for the user to copy. Rules: 1. Do NOT mention specific table or column names (the agent must find them). 2. Present as a complex business question. 3. Synergize BigQuery analytics with Google Maps (location grounding) and Public Datasets where available."
+    }
+  ]
 }
 
 ## Critical Notes
+- **DEMO PROMPTS (CRITICAL)**: Generate 3-4 structured demo prompts that showcase the agent's "reasoning" and "tool-use" capabilities.
+    1. **NO TABLES/COLUMNS**: Do NOT mention \`production_batches\`, \`port_id\`, etc. in the prompt text.
+    2. **TOOL SYNERGY**: At least one prompt MUST require the agent to use BOTH BigQuery (for historical trends/metrics) and Google Maps (for travel times, routes, or place details) to answer.
+    3. **PROBLEM-CENTRIC**: Focus on high-level business goals (e.g., "Identify the financial impact of logistics delays in coastal regions and propose an optimized route for the highest-value shipments").
 - **MAXIMUM DATA (CRITICAL)**: You MUST generate **exactly ${maxRows} rows** for every table. Do NOT use "etc.", "...", or any placeholder to truncate data. This is a technical requirement for a simulation.
 - **RELATIONAL INTEGRITY & NAMING**: 
     1. **Primary/Foreign Keys MUST follow the format \`[entity]_id\`** (e.g., \`talent_id\`, \`theater_id\`).
     2. **STRICT SYMMETRY**: Foreign Keys MUST have the EXACT same name as the Primary Key they reference. Do NOT use prefixes like \`main_\` or \`ref_\` for ID columns.
-    3. Tables MUST be designed for joining.
+    3. **STAR SCHEMA PREFERENCE**: When generating multiple tables, favor a "Star Schema" approach. Include at least one central "Dimension/Master" table (e.g., \`products\`, \`locations\`, \`customers\`) that other "Fact/Log" tables reference. This ensures better data connectivity and analytical depth.
+    4. Tables MUST be designed for joining.
 - **ABSTRACT INSTRUCTIONS**: Do NOT mention column names in prompts.
 - **STRICT CSV FORMATTING**:
     1. **ALWAYS wrap text-based values** (STRING) in double quotes.
@@ -820,15 +814,24 @@ function generateSetupScript(params) {
 
   // Build local BQ creation commands
   let bqCommands = `echo "🗄 Creating BigQuery Dataset: ${datasetId}..."\n`;
-  bqCommands += `bq mk --dataset --location=US ${datasetId} 2>/dev/null || echo "Dataset exists."\n\n`;
+  bqCommands += `bq mk --dataset --location=US ${datasetId} 2>/dev/null || echo "    ✅ Dataset already exists."\n\n`;
 
   for (const table of tables) {
     const schemaStr = table.schema.map(f => `${f.name}:${f.type}`).join(',');
-    bqCommands += `echo "📊 Creating Table: ${table.tableName}..."\n`;
-    bqCommands += `cat <<'__CSV_EOF__' > ${table.tableName}.csv\n${table.csvData}\n__CSV_EOF__\n`;
-    bqCommands += `bq load --source_format=CSV --skip_leading_rows=1 --allow_quoted_newlines --null_marker="" --quote='"' --encoding=UTF-8 --location=US ${datasetId}.${table.tableName} ${table.tableName}.csv ${schemaStr}\n`;
-    bqCommands += `rm ${table.tableName}.csv\n\n`;
+    bqCommands += `echo "📊 Table: ${table.tableName}..."\n`;
+    bqCommands += `if bq show ${datasetId}.${table.tableName} >/dev/null 2>&1; then\n`;
+    bqCommands += `  echo "    ✅ Table already exists, skipping load."\n`;
+    bqCommands += `else\n`;
+    bqCommands += `  echo "    📥 Loading sample data..."\n`;
+    bqCommands += `  cat <<'__CSV_EOF__' > ${table.tableName}.csv\n${table.csvData}\n__CSV_EOF__\n`;
+    bqCommands += `  bq load --source_format=CSV --skip_leading_rows=1 --allow_quoted_newlines --null_marker="" --quote='"' --encoding=UTF-8 --location=US ${datasetId}.${table.tableName} ${table.tableName}.csv ${schemaStr} >/dev/null 2>&1\n`;
+    bqCommands += `  rm ${table.tableName}.csv\n`;
+    bqCommands += `  echo "    ✅ Loaded."\n`;
+    bqCommands += `fi\n\n`;
   }
+
+  // Robustly escape instruction for a text file
+  const rawInstruction = systemInstruction;
 
   return `#!/bin/bash
 # ===========================================
@@ -840,50 +843,55 @@ function generateSetupScript(params) {
 set -e
 
 # --- Cleanup Mode Handler ---
-if [ "$1" = "--cleanup" ] || [ "$1" = "-c" ]; then
-  echo ""
-  echo "========================================================="
-  echo "🧹 DEMO CLEANUP MODE"
-  echo "========================================================="
-  echo ""
-  echo "This will delete the following resources:"
-  echo "  • BigQuery Dataset: ${datasetId}"
-  echo "  • Maps API Key: MCP-Demo-Key-${suffix}"
-  echo "  • Local Directory: ~/${dirName}"
-  echo ""
-  read -p "Are you sure you want to proceed? (y/n) " -n 1 -r
-  echo
-  if [[ ! \$REPLY =~ ^[Yy]$ ]]; then
-    echo "Cleanup cancelled."
+  if [ "$1" = "--cleanup" ] || [ "$1" = "-c" ]; then
+    echo ""
+    echo "========================================================="
+    echo "🧹 DEMO CLEANUP MODE"
+    echo "========================================================="
+    echo ""
+    echo "This will delete the following resources:"
+    echo "  • BigQuery Dataset: ${datasetId}"
+    echo "  • Maps API Key: MCP-Demo-Key-${suffix}"
+    echo "  • Cloud Run Service: ${dirName} (if deployed)"
+    echo "  • Local Directory: ~/${dirName}"
+    echo ""
+    read -p "Are you sure you want to proceed? (y/n) " -n 1 -r
+    echo
+    if [[ ! \$REPLY =~ ^[Yy]$ ]]; then
+      echo "Cleanup cancelled."
+      exit 0
+    fi
+    
+    PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+    
+    echo ""
+    echo "🗑️  Deleting BigQuery Dataset: ${datasetId}..."
+    bq rm -r -f -d \$PROJECT_ID:${datasetId} 2>/dev/null && echo "   ✅ Dataset deleted." || echo "   ⚠️  Dataset not found or already deleted."
+    
+    echo ""
+    echo "🔑 Deleting Maps API Key: MCP-Demo-Key-${suffix}..."
+    KEY_NAME=$(gcloud alpha services api-keys list --filter="displayName:MCP-Demo-Key-${suffix}" --format="value(name)" 2>/dev/null || echo "")
+    if [ ! -z "\$KEY_NAME" ]; then
+      gcloud alpha services api-keys delete "\$KEY_NAME" --quiet 2>/dev/null && echo "   ✅ API Key deleted." || echo "   ⚠️  Failed to delete API Key."
+    else
+      echo "   ⚠️  API Key not found or already deleted."
+    fi
+
+    echo ""
+    echo "🚀 Deleting Cloud Run service: ${dirName}..."
+    gcloud run services delete ${dirName} --region=us-central1 --quiet 2>/dev/null && echo "   ✅ Cloud Run service deleted." || echo "   ⚠️  Service not found or already deleted."
+    
+    echo ""
+    echo "📂 Deleting local directory: ~/${dirName}..."
+    cd ~
+    rm -rf ~/${dirName} && echo "   ✅ Directory deleted." || echo "   ⚠️  Failed to delete directory."
+    
+    echo ""
+    echo "========================================================="
+    echo "✅ CLEANUP COMPLETE"
+    echo "========================================================="
     exit 0
   fi
-  
-  PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
-  
-  echo ""
-  echo "🗑️  Deleting BigQuery Dataset: ${datasetId}..."
-  bq rm -r -f -d \$PROJECT_ID:${datasetId} 2>/dev/null && echo "   ✅ Dataset deleted." || echo "   ⚠️  Dataset not found or already deleted."
-  
-  echo ""
-  echo "🔑 Deleting Maps API Key: MCP-Demo-Key-${suffix}..."
-  KEY_NAME=$(gcloud alpha services api-keys list --filter="displayName:MCP-Demo-Key-${suffix}" --format="value(name)" 2>/dev/null || echo "")
-  if [ ! -z "\$KEY_NAME" ]; then
-    gcloud alpha services api-keys delete "\$KEY_NAME" --quiet 2>/dev/null && echo "   ✅ API Key deleted." || echo "   ⚠️  Failed to delete API Key."
-  else
-    echo "   ⚠️  API Key not found or already deleted."
-  fi
-  
-  echo ""
-  echo "📂 Deleting local directory: ~/${dirName}..."
-  cd ~
-  rm -rf ~/${dirName} && echo "   ✅ Directory deleted." || echo "   ⚠️  Failed to delete directory."
-  
-  echo ""
-  echo "========================================================="
-  echo "✅ CLEANUP COMPLETE"
-  echo "========================================================="
-  exit 0
-fi
 
 # --- 1. Project Detection & Confirmation ---
 PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
@@ -891,6 +899,16 @@ if [ -z "$PROJECT_ID" ]; then
   echo "❌ Error: No default project found in your environment."
   echo "Please run 'gcloud config set project [PROJECT_ID]' first."
   exit 1
+fi
+
+echo "========================================================="
+echo "🚀 Target Project: $PROJECT_ID"
+echo "📂 Target Dataset: ${datasetId}"
+echo "========================================================="
+read -p "Do you want to proceed with this project? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
 fi
 
 # --- 1.1 Authentication & Permissions Check ---
@@ -912,15 +930,23 @@ if [ "$FREE_SPACE" -lt 524288 ]; then
   echo ""
 fi
 
+# --- 1.2 Deployment Choice ---
+echo ""
 echo "========================================================="
-echo "🚀 Target Project: $PROJECT_ID"
-echo "📂 Target Dataset: ${datasetId}"
+echo "🚀 DEPLOYMENT STRATEGY"
 echo "========================================================="
-read -p "Do you want to proceed with this project? (y/n) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    exit 1
-fi
+echo "Select your deployment target:"
+echo "  [1] Local (Recommended for quick testing via Cloud Shell)"
+echo "      - Launches 'adk web' on a local port."
+echo "      - Best for quick iteration."
+echo ""
+echo "  [2] Cloud Run (Public URL)"
+echo "      - Deploys the agent to a public, unauthenticated URL."
+echo "      - Automates API enablement, Docker build, and IAM roles."
+echo "      - Warning: Organization policies may block public ingress."
+echo ""
+read -p "Enter Choice [1 or 2] (Default: 1): " DEPLOY_CHOICE
+DEPLOY_CHOICE=\${DEPLOY_CHOICE:-1}
 
 # --- 2. IAM & API Checks ---
 echo "📡 Checking & Enabling APIs..."
@@ -939,6 +965,15 @@ gcloud services enable \\
   telemetry.googleapis.com \\
   --project="$PROJECT_ID"
 
+if [ "$DEPLOY_CHOICE" = "2" ]; then
+  echo "📡 Enabling Cloud Run specific APIs..."
+  gcloud services enable \\
+    run.googleapis.com \\
+    cloudbuild.googleapis.com \\
+    artifactregistry.googleapis.com \\
+    --project="$PROJECT_ID"
+fi
+
 # --- 2.1 Ensure Service Agent Ready ---
 echo "🛡 Ensuring Reasoning Engine Service Agent exists..."
 # Creating the service identity for AI Platform often triggers the specific RE SA as well
@@ -951,7 +986,7 @@ echo "🔐 Configuring IAM permissions for Agent Engine..."
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
 RE_SA="service-\${PROJECT_NUMBER}@gcp-sa-aiplatform-re.iam.gserviceaccount.com"
 
-# Helper function to grant and verify roles with retries
+# --- IAM Helper Functions ---
 check_and_grant_role() {
   local project=$1
   local member=$2
@@ -992,6 +1027,15 @@ for ROLE in "roles/mcp.toolUser" "roles/bigquery.jobUser" "roles/bigquery.dataVi
   check_and_grant_role "$PROJECT_ID" "\$RE_SA" "\$ROLE"
 done
 
+# If Cloud Run is selected, ensure the default compute service account has required permissions
+if [ "$DEPLOY_CHOICE" = "2" ]; then
+  echo "🔐 Configuring IAM permissions for Cloud Run Service Account..."
+  COMPUTE_SA="\${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+  for ROLE in "roles/mcp.toolUser" "roles/bigquery.jobUser" "roles/bigquery.dataViewer" "roles/serviceusage.serviceUsageConsumer" "roles/aiplatform.user" "roles/logging.logWriter" "roles/storage.admin" "roles/artifactregistry.writer" "roles/run.developer" "roles/iam.serviceAccountUser" "roles/iam.serviceAccountTokenCreator"; do
+    check_and_grant_role "$PROJECT_ID" "\$COMPUTE_SA" "\$ROLE"
+  done
+fi
+
 # Enable MCP services
 echo "🔧 Enabling MCP services..."
 gcloud beta services mcp enable bigquery.googleapis.com --project="$PROJECT_ID" 2>/dev/null || true
@@ -1000,11 +1044,17 @@ gcloud beta services mcp enable mapstools.googleapis.com --project="$PROJECT_ID"
 # --- 2.2 User-level IAM Configuration (for Cloud Shell users) ---
 echo "🔐 Configuring user permissions for local execution..."
 USER_ACCOUNT=$(gcloud config get-value account 2>/dev/null)
-for ROLE in "roles/mcp.toolUser" "roles/serviceusage.serviceUsageConsumer"; do
-  echo "  Granting $ROLE to $USER_ACCOUNT..."
+# For Cloud Run deployment, the user needs roles to build and deploy
+ROLES_TO_GRANT=("roles/mcp.toolUser" "roles/serviceusage.serviceUsageConsumer")
+if [ "$DEPLOY_CHOICE" = "2" ]; then
+  ROLES_TO_GRANT+=("roles/run.admin" "roles/cloudbuild.builds.builder" "roles/iam.serviceAccountUser" "roles/artifactregistry.admin")
+fi
+
+for ROLE in "\${ROLES_TO_GRANT[@]}"; do
+  echo "  Granting \$ROLE to \$USER_ACCOUNT..."
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \\
-    --member="user:$USER_ACCOUNT" \\
-    --role="$ROLE" --condition=None >/dev/null 2>&1 || true
+    --member="user:\$USER_ACCOUNT" \\
+    --role="\$ROLE" --condition=None >/dev/null 2>&1 || true
   echo "    ✅ Done"
 done
 
@@ -1039,15 +1089,41 @@ vertexai>=1.0.0
 db-dtypes>=1.0.0
 __REQ_EOF__
 
-echo "📦 Installing dependencies..."
-if ! command -v uv >/dev/null 2>&1; then
-    echo "    installing uv via astral.sh..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1 || true
-    # Add to current PATH for the rest of the script
-    export PATH="\$HOME/.cargo/bin:\$PATH"
+# Generate pyproject.toml required for adk project type
+cat <<'__PYPROJ_EOF__' > pyproject.toml
+[project]
+name = "mcp-agent"
+version = "0.1.0"
+dependencies = ["google-adk>=1.0.0", "google-genai>=1.9.0"]
+[tool.adk]
+project_type = "agent"
+__PYPROJ_EOF__
+
+# Generate Dockerfile using uv for performance (PoC v9 style)
+cat <<'__DOCKER_EOF__' > Dockerfile
+FROM python:3.11-slim
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+WORKDIR /app
+COPY requirements.txt pyproject.toml ./
+RUN uv pip install --system -r requirements.txt
+COPY . .
+ENV PORT 8080
+ENV GOOGLE_GENAI_USE_VERTEXAI=1
+ENV PYTHONUNBUFFERED=1
+CMD ["adk", "web", "adk_agent", "--host", "0.0.0.0", "--port", "8080"]
+__DOCKER_EOF__
+
+echo "📦 Preparing environment..."
+if [ "$DEPLOY_CHOICE" = "1" ]; then
+  if ! command -v uv >/dev/null 2>&1; then
+      echo "    installing uv via astral.sh..."
+      curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1 || true
+      # Add to current PATH for the rest of the script
+      export PATH="\$HOME/.cargo/bin:\$PATH"
+  fi
+  uv venv
+  uv pip install -r requirements.txt
 fi
-uv venv
-uv pip install -r requirements.txt
 
 # --- 5. Generate Maps API Key ---
 echo "🔑 Generating Maps API key..."
@@ -1086,6 +1162,7 @@ touch adk_agent/__init__.py
 cat <<'__INIT_EOF__' > adk_agent/mcp_app/__init__.py
 from . import agent
 __INIT_EOF__
+
 
 # --- 6. Customizing Agent ---
 echo "🔧 Configuring agent..."
@@ -1211,16 +1288,20 @@ async def _patched_send(self, request, *args, **kwargs):
                 print('             gcloud auth application-default login --scopes="https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/bigquery,openid,https://www.googleapis.com/auth/userinfo.email"')
                 print("             Then restart the agent.")
             
+            if "Access Denied" in body_text and "bigquery-public-data" in body_text:
+                print("  [AUTH TIP] 403 Permission Error: Targeted project 'bigquery-public-data' is forbidden for MCP tool execution.")
+                print("             You MUST use your own project for 'projectId' and use fully qualified names for public tables in 'execute_sql'.")
+            
             print(f"  [DEBUG ERROR] Header Authorization: {'PRESENT' if 'Authorization' in request.headers else 'MISSING'}")
             print(f"  [DEBUG ERROR] Detected project_id at runtime: {project_id}")
             print(f"  [DEBUG ERROR] Status: {response.status_code}")
             print(f"  [DEBUG ERROR] Body: {body_text}")
             
-            # --- Anti-Crash Patch (400 -> 200) ---
-            # If the tool returned a 400 but the body is valid JSON-RPC, 
+            # --- Anti-Crash Patch (400/403 -> 200) ---
+            # If the tool returned a 400 or 403 but the body is valid JSON-RPC, 
             # we change it to 200 so the ADK processes it as a tool error rather than a crash.
-            if response.status_code == 400 and '"jsonrpc":' in body_text:
-                print("  [DEBUG ERROR] Transmuting 400 -> 200 to prevent crash and allow agent self-correction.")
+            if response.status_code in [400, 403] and '"jsonrpc":' in body_text:
+                print(f"  [DEBUG ERROR] Transmuting {response.status_code} -> 200 to prevent crash and allow agent self-correction.")
                 response.status_code = 200
             
             response._content = body 
@@ -1343,11 +1424,12 @@ Help the user answer questions by strategically combining insights from BigQuery
 ---------------------------------------------------
 CRITICAL OPERATIONAL RULES:
 - DATA DISCOVERY & ACCURACY (HIGHEST PRIORITY): 
-    * MANDATORY: Always use \\\`get_table_info\\\` before your FIRST SQL query to confirm the schema. 
+    * ADAPTIVE DISCOVERY: Use \\\`get_table_info\\\` only when necessary to confirm schemas for a specific query. 
     * DO NOT ASSUME column names (e.g., 'region', 'category', 'prefecture') exist without checking. Hallucinating columns causes fatal errors.
-    * ERROR RECOVERY: If a SQL query fails, immediately re-run \\\`get_table_info\\\` to verify schema and fix the query based on results.
+    * AUTONOMOUS ERROR RECOVERY: If a SQL query fails, DO NOT ask the user for help immediately. Instead, re-run \\\`get_table_info\\\` to verify schema, explore values with \\\`SELECT DISTINCT\\\`, and fix the query yourself. Be relentless in finding the correct data.
     * VALUE EXPLORATION: For unfamiliar columns, run \\\`SELECT DISTINCT column LIMIT 10\\\` to identify valid values.
 - EXECUTION FLOW: 
+    * REACTIVE BEHAVIOR: Always wait for a specific user request or question before starting data analysis or tool execution. Respond to greetings with a friendly message and a brief offer of help.
     * SEQUENTIAL EXECUTION: Call exactly ONE tool per response and wait for its output. You are encouraged to use BigQuery and Maps tools together in sequence to provide richer insights.
     * SELECT ONLY: Only SELECT statements are supported. Do not attempt INSERT, UPDATE, or DELETE.
 - GEOSPATIAL CONTEXT: Use specific location data from BigQuery (city, state, etc.) in Maps tool calls to ensure accuracy.
@@ -1359,12 +1441,18 @@ CRITICAL OPERATIONAL RULES:
 """
 
 public_info = "- Additional Dataset: Use [PUBLIC_DATASET_ID] for context." if "[PUBLIC_DATASET_ID]" else ""
+
+# Embedding instruction directly (Reverted from separate file approach)
+gen_instruction = r"""
+${rawInstruction}
+"""
+
 instruction = base_instruction\
     .replace("[PROJECT_ID]", PROJECT_ID)\
     .replace("[DATASET_ID]", "${datasetId}")\
     .replace("[REFERENCE_DATE]", "${referenceDate}")\
     .replace("[PUBLIC_DATASET_INFO]", public_info.replace("[PUBLIC_DATASET_ID]", "${publicDatasetId || ''}"))\
-    .replace("[GENERATED_SYSTEM_INSTRUCTION]", """${escapedInstruction}""")
+    .replace("[GENERATED_SYSTEM_INSTRUCTION]", gen_instruction)
 
 # Configure the model with automatic retries for 429/5xx errors
 gemini_model = Gemini(
@@ -1387,6 +1475,42 @@ root_agent = LlmAgent(
 __AGENT_EOF__
 
 # --- Final Launch & Tips ---
+if [ "$DEPLOY_CHOICE" = "2" ]; then
+  echo "🚀 Deploying to Cloud Run (this will take 2-3 minutes)..."
+  # Note: --set-env-vars is used to inject the runtime configuration
+  # Deploy to Cloud Run (Unauthenticated / IAP-less)
+  SERVICE_NAME="${dirName}"
+  gcloud run deploy "$SERVICE_NAME" \
+    --source . \
+    --platform managed \
+    --region us-central1 \
+    --allow-unauthenticated \
+    --ingress all \
+    --service-account "\${COMPUTE_SA}" \
+    --set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=global,MAPS_API_KEY=$API_KEY" \
+    --quiet
+
+  # Get the URL and append the auto-selection parameter for mcp_app
+  BASE_URL=$(gcloud run services describe "$SERVICE_NAME" --region us-central1 --format='value(status.url)')
+  SERVICE_URL="\${BASE_URL}/dev-ui/?app=mcp_app"
+  
+  clear
+  echo "========================================================="
+  echo "🎉 Cloud Run Deployment Complete!"
+  echo "========================================================="
+  echo ""
+  echo "📂 Project directory: ${dirName}"
+  echo "🌐 Public URL: \$SERVICE_URL"
+  echo ""
+  echo "========================================================="
+  echo "💡 TIPS:"
+  echo "   • The agent is now live at the URL above."
+  echo "   • To CLEANUP:        bash setup-${dirName}.sh --cleanup"
+  echo "========================================================="
+  exit 0
+fi
+
+# --- Local Launch Logic ---
 is_port_busy() {
   local port=\$1
   # Method 1: lsof (Standard on Mac)
@@ -1408,20 +1532,13 @@ find_free_port() {
   echo "\$port"
 }
 
-PORT=$(find_free_port 8000)
-
-clear
-echo "========================================================="
-echo "🎉 Setup Complete!"
-echo "========================================================="
-echo ""
 START_PORT=8000
 if [ "$CLOUD_SHELL" = "true" ]; then START_PORT=8080; fi
 PORT=$(find_free_port \$START_PORT)
 
 clear
 echo "========================================================="
-echo "🎉 Setup Complete!"
+echo "🎉 Local Setup Complete!"
 echo "========================================================="
 echo ""
 echo "📂 Project directory: ${dirName}"
