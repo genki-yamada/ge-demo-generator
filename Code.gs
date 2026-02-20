@@ -181,22 +181,24 @@ function generateDemo(userGoal, options = {}) {
  * @returns {string} A verified public dataset ID or a fallback.
  */
 function discoverPublicDataset(userGoal) {
-  const discoveryPrompt = `Find a real BigQuery public dataset that would be relevant for the following business problem:
+  const discoveryPrompt = `Find a real BigQuery public dataset that would provide EXTERNAL CONTEXT or ENRICHMENT for the following business problem:
 
 "${userGoal}"
 
 Requirements:
 1. The dataset MUST exist under the project 'bigquery-public-data'.
 2. Search Google to find the exact dataset and table names.
-3. Return ONLY the fully qualified ID in the format: bigquery-public-data.dataset_name.table_name
-4. If multiple tables exist, choose the most commonly used or primary one.
-5. Do NOT invent or hallucinate dataset names.
+3. PRIORITIZE "External Context" data: weather, demographics, census, economic indicators, geographic features, or market statistics.
+4. AVOID "Core Business" data: Do NOT select datasets that look like internal company records (e.g., avoid order histories, customer lists, or internal transactions) unless explicitly required for external benchmarking.
+5. Return ONLY the fully qualified ID in the format: bigquery-public-data.dataset_name.table_name
+6. If multiple tables exist, choose the most commonly used or primary one.
+7. Do NOT invent or hallucinate dataset names.
 
-Examples of real datasets:
-- bigquery-public-data.new_york_taxi_trips.tlc_yellow_trips_2022
-- bigquery-public-data.thelook_ecommerce.orders
-- bigquery-public-data.austin_bikeshare.bikeshare_trips
-- bigquery-public-data.noaa_gsod.gsod2023
+Examples of preferred "External Context" datasets:
+- bigquery-public-data.noaa_gsod.gsod2023 (Weather)
+- bigquery-public-data.census_bureau_acs.zip_codes_2018_5yr (Demographics)
+- bigquery-public-data.geo_open_streets.lines (Geographic)
+- bigquery-public-data.google_trends.top_terms (Market Trends)
 
 Return ONLY the dataset ID, nothing else.`;
 
@@ -313,7 +315,10 @@ function planAndGenerateData(userGoal, options) {
 function buildPlanningPrompt(userGoal, options) {
   const maxRows = Math.min(options.rowCount || 100, 150);
   const publicDatasetInfo = options.usePublicDataset && options.publicDatasetId 
-    ? `- Related Public Dataset for JOINs: ${options.publicDatasetId}`
+    ? `- RELATED PUBLIC DATASET (ENRICHMENT ONLY): ${options.publicDatasetId}
+       * ROLE: This dataset serves as EXTERNAL CONTEXT (e.g., weather, statistics) to enrich the core business data.
+       * CONSTRAINT: DO NOT use this dataset as a replacement for core business operations (e.g., do not use public orders/customers if you are generating a retail demo).
+       * JOIN STRATEGY: Link via common attributes like 'zip_code', 'category', 'region', or 'date' rather than internal system IDs.`
     : `- IMPORTANT: NO public dataset should be used for this demo. Focus ONLY on synthetic tables below. Do NOT attempt to JOIN with external public-data.`;
   
   return `You are a versatile data analyst and BigQuery expert capable of generating realistic datasets for ANY industry or business function.
@@ -415,12 +420,19 @@ Output in the following JSON format. Output **pure JSON only without code blocks
     1. **Primary/Foreign Keys MUST follow the format \`[entity]_id\`** (e.g., \`talent_id\`, \`theater_id\`).
     2. **STRICT SYMMETRY**: Foreign Keys MUST have the EXACT same name as the Primary Key they reference. Do NOT use prefixes like \`main_\` or \`ref_\` for ID columns.
     3. **STAR SCHEMA PREFERENCE**: When generating multiple tables, favor a "Star Schema" approach. Include at least one central "Dimension/Master" table (e.g., \`products\`, \`locations\`, \`customers\`) that other "Fact/Log" tables reference. This ensures better data connectivity and analytical depth.
-    4. Tables MUST be designed for joining.
+    4. **NO ISOLATED TABLES (CRITICAL)**: Every table MUST be connected to at least one other table. Isolated tables (islands) are strictly forbidden. Ensure that all tables can be joined together directly or through an intermediary table.
+    5. Tables MUST be designed for joining.
+- **LANGUAGE CONSISTENCY (CRITICAL)**: Detect the language used in the "Business Problem" above. You MUST use this same language for ALL user-facing fields, including:
+    - Table and Column descriptions
+    - STRING values in the CSV data (e.g., product names, categories, person names, names of things)
+    - \`systemInstruction\`
+    - \`appliedFactors\` descriptions
+    - \`demoGuide\` titles and prompts
+- **TECHNICAL NAMES (CRITICAL)**: Table names, column names, and ALL ID fields (primary/foreign keys) MUST use English (snake_case) for technical compatibility and data integrity. Do NOT translate technical identifiers.
 - **ABSTRACT INSTRUCTIONS**: Do NOT mention column names in prompts.
 - **STRICT CSV FORMATTING**:
     1. **ALWAYS wrap text-based values** (STRING) in double quotes.
     2. **DO NOT wrap numeric values** (INTEGER, FLOAT) in quotes.
-- **LANGUAGE PARITY**: Use the user's language.
 `;
 }
 
@@ -807,7 +819,7 @@ function generateSetupScript(params) {
   
   const escapedInstruction = systemInstruction
     .replace(/\\/g, '\\\\\\\\')
-    .replace(/'/g, "'\\\\''")
+    .replace(/'/g, "'\\''")
     .replace(/\{/g, '{{')
     .replace(/\}/g, '}}')
     .replace(/\n/g, '\\n');
@@ -886,35 +898,62 @@ set -e
     echo ""
     echo "🤖 Deleting Agent Engine (Reasoning Engine) instance..."
     TOKEN=\$(gcloud auth print-access-token)
+    # Robust search: Try exact match first, then suffix match
     RE_NAME=\$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
-      "https://us-central1-aiplatform.googleapis.com/v1/projects/\$PROJECT_ID/locations/us-central1/reasoningEngines" | \
-      jq -r ".reasoningEngines[] | select(.displayName == \"${dirName}\") | .name" 2>/dev/null | head -n 1)
+        "https://us-central1-aiplatform.googleapis.com/v1/projects/\$PROJECT_ID/locations/us-central1/reasoningEngines" | \
+        jq -r --arg dir "${dirName}" --arg suf "${suffix}" '.. | objects | select(.displayName? == $dir or (.displayName? | strings | endswith($suf))) | .name' | head -n 1)
     
-    if [ ! -z "\$RE_NAME" ]; then
+    if [ ! -z "\$RE_NAME" ] && [ "\$RE_NAME" != "null" ]; then
+      RE_ID_NUM=\$(echo "\$RE_NAME" | grep -oE "[0-9]+$")
       curl -s -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
-        "https://us-central1-aiplatform.googleapis.com/v1/\$RE_NAME" && echo "   ✅ Agent Engine instance deleted." || echo "   ⚠️  Failed to delete Agent Engine instance."
+        "https://us-central1-aiplatform.googleapis.com/v1/\$RE_NAME?force=true" && echo "   ✅ Agent Engine instance deleted." || echo "   ⚠️  Failed to delete Agent Engine instance."
     else
-      echo "   ⚠️  Agent Engine instance not found."
+      echo "   ⚠️  Agent Engine instance not found matching '${dirName}' or suffix '${suffix}'."
     fi
 
     echo ""
-    echo "🌍 Deleting Gemini Enterprise registration (App)..."
-    TOKEN=\$(gcloud auth print-access-token)
-    ENGINE_NAME=\$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
-      "https://discoveryengine.googleapis.com/v1alpha/projects/\$PROJECT_ID/locations/global/collections/default_collection/engines" | \
-      jq -r ".engines[] | select(.displayName == \"${dirName}\") | .name" 2>/dev/null | head -n 1)
+    echo "🌍 Deleting Gemini Enterprise registration (App/Agent)..."
+    # 1. First, list all engines and check for name match or link match
+    ENGINES_JSON=\$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
+      "https://discoveryengine.googleapis.com/v1alpha/projects/\$PROJECT_ID/locations/global/collections/default_collection/engines")
     
-    if [ ! -z "\$ENGINE_NAME" ]; then
+    # Try to find engine matching name directly
+    ENGINE_NAME=\$(echo "\$ENGINES_JSON" | jq -r --arg dir "${dirName}" '.engines[]? | select(.displayName == $dir) | .name' 2>/dev/null | head -n 1)
+    
+    if [ ! -z "\$ENGINE_NAME" ] && [ "\$ENGINE_NAME" != "null" ]; then
+      # If the whole Engine (App) matches, delete it (this removes all agents under it)
+      echo "   � Deleting entire Gemini Enterprise App: \${dirName}..."
       curl -s -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
         "https://discoveryengine.googleapis.com/v1alpha/\$ENGINE_NAME" && echo "   ✅ Gemini Enterprise App deleted." || echo "   ⚠️  Failed to delete Gemini Enterprise App."
     else
-      echo "   ⚠️  Gemini Enterprise App not found."
+      # 2. If no engine match, scan for individual agents within existing engines
+      echo "   🔍 Searching for individual agent registrations..."
+      for E_NAME in \$(echo "\$ENGINES_JSON" | jq -r '.engines[]? | .name'); do
+        # List assistants for this engine
+        ASSISTANTS=\$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" "https://discoveryengine.googleapis.com/v1alpha/\${E_NAME}/assistants")
+        for A_NAME in \$(echo "\$ASSISTANTS" | jq -r '.assistants[]? | .name'); do
+          # List agents for this assistant
+          AGENTS_JSON=\$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" "https://discoveryengine.googleapis.com/v1alpha/\${A_NAME}/agents?pageSize=100")
+          
+          # Find agent by display name OR by Reasoning Engine link
+          TARGET_AGENT_NAME=\$(echo "\$AGENTS_JSON" | jq -r --arg dir "${dirName}" --arg suf "${suffix}" --arg re "\$RE_ID_NUM" '.agents[]? | select(.displayName == $dir or (.displayName | endswith($suf)) or (.adkAgentDefinition.provisionedReasoningEngine.reasoningEngine | contains($re))) | .name' 2>/dev/null | head -n 1)
+          
+          if [ ! -z "\$TARGET_AGENT_NAME" ] && [ "\$TARGET_AGENT_NAME" != "null" ]; then
+            echo "   🗑 Unregistering agent: \${TARGET_AGENT_NAME}..."
+            curl -s -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
+              "https://discoveryengine.googleapis.com/v1alpha/\$TARGET_AGENT_NAME" && echo "   ✅ Gemini Enterprise Agent unlisted." || echo "   ⚠️  Failed to unlist Gemini Enterprise Agent."
+            break 2
+          fi
+        done
+      done
     fi
     
     echo ""
-    echo "📂 Deleting local directory: ~/${dirName}..."
+    echo "📂 Deleting local directory and uv cache: ~/${dirName}..."
     cd ~
-    rm -rf ~/${dirName} && echo "   ✅ Directory deleted." || echo "   ⚠️  Failed to delete directory."
+    rm -rf ~/${dirName}
+    rm -rf ~/.cache/uv
+    echo "   ✅ Directory and UV cache deleted."
     
     echo ""
     echo "========================================================="
@@ -954,10 +993,15 @@ fi
 
 echo "💾 Checking disk space..."
 FREE_SPACE=$(df -k . | awk 'NR==2 {print $4}')
-if [ "$FREE_SPACE" -lt 524288 ]; then
-  echo "⚠️  Warning: Low disk space detected in Cloud Shell ($((FREE_SPACE/1024)) MB left)."
-  echo "To clear space, you can run: rm -rf ~/demo-*"
+if [ "$FREE_SPACE" -lt 1048576 ]; then
+  echo "⚠️  CRITICAL: Low disk space detected ($((FREE_SPACE/1024)) MB left)."
+  echo "    Deployment will likely fail (needs ~1GB free)."
+  echo "    Use the cleanup command to free up space:"
+  echo "    bash \$0 --cleanup"
   echo ""
+  read -p "Attempt to continue anyway? (y/n) " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then exit 1; fi
 fi
 
 # --- 1.2 Deployment Choice ---
@@ -1180,8 +1224,17 @@ if ! command -v uv >/dev/null 2>&1; then
     # Add to current PATH for the rest of the script
     export PATH="\$HOME/.cargo/bin:\$PATH"
 fi
+# Set UV to copy mode to prevent cross-filesystem hardlink failures (os error 28)
+export UV_LINK_MODE=copy
+uv cache clean >/dev/null 2>&1
 uv venv
-uv pip install -r requirements.txt
+if ! uv pip install --no-cache -r requirements.txt; then
+  echo ""
+  echo "❌ ERROR: Installation failed."
+  echo "   This is often caused by 'No space left on device'."
+  echo "   Please run 'bash $0 --cleanup' to free up space and try again."
+  exit 1
+fi
 
 # --- 6. Generate Maps API Key ---
 echo "🔑 Generating Maps API key..."
@@ -1229,14 +1282,19 @@ echo "🔧 Configuring agent..."
 
 cat <<'__TOOLS_EOF__' > adk_agent/mcp_app/tools.py
 import os
+import asyncio
 import dotenv
 import google.auth
 import google.auth.transport.requests
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
+from google.adk.tools.mcp_tool.mcp_tool import MCPTool
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
 import httpx
 import anyio
 import time
+
+# Enforce sequential execution across all tools to prevent session termination
+_tool_semaphore = asyncio.Semaphore(1)
 
 def get_project_id():
     """Robustly retrieves the project ID from env, .env, or credentials."""
@@ -1260,38 +1318,37 @@ def get_project_id():
 # 🛡️ Stability Patches for Reasoning Engine (Mandatory)
 # =============================================================================
 
-
-# =============================================================================
-# 🛡️ Stability Patches for Reasoning Engine (Mandatory)
-# =============================================================================
-
 _orig_client_init = httpx.AsyncClient.__init__
 def _patched_client_init(self, *args, **kwargs):
     kwargs['http2'] = False 
+    # Use long timeouts for stable MCP sessions (300s)
+    kwargs['timeout'] = httpx.Timeout(300.0, connect=60.0)
     return _orig_client_init(self, *args, **kwargs)
 
 _token_cache = {"token": None, "expiry": 0}
-def _get_fresh_mcp_token():
-    """Retrieves a fresh access token with caching."""
+_token_lock = asyncio.Lock()
+
+async def _get_fresh_mcp_token():
+    """Retrieves a fresh access token with async-safe caching."""
     global _token_cache
-    now = time.time()
-    if _token_cache["token"] and now < _token_cache["expiry"]:
-        return _token_cache["token"]
-    try:
-        import google.auth
-        import google.auth.transport.requests
-        scopes = ["https://www.googleapis.com/auth/cloud-platform", "https://www.googleapis.com/auth/bigquery"]
-        credentials, _ = google.auth.default(scopes=scopes)
-        credentials.refresh(google.auth.transport.requests.Request())
-        _token_cache = {"token": credentials.token, "expiry": now + 1800}
-        return credentials.token
-    except: return ""
+    async with _token_lock:
+        now = time.time()
+        if _token_cache["token"] and now < _token_cache["expiry"]:
+            return _token_cache["token"]
+        try:
+            scopes = ["https://www.googleapis.com/auth/cloud-platform", "https://www.googleapis.com/auth/bigquery"]
+            credentials, _ = google.auth.default(scopes=scopes)
+            # Run blocking refresh in a thread to avoid stalling the event loop
+            await anyio.to_thread.run_sync(credentials.refresh, google.auth.transport.requests.Request())
+            _token_cache = {"token": credentials.token, "expiry": now + 1800}
+            return credentials.token
+        except: return ""
 
 _orig_send = httpx.AsyncClient.send
 async def _patched_send(self, request, *args, **kwargs):
     # BigQuery MCP Auth Injection
     if "bigquery.googleapis.com/mcp" in str(request.url):
-        token = _get_fresh_mcp_token()
+        token = await _get_fresh_mcp_token()
         if token: request.headers['Authorization'] = f"Bearer {token}"
             
     # Execute actual request
@@ -1308,8 +1365,45 @@ async def _patched_send(self, request, *args, **kwargs):
 
 # Apply Stability Patches
 try:
+    # 1. HTTP/2 Disable for stability
     httpx.AsyncClient.__init__ = _patched_client_init
     httpx.AsyncClient.send = _patched_send
+    
+    # 2. Sequential MCP Initialization Patch
+    _orig_get_tools = MCPToolset.get_tools
+    async def _patched_get_tools(self, *args, **kwargs):
+        async with _tool_semaphore:
+            return await _orig_get_tools(self, *args, **kwargs)
+    MCPToolset.get_tools = _patched_get_tools
+
+    # 3. Deep Drip & Global Lock Recovery (Phase 4)
+    try:
+        _orig_run_async = MCPTool.run_async
+        async def _patched_run_async(self, *args, **kwargs):
+            # The lock must surround the ENTIRE retry loop to prevent concurrent 
+            # "retry stampedes" that crash the session manager.
+            async with _tool_semaphore:
+                max_retries = 3
+                for attempt in range(max_retries + 1):
+                    try:
+                        result = await _orig_run_async(self, *args, **kwargs)
+                        # [Deep Drip] Add a small delay AFTER success to let the SSE pipe breathe
+                        await asyncio.sleep(1)
+                        return result
+                    except Exception as e:
+                        err_msg = str(e).lower()
+                        # Catch both explicit McpError and raw strings from lower levels
+                        if ("session terminated" in err_msg or "mcperror" in err_msg or "broken pipe" in err_msg or "protocol error" in err_msg or "eos" in err_msg) and attempt < max_retries:
+                            print(f"  [DEBUG] MCP Session failure: {err_msg}. Recovering ({attempt + 1}/{max_retries})...")
+                            # 10s backoff to allow session manager to fully reset and re-establish SSE
+                            await asyncio.sleep(10) 
+                            continue
+                        raise
+        MCPTool.run_async = _patched_run_async
+        print("  [DEBUG] MCPTool.run_async patched with Deep Drip Sequential lock.")
+    except Exception as e:
+        print(f"  [DEBUG] Failed to patch MCPTool.run_async: {e}")
+
 except Exception as e:
     print(f"  [DEBUG] Stability patches not applied: {e}")
 
@@ -1362,7 +1456,7 @@ def get_bigquery_mcp_toolset():
     return MCPToolset(connection_params=StreamableHTTPConnectionParams(
         url=url, 
         headers={"x-goog-user-project": project_id},
-        timeout=180
+        timeout=300
     ))
 
 def get_maps_mcp_toolset():
@@ -1376,7 +1470,7 @@ def get_maps_mcp_toolset():
         headers={
             "x-goog-api-key": maps_api_key
         },
-        timeout=180
+        timeout=300
     ))
 __TOOLS_EOF__
 
@@ -1431,14 +1525,16 @@ CRITICAL OPERATIONAL RULES:
 - DATA DISCOVERY & ACCURACY (HIGHEST PRIORITY): 
     * ADAPTIVE DISCOVERY: Use \\\`get_table_info\\\` only when necessary to confirm schemas for a specific query. 
     * DO NOT ASSUME column names (e.g., 'region', 'category', 'prefecture') exist without checking. Hallucinating columns causes fatal errors.
-    * AUTONOMOUS ERROR RECOVERY: If a SQL query fails, DO NOT ask the user for help immediately. Instead, re-run \\\`get_table_info\\\` to verify schema, explore values with \\\`SELECT DISTINCT\\\`, and fix the query yourself. Be relentless in finding the correct data.
+    * AUTONOMOUS ERROR RECOVERY: If a SQL query fails, DO NOT ask the user for help immediately. Instead, output a status message explaining the error (e.g. "⚠️ Query failed due to column mismatch. Re-checking schema..."), then re-run \\\`get_table_info\\\` to verify schema, explore values with \\\`SELECT DISTINCT\\\`, and fix the query yourself. Be relentless in finding the correct data.
     * VALUE EXPLORATION: For unfamiliar columns, run \\\`SELECT DISTINCT column LIMIT 10\\\` to identify valid values.
 - EXECUTION FLOW: 
     * REACTIVE BEHAVIOR: Always wait for a specific user request or question before starting data analysis or tool execution. Respond to greetings with a friendly message and a brief offer of help.
-    * SEQUENTIAL EXECUTION: Call exactly ONE tool per response and wait for its output. You are encouraged to use BigQuery and Maps tools together in sequence to provide richer insights.
+    * MULTI-STEP PLANNING: For complex requests, summarize your planned steps in 1-2 sentences before starting the first tool execution. This keeps the user informed of your reasoning path.
+    * RANGE QUERIES (STRICT RULE): If you need to analyze a time range (e.g., 'first two weeks', 'last month'), you MUST query ONLY THE FIRST DAY of the range first to verify data density and schema. DO NOT 'gulp' large ranges in a single response, as this crashes the data pipe. Only expand to the full range in subsequent turns once the first day is verified.
     * SELECT ONLY: Only SELECT statements are supported. Do not attempt INSERT, UPDATE, or DELETE.
+    * SEQUENTIAL EXECUTION (MANDATORY): You MUST call exactly ONE tool per response and wait for its output. Proposing multiple tools (parallelism) is COMPLETELY FORBIDDEN and triggers fatal session termination. Slow, steady progress is the only way to succeed.
 - GEOSPATIAL CONTEXT: Use specific location data from BigQuery (city, state, etc.) in Maps tool calls to ensure accuracy.
-- PROGRESS UPDATES: Before each tool call, output a brief status message with an emoji (e.g., "📊 Checking schema...", "🔍 Running SQL...").
+- PROGRESS UPDATES (MANDATORY): You MUST output a brief status message with an emoji BEFORE every single tool call (e.g., "📊 Checking schema...", "🔍 Running SQL...", "🗺️ Calculating routes..."). This is critical for the user to see your progress in the UI. Even if you are repeating a step, report it.
 - PUBLIC DATASET ACCESS (CRITICAL):
     * The projectId argument in ALL BigQuery tool calls MUST ALWAYS be YOUR project ID ([PROJECT_ID]). NEVER use "bigquery-public-data" as projectId.
     * Access public tables ONLY via \\\`execute_sql\\\` using fully qualified names (e.g., \\\`bigquery-public-data.google_trends.top_terms\\\`).
@@ -1492,7 +1588,8 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
   echo "🔧 Initializing production infrastructure (enhance)..."
   # We MUST be in the adk_agent directory for enhance to handle mcp_app correctly
   cd adk_agent
-  printf '\n\n\n\n\n\n\n' | uvx agent-starter-pack enhance
+  export UV_LINK_MODE=copy
+  printf '\n\n\n\n\n\n\n' | uvx --no-cache agent-starter-pack enhance
   
   # Apply naming fixes (Robust regex for different quote styles and separators)
   echo "🔧 Applying project name customizations..."
@@ -1517,8 +1614,25 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
   
   echo ""
   echo "🤖 Step 2/2: Registering Agent to Gemini Enterprise..."
-  # This command is interactive for instance selection if multiple exist
-  make register-gemini-enterprise
+  # Count apps using the same API-based approach as cleanup logic
+  TOKEN=$(gcloud auth print-access-token)
+  ENGINES_JSON=$(curl -s -H "Authorization: Bearer $TOKEN" -H "X-Goog-User-Project: $PROJECT_ID" \
+      "https://discoveryengine.googleapis.com/v1alpha/projects/$PROJECT_ID/locations/global/collections/default_collection/engines")
+  APP_COUNT=$(echo "$ENGINES_JSON" | jq -r ".engines | length" 2>/dev/null || echo "0")
+  
+  if [ "$APP_COUNT" = "1" ]; then
+    echo "✅ Found exactly one Gemini Enterprise app. Automating registration..."
+    # Y (Agent ID) -> Y (Project ID) -> 1 (App Selection) -> Any subsequent defaults (yes "")
+    (printf "Y\\nY\\n1\\n"; yes "") | make register-gemini-enterprise
+  else
+    if [ "$APP_COUNT" = "0" ]; then
+      echo "⚠️ No Gemini Enterprise apps found. You might need to create one first."
+    else
+      echo "💡 Found $APP_COUNT apps. Please select one manually:"
+    fi
+    # Fallback: Automated defaults (Y, Y) + interactive app selection
+    (printf "Y\\nY\\n"; cat) | make register-gemini-enterprise
+  fi
   cd ..
   
   clear

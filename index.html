@@ -2790,30 +2790,44 @@
         table.headers.forEach(h => {
           const hLower = h.toLowerCase();
           if (hLower.endsWith('_id')) {
-            const isPK = h === tablePKs[table.tableName];
-            if (isPK) return; // Don't create edge from table to itself via its own PK
-
-            // Find target table that has this h as its PK OR has a matching column name
-            const targetTable = tables.find(t => {
+            // Find ALL target tables that have a matching column name
+            const matchingTables = tables.filter(t => {
               if (t.tableName === table.tableName) return false;
-              // Link if it's the PK of the target table
-              if (tablePKs[t.tableName] === h) return true;
-              // Link if the target table has a column with the EXACT SAME name (Semantic Link)
-              // We only do this for _id columns to avoid excessive edges
+              // Link if the target table has a column with the EXACT SAME name
               return t.headers.includes(h);
             });
 
-            if (targetTable) {
-              // Avoid duplicate edges
+            matchingTables.forEach(targetTable => {
+              // Avoid duplicate edges between the same two tables for the same field
+              // Note: We don't check direction here because arrows indicate the relationship flow
+              // but we want to avoid drawing two lines for the exact same field between two tables
               const edgeExists = edges.find(e =>
                 (e.from === table.tableName && e.to === targetTable.tableName && e.label.trim() === h) ||
                 (e.from === targetTable.tableName && e.to === table.tableName && e.label.trim() === h)
               );
 
               if (!edgeExists) {
+                // Determine direction: From FK to PK if possible
+                const isFromPK = tablePKs[table.tableName] === h;
+                const isToPK = tablePKs[targetTable.tableName] === h;
+
+                let from = table.tableName;
+                let to = targetTable.tableName;
+
+                // If the target has the PK and the source doesn't, point to the target
+                // If both have it (e.g. 1:1 or shared ID), keep default alphabetical or creation order
+                // to maintain consistency
+                if (isToPK && !isFromPK) {
+                  from = table.tableName;
+                  to = targetTable.tableName;
+                } else if (isFromPK && !isToPK) {
+                  from = targetTable.tableName;
+                  to = table.tableName;
+                }
+
                 edges.push({
-                  from: table.tableName,
-                  to: targetTable.tableName,
+                  from: from,
+                  to: to,
                   label: `  ${h}  `,
                   font: {
                     size: 9,
@@ -2840,7 +2854,7 @@
                   }
                 });
               }
-            }
+            });
           }
         });
       });
