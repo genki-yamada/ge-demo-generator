@@ -1557,7 +1557,7 @@ instruction = base_instruction\
 
 # Configure the model with automatic retries for 429/5xx errors
 gemini_model = Gemini(
-    model="gemini-3-pro-preview",
+    model="gemini-3.1-pro-preview",
     retry_options=types.HttpRetryOptions(
         attempts=8,              # Increase attempts to handle higher load
         initial_delay=2.0,       # Initial backoff delay
