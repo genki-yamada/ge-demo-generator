@@ -21,7 +21,7 @@ const CONFIG = {
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',
-  MAX_HISTORY: 5,
+  MAX_HISTORY: 10,
   APP_VERSION: 'v4.0',
   UPDATE_LOG: [
     { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
@@ -1510,6 +1510,7 @@ Help the user answer questions by strategically combining insights from BigQuery
 
 1. **BigQuery Toolset**: Access data in the [PROJECT_ID].[DATASET_ID] dataset.
    - Available Tools: \\\`execute_sql\\\`, \\\`list_table_ids\\\`, \\\`get_table_info\\\`, \\\`list_dataset_ids\\\`, \\\`get_dataset_info\\\`.
+   - DATASET ISOLATION (CRITICAL): You MUST ONLY access the \\\`[DATASET_ID]\\\` dataset. DO NOT use \\\`list_dataset_ids\\\` to discover other datasets. DO NOT query any dataset other than \\\`[DATASET_ID]\\\` (except public datasets when explicitly instructed). If a user asks about data not in \\\`[DATASET_ID]\\\`, inform them that only this dataset is available for this demo.
 [PUBLIC_DATASET_INFO]
 
 [GENERATED_SYSTEM_INSTRUCTION]
@@ -1819,7 +1820,7 @@ function saveHistory(entry) {
   history.unshift(indexEntry);
   
   // Clean up old entries' extra data if exceeding limit
-  if (history.length > CONFIG.MAX_HISTORY) {
+  while (history.length > CONFIG.MAX_HISTORY) {
     const expired = history.pop();
     if (expired.storageId) {
       deleteLargeData(props, expired.storageId);
@@ -1827,6 +1828,21 @@ function saveHistory(entry) {
   }
   
   props.setProperty(historyKey, JSON.stringify(history));
+  
+  // Safety: evict oldest entries if total storage approaches 500KB limit
+  const SAFE_LIMIT = 480000; // 500KB - 20KB safety margin
+  const allProps = props.getProperties();
+  let totalSize = Object.entries(allProps).reduce((sum, [k, v]) => sum + k.length + v.length, 0);
+  while (totalSize > SAFE_LIMIT && history.length > 1) {
+    const oldest = history.pop();
+    if (oldest.storageId) {
+      deleteLargeData(props, oldest.storageId);
+    }
+    props.setProperty(historyKey, JSON.stringify(history));
+    // Recalculate after eviction
+    const updatedProps = props.getProperties();
+    totalSize = Object.entries(updatedProps).reduce((sum, [k, v]) => sum + k.length + v.length, 0);
+  }
 }
 
 function getHistory() { 
