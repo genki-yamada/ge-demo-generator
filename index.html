@@ -1362,18 +1362,22 @@
                     <div id="scriptContainer"
                       class="bg-black/80 rounded-2xl border border-white/5 transition-all max-h-40 overflow-hidden cursor-pointer relative group/script"
                       onclick="toggleScriptExpansion()">
+
+                      <!-- Floating Download Button (Icon only, subtle) - Top-right sticky -->
+                      <div class="sticky top-0 z-30 h-0 w-full flex justify-end">
+                        <button onclick="downloadSetupScript(); event.stopPropagation();"
+                          class="mt-4 mr-4 w-9 h-9 flex items-center justify-center rounded-xl bg-gray-900/60 hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-400 transition-all border border-white/10 backdrop-blur-md shadow-xl group/download pointer-events-auto"
+                          title="Download setup script">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                          </svg>
+                        </button>
+                      </div>
+
                       <pre id="setupCommand"
                         class="p-6 pb-4 text-[11px] font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap break-all"></pre>
 
-                      <!-- Download Button -->
-                      <button onclick="downloadSetupScript(); event.stopPropagation();"
-                        class="sticky top-3 float-right mr-3 mt-3 p-2 rounded-xl bg-gray-900/80 text-gray-400 hover:text-white hover:bg-emerald-500/20 transition-all border border-white/5 z-20 shadow-xl backdrop-blur-sm"
-                        title="Download setup script">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                        </svg>
-                      </button>
                       <div
                         class="sticky bottom-0 left-0 right-0 z-10 flex justify-center py-4 bg-gradient-to-t from-black via-black/90 to-transparent pointer-events-none"
                         id="stickyBtnWrapper">
@@ -2669,7 +2673,12 @@
             </div>
           </div>`;
 
-        html += `<div class="overflow-x-auto custom-scrollbar"><table class="w-full text-[10px] text-left"><thead class="bg-black/40 text-gray-500 uppercase tracking-tighter"><tr>`;
+        html += `
+          <div class="overflow-x-auto custom-scrollbar">
+            <div class="max-h-[220px] overflow-y-auto custom-scrollbar-y">
+              <table class="w-full text-[10px] text-left">
+                <thead class="bg-black/40 text-gray-500 uppercase tracking-tighter sticky top-0 z-10 backdrop-blur-md">
+                  <tr>`;
 
         table.headers.forEach(h => {
           const firstVal = table.rows[0] ? table.rows[0][h] : '';
@@ -2698,11 +2707,11 @@
             const isDate = /^\d{4}-\d{2}-\d{2}/.test(val);
             const isNum = !isNaN(parseFloat(val)) && isFinite(val);
             const cellClass = isNum ? 'text-emerald-400/80' : (isDate ? 'text-sky-300/80' : 'text-gray-400');
-            html += `<td class="px-4 py-2.5 border-r border-white/5 last:border-0 ${cellClass}">${val}</td>`;
+            html += `<td class="px-4 py-2.5 border-r border-white/5 last:border-0 ${cellClass} truncate max-w-[200px]" title="${val}">${val}</td>`;
           });
           html += `</tr>`;
         });
-        html += `</tbody></table></div>`;
+        html += `</tbody></table></div></div>`;
         div.innerHTML = html;
         container.appendChild(div);
       });
@@ -2898,7 +2907,7 @@
         interaction: {
           hover: true,
           tooltipDelay: 200,
-          zoomView: true,
+          zoomView: false,
           navigationButtons: false,
           multiselect: false
         }

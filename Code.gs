@@ -22,7 +22,7 @@ const CONFIG = {
   RETRY_DELAY_MS: 1000,
   HISTORY_KEY: 'demo_history',
   MAX_HISTORY: 10,
-  APP_VERSION: 'v4.0',
+  APP_VERSION: 'v4.4',
   UPDATE_LOG: [
     { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
   ]
@@ -282,7 +282,7 @@ function planAndGenerateData(userGoal, options) {
       if (table.csvData) {
         const lines = table.csvData.trim().split('\n');
         const headers = parseCSVLine(lines[0]);
-        const previewRows = lines.slice(1, 6).map(line => {
+        const previewRows = lines.slice(1).map(line => {
           const values = parseCSVLine(line);
           const row = {};
           headers.forEach((h, i) => { row[h.trim().replace(/^"|"$/g, '')] = values[i] || ''; });
@@ -411,7 +411,7 @@ Output in the following JSON format. Output **pure JSON only without code blocks
 }
 
 ## Critical Notes
-- **DEMO PROMPTS (CRITICAL)**: Generate 3-4 structured demo prompts that showcase the agent's "reasoning" and "tool-use" capabilities.
+- **DEMO PROMPTS (CRITICAL)**: Generate EXACTLY 5 structured demo prompts that showcase the agent's "reasoning" and "tool-use" capabilities.
     1. **NO TABLES/COLUMNS**: Do NOT mention \`production_batches\`, \`port_id\`, etc. in the prompt text.
     2. **TOOL SYNERGY**: At least one prompt MUST require the agent to use BOTH BigQuery (for historical trends/metrics) and Google Maps (for travel times, routes, or place details) to answer.
     3. **PROBLEM-CENTRIC**: Focus on high-level business goals (e.g., "Identify the financial impact of logistics delays in coastal regions and propose an optimized route for the highest-value shipments").
@@ -1873,37 +1873,37 @@ function getHistoryItem(timestamp) {
       entry.result = JSON.parse(dataStr);
       
       // RECONSTRUCTION: Restore setupScript and dataPreview on the fly
-      if (entry.result.rawTables && !entry.result.setupScript) {
-        entry.result.setupScript = generateSetupScript({
-          datasetId: entry.datasetId,
-          systemInstruction: entry.result.systemInstruction,
-          referenceDate: entry.result.referenceDate,
-          publicDatasetId: entry.publicDatasetId,
-          suffix: entry.result.suffix,
-          dirName: entry.result.dirName,
-          tables: entry.result.rawTables,
-          userGoal: entry.userGoal
-        });
-        
-        // Re-generate preview if missing
-        if (!entry.result.dataPreview) {
-          entry.result.dataPreview = entry.result.rawTables.map(table => {
-            const lines = table.csvData.trim().split('\n');
-            const headers = parseCSVLine(lines[0]);
-            const previewRows = lines.slice(1, 6).map(line => {
-              const values = parseCSVLine(line);
-              const row = {};
-              headers.forEach((h, i) => { row[h.trim()] = values[i] || ''; });
-              return row;
-            });
-            return {
-              tableName: table.tableName,
-              headers: headers,
-              rows: previewRows,
-              totalRows: lines.length - 1
-            };
+      if (entry.result.rawTables) {
+        if (!entry.result.setupScript) {
+          entry.result.setupScript = generateSetupScript({
+            datasetId: entry.datasetId,
+            systemInstruction: entry.result.systemInstruction,
+            referenceDate: entry.result.referenceDate,
+            publicDatasetId: entry.publicDatasetId,
+            suffix: entry.result.suffix,
+            dirName: entry.result.dirName,
+            tables: entry.result.rawTables,
+            userGoal: entry.userGoal
           });
         }
+        
+        // Always reconstruct preview to ensure it matches current UI capabilities (e.g. show all rows)
+        entry.result.dataPreview = entry.result.rawTables.map(table => {
+          const lines = table.csvData.trim().split('\n');
+          const headers = parseCSVLine(lines[0]);
+          const previewRows = lines.slice(1).map(line => {
+            const values = parseCSVLine(line);
+            const row = {};
+            headers.forEach((h, i) => { row[h.trim()] = values[i] || ''; });
+            return row;
+          });
+          return {
+            tableName: table.tableName,
+            headers: headers,
+            rows: previewRows,
+            totalRows: lines.length - 1
+          };
+        });
       }
     }
   }
