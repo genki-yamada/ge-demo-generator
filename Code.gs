@@ -1268,6 +1268,16 @@ __ENV_EOF__
 ln -sf ../.env adk_agent/.env
 ln -sf ../../.env adk_agent/mcp_app/.env
 
+# Ignore large directories to prevent Reason Engine payload bloating
+cat <<'__GITIGNORE_EOF__' > adk_agent/.gitignore
+.venv/
+.venv
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+__GITIGNORE_EOF__
+
 # Create __init__.py files for proper Python package structure
 touch adk_agent/__init__.py
 cat <<'__INIT_EOF__' > adk_agent/mcp_app/__init__.py
