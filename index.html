@@ -1065,7 +1065,7 @@
         </section>
 
         <!-- Result Section -->
-        <section id="resultSection" class="hidden space-y-10 fade-in pb-24">
+        <section id="resultSection" class="hidden space-y-10 fade-in mb-10">
 
           <!-- Post-Synthesis Roadmap -->
           <div id="postSynthesisRoadmap" class="glass rounded-3xl p-8 border border-sky-500/30 bg-sky-500/5 mb-10">
@@ -1397,28 +1397,55 @@
                 </div>
               </div>
 
-              <!-- Important Confirmation Card -->
-              <div class="mt-8 p-5 bg-amber-500/5 rounded-2xl border border-amber-500/20 shadow-lg">
-                <div class="flex items-start gap-4">
+              <!-- Setup Script Configurations -->
+              <div class="mt-8 space-y-4">
+                <h4 class="text-[12px] font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+                  <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  Deployment Strategies
+                </h4>
+                <p class="text-[13px] text-gray-400 leading-relaxed mb-4">
+                  During the setup script execution, you will be prompted to select one of three deployment strategies:
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <!-- Strategy 1 -->
                   <div
-                    class="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
-                      </path>
-                    </svg>
+                    class="bg-black/40 border border-white/5 rounded-xl p-4 hover:border-emerald-500/30 transition-all shadow-lg flex flex-col gap-2">
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="w-5 h-5 rounded-md bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-[10px] font-bold">1</span>
+                      <h5 class="text-[11px] font-bold text-gray-300 uppercase tracking-wide">Local Host</h5>
+                    </div>
+                    <p class="text-[11px] text-gray-400 leading-relaxed">
+                      Runs the agent server locally. If you choose this, proceed to the <span
+                        class="text-emerald-400 font-bold">Next Step: Open Local Server</span> section below.
+                    </p>
                   </div>
-                  <div class="flex-1">
-                    <h4 class="text-[12px] font-bold text-amber-400 uppercase tracking-widest mb-2">Important
-                      Confirmation</h4>
-                    <p class="text-[13px] text-amber-200/80 leading-relaxed">
-                      After pasting the setup script and hitting the enter key, the terminal will ask: <span
-                        class="text-amber-300 font-mono bg-black/30 px-1.5 py-0.5 rounded">"Do you want to proceed with
-                        this project? (y/n)"</span>.
-                      Verify the project ID and type <kbd
-                        class="px-2 py-1 bg-gray-800 border-b-2 border-gray-900 rounded-lg font-mono text-white text-[10px] mx-1">y</kbd>
-                      then press <kbd
-                        class="px-2 py-1 bg-gray-800 border-b-2 border-gray-900 rounded-lg font-mono text-white text-[10px] mx-1">Enter</kbd>.
+                  <!-- Strategy 2 -->
+                  <div
+                    class="bg-black/40 border border-white/5 rounded-xl p-4 hover:border-sky-500/30 transition-all shadow-lg flex flex-col gap-2">
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="w-5 h-5 rounded-md bg-sky-500/10 text-sky-400 flex items-center justify-center text-[10px] font-bold">2</span>
+                      <h5 class="text-[11px] font-bold text-gray-300 uppercase tracking-wide">Cloud Run</h5>
+                    </div>
+                    <p class="text-[11px] text-gray-400 leading-relaxed">
+                      Deploys the agent server to Google Cloud Run as a publicly accessible endpoint.
+                    </p>
+                  </div>
+                  <!-- Strategy 3 -->
+                  <div
+                    class="bg-black/40 border border-white/5 rounded-xl p-4 hover:border-purple-500/30 transition-all shadow-lg flex flex-col gap-2">
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="w-5 h-5 rounded-md bg-purple-500/10 text-purple-400 flex items-center justify-center text-[10px] font-bold">3</span>
+                      <h5 class="text-[11px] font-bold text-gray-300 uppercase tracking-wide">Gemini Enterprise</h5>
+                    </div>
+                    <p class="text-[11px] text-gray-400 leading-relaxed">
+                      Deploys to Reasoning Engine and registers it. If chosen, skip to <span
+                        class="text-purple-400 font-bold">Step 5: Deploy to Gemini Enterprise</span>.
                     </p>
                   </div>
                 </div>
@@ -1636,7 +1663,8 @@
                   </span>
                 </span>
               </div>
-              <p class="text-[11px] text-gray-500">Scale your demo by deploying to Vertex AI Agent Engine</p>
+              <p class="text-[11px] text-gray-500">Scale your demo by deploying to Vertex AI Agent Engine and register
+                it to Gemini Enterprise</p>
             </div>
           </div>
 
