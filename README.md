@@ -57,10 +57,11 @@ ge-demo-generator/
 ## Setup
 
 1. Create a new Google Apps Script project
-2. Copy `Code.gs` and `index.html` into the project
-3. Enable the **BigQuery** Advanced Service:
-   - Go to **Services > + Add a service > BigQuery**
-4. Deploy as a **Web App**
+2. Open **Project Settings** (gear icon) and enable **"Show 'appsscript.json' manifest file in editor"**
+3. Copy `Code.gs`, `index.html`, and `appsscript.json` into the project
+4. Link your Google Cloud project:
+   - Go to **Project Settings > Google Cloud Platform (GCP) Project** and enter your Project Number
+5. Deploy as a **Web App** (You will be prompted to authorize scopes including Google Cloud)
 
 ## Configuration
 
