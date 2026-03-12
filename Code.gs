@@ -836,7 +836,7 @@ function generateSetupScript(params) {
     bqCommands += `else\n`;
     bqCommands += `  echo "    📥 Loading sample data..."\n`;
     bqCommands += `  cat <<'__CSV_EOF__' > ${table.tableName}.csv\n${table.csvData}\n__CSV_EOF__\n`;
-    bqCommands += `  bq load --source_format=CSV --skip_leading_rows=1 --allow_quoted_newlines --null_marker="" --quote='"' --encoding=UTF-8 --location=US ${datasetId}.${table.tableName} ${table.tableName}.csv ${schemaStr} >/dev/null 2>&1\n`;
+    bqCommands += `  bq load --source_format=CSV --skip_leading_rows=1 --allow_quoted_newlines --null_marker="" --quote='"' --encoding=UTF-8 --location=US ${datasetId}.${table.tableName} ${table.tableName}.csv ${schemaStr}\n`;
     bqCommands += `  rm ${table.tableName}.csv\n`;
     bqCommands += `  echo "    ✅ Loaded."\n`;
     bqCommands += `fi\n\n`;
@@ -1398,16 +1398,22 @@ try:
                     try:
                         result = await _orig_run_async(self, *args, **kwargs)
                         # [Deep Drip] Add a small delay AFTER success to let the SSE pipe breathe
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(1.5)
                         return result
                     except Exception as e:
                         err_msg = str(e).lower()
                         # Catch both explicit McpError and raw strings from lower levels
                         if ("session terminated" in err_msg or "mcperror" in err_msg or "broken pipe" in err_msg or "protocol error" in err_msg or "eos" in err_msg) and attempt < max_retries:
-                            print(f"  [DEBUG] MCP Session failure: {err_msg}. Recovering ({attempt + 1}/{max_retries})...")
-                            # 10s backoff to allow session manager to fully reset and re-establish SSE
-                            await asyncio.sleep(10) 
+                            backoff_time = 5 * (2 ** attempt)
+                            print(f"  [DEBUG] MCP Session failure: {err_msg}. Recovering ({attempt + 1}/{max_retries})... Waiting {backoff_time}s")
+                            await asyncio.sleep(backoff_time) 
                             continue
+                        elif '429' in str(e) or 'resource exhausted' in err_msg:
+                            if attempt < max_retries:
+                                backoff_time = 5 * (2 ** attempt)
+                                print(f"  [DEBUG] ⚠️ MCP Resource exhausted (429). Cooling down for {backoff_time}s...")
+                                await asyncio.sleep(backoff_time)
+                                continue
                         raise
         MCPTool.run_async = _patched_run_async
         print("  [DEBUG] MCPTool.run_async patched with Deep Drip Sequential lock.")
@@ -1541,9 +1547,10 @@ CRITICAL OPERATIONAL RULES:
 - EXECUTION FLOW: 
     * REACTIVE BEHAVIOR: Always wait for a specific user request or question before starting data analysis or tool execution. Respond to greetings with a friendly message and a brief offer of help.
     * MULTI-STEP PLANNING: For complex requests, summarize your planned steps in 1-2 sentences before starting the first tool execution. This keeps the user informed of your reasoning path.
-    * RANGE QUERIES (STRICT RULE): If you need to analyze a time range (e.g., 'first two weeks', 'last month'), you MUST query ONLY THE FIRST DAY of the range first to verify data density and schema. DO NOT 'gulp' large ranges in a single response, as this crashes the data pipe. Only expand to the full range in subsequent turns once the first day is verified.
+    * RANGE QUERIES & DISCOVERY (STRICT RULE): If you need to analyze a time range (e.g., 'first two weeks') or discover unique values for a column, you MUST query ONLY THE SMALLEST PRACTICAL SUBSET (e.g., first day or LIMIT 10) first to verify data density and schema. DO NOT 'gulp' large ranges or entire columns in a single response, as this crashes the data pipe.
+    * GULP PREVENTION (MANDATORY): EVERY \\\`execute_sql\\\` query MUST include a \\\`LIMIT 100\\\` or smaller unless you are explicitly counting rows. Never attempt to retrieve thousands of rows at once.
     * SELECT ONLY: Only SELECT statements are supported. Do not attempt INSERT, UPDATE, or DELETE.
-    * SEQUENTIAL EXECUTION (MANDATORY): You MUST call exactly ONE tool per response and wait for its output. Proposing multiple tools (parallelism) is COMPLETELY FORBIDDEN and triggers fatal session termination. Slow, steady progress is the only way to succeed.
+    * SEQUENTIAL EXECUTION (MANDATORY): You MUST call exactly ONE tool per response and wait for its output. Proposing multiple tools (parallelism) is COMPLETELY FORBIDDEN and triggers fatal session termination by the infrastructure. Slow, steady progress is the only way to succeed.
 - GEOSPATIAL CONTEXT: Use specific location data from BigQuery (city, state, etc.) in Maps tool calls to ensure accuracy.
 - PROGRESS UPDATES (MANDATORY): You MUST output a brief status message with an emoji BEFORE every single tool call (e.g., "📊 Checking schema...", "🔍 Running SQL...", "🗺️ Calculating routes..."). This is critical for the user to see your progress in the UI. Even if you are repeating a step, report it.
 - PUBLIC DATASET ACCESS (CRITICAL):
