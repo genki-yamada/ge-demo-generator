@@ -1,114 +1,54 @@
-# ADK Agent Demo Generator
+# GE Demo Generator
 
-A Google Apps Script-based tool for rapidly generating hyper-personalized AI agent demos. It synthesizes realistic business datasets and agent configurations on top of the [LaunchMyBakery](https://github.com/google/mcp/tree/main/examples/launchmybakery) demo application.
+Dynamically generate portable, high-fidelity AI agent demos using **BigQuery** and **Google Maps** MCP (Model Context Protocol) servers.
 
-## Overview
+## 🚀 Overview
 
-This tool helps you:
-- **Generate synthetic datasets** tailored to any business scenario
-- **Auto-discover BigQuery public datasets** using Google Search grounding
-- **Create ready-to-run setup scripts** for Google Cloud Shell
-- **Configure AI agents** with custom system instructions and demo guides (uses `gemini-3.1-pro-preview`)
+The **GE Demo Generator** is an accelerator for building Vertex AI Agent demos. It uses Gemini to:
+1.  **Synthesize Scenarios**: Understands a business challenge (e.g., "logistics delay analysis") and plans a data strategy.
+2.  **Generate Synthetic Data**: Creates multiple BigQuery tables with realistic data and relational integrity.
+3.  **Produce Setup Scripts**: Generates a single bash script that provisions the entire environment (Data + Agent Code + Deployment) in your own Google Cloud projects.
+4.  **Visualize Architecture**: Auto-generates ER diagrams and architecture maps.
 
-## Features
+## 🛠️ Prerequisites
 
-### 🎯 Smart Data Synthesis
-- Generates 1-3 relational tables with 15-50 rows each
-- Ensures relational integrity (consistent primary/foreign keys)
-- Supports multi-table JOINs for complex data analysis demos
+*   **Google Cloud Project**: With Billing enabled.
+*   **Google Apps Script**: To host the Generator Web UI.
+*   **Vertex AI**: Enabled in your project.
+*   **Cloud Shell**: Used for running the generated setup scripts.
 
-### 🔍 Dynamic Public Dataset Discovery
-Uses Gemini's Google Search grounding to find real BigQuery public datasets, then verifies table existence via BigQuery API.
+## 📖 Setup Guide
 
-### 🚀 One-Click Cloud Shell Deployment
-Generates a uniquely named setup script (e.g., `setup-demo-retail-inventory-831afa90.sh`) that:
-- Creates BigQuery datasets and tables
-- Configures ADK agent with MCP servers (BigQuery + Google Maps)
-- Launches the agent UI automatically
-- Supports `--cleanup` option to remove all deployed resources
+### 1. Host the Generator
+1.  Create a new **Google Apps Script** project.
+2.  Copy `Code.gs` and `index.html` into the editor.
+3.  Update `appsscript.json` (Manifest) with the provided file.
+4.  Enable the **BigQuery API** in the Apps Script editor (Services > Add > BigQuery).
 
-### 📖 Interactive Walkthrough
-Includes a built-in Cloud Shell tutorial (`tutorial.md`) that guides users through the deployment and demo execution.
+### 2. Configure Your Project
+1.  In the Apps Script editor, run the `initializeProject("YOUR-PROJECT-ID")` function.
+2.  Deploy the script as a **Web App** (Deploy > New Deployment > Web App).
+3.  Access the provided URL.
 
-### ✅ Targeted Production Deployment
-Step 5 allows flexible transition to Vertex AI Agent Engine with:
-- **Deployment Mode Choice**: Choose between **Update Existing** (default) to refresh current resources or **Create New** to provision a brand-new agent.
-- **Custom Agent Naming**: Set a unique name for your agent in Agent Engine, which automatically updates project configuration.
-- **Permission Automation**: Ready-to-use IAM commands for BigQuery/Maps access.
+### 3. Generate a Demo
+1.  Enter a business challenge in the Web UI.
+2.  Click **Generate Demo Architecture**.
+3.  Copy the generated **Setup Script** command.
+4.  Paste it into your **Google Cloud Shell** and follow the prompts.
 
-## Naming Conventions
+## 🧼 Cleanup
 
-The generator follows a consistent, descriptive naming pattern for all artifacts:
-- **Folders**: Prefixed with `demo-` followed by a descriptive ID (e.g., `demo-retail-inventory-831afa90`).
-- **BigQuery Datasets**: Prefixed with `demo_` and matches the folder description (e.g., `demo_retail_inventory_831afa90`).
-- **Agent Resource Name**: Defaults to `adk-agent` (customizable in Step 5).
-
-## Project Structure
-
-```
-ge-demo-generator/
-├── Code.gs           # Backend logic (Apps Script)
-├── index.html        # Frontend UI
-├── appsscript.json   # Apps Script manifest
-├── tutorial.md       # Cloud Shell tutorial
-└── README.md         # Documentation
+Every generated demo includes a cleanup command. To remove all provisioned data and local files for a specific demo, run:
+```bash
+bash setup-demo-xxx.sh --cleanup
 ```
 
-## Setup
+## 🔒 Security & Privacy
 
-1. Create a new Google Apps Script project
-2. Open **Project Settings** (gear icon) and enable **"Show 'appsscript.json' manifest file in editor"**
-3. Copy `Code.gs`, `index.html`, and `appsscript.json` into the project
-4. Link your Google Cloud project:
-   - Go to **Project Settings > Google Cloud Platform (GCP) Project** and enter your Project Number
-5. Deploy as a **Web App** (You will be prompted to authorize scopes including Google Cloud)
+*   This tool generates **synthetic data**. Do not use sensitive or PII data in the generator prompt.
+*   History is stored locally in your Google account's **UserProperties**.
+*   No external databases (Sheets, Drive, or Global logs) are used in this version.
 
-## Configuration
-
-Update `CONFIG` in `Code.gs` with your settings:
-
-### Option 1: Script Properties (Recommended for Security)
-
-1. Go to **Project Settings > Script Properties**
-2. Add the following properties:
-   - `PROJECT_ID`: Your Google Cloud project ID
-   - `LOCATION`: `global` (default)
-   - `MODEL`: `gemini-3-flash-preview` (or your preferred model)
-
-### Option 2: Direct Edit
-
-Update `CONFIG` in `Code.gs`:
-
-```javascript
-const CONFIG = {
-  PROJECT_ID: 'your-project-id',
-  LOCATION: 'global',
-  MODEL: 'gemini-3-flash-preview',
-  // ...
-};
-```
-
-## Usage
-
-1. Open the deployed Web App
-2. Enter a business scenario (e.g., "Retail optimization for Tokyo stores")
-3. Click **Generate Setup Script & Assets**
-4. Copy the generated script to Google Cloud Shell
-5. Run the script to deploy your personalized demo
-6. Use the **New Demo** button at any time to reset the form and start a fresh synthesis.
-
-## Advanced Settings
-
-- **Synthesis Volume**: Rows per table (50/100/150)
-- **Dataset Complexity**: Number of tables (5/6/7/8)
-- **Public Dataset Override**: Manually specify a BigQuery public dataset
-- **Cleanup**: Run `bash setup-demo-xxx.sh --cleanup` to remove all deployed resources
-
-## License
-
-Apache 2.0
-
-## Related Projects
-
-- [LaunchMyBakery](https://github.com/google/mcp/tree/main/examples/launchmybakery) - The base demo application
-- [ADK (Agent Development Kit)](https://github.com/google/adk-python) - Python framework for building AI agents
+---
+**License**: MIT  
+**Contributions**: Open source contributions are welcome via Pull Requests.

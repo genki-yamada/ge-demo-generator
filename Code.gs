@@ -8,25 +8,48 @@
 // ===========================================
 // Configuration
 // ===========================================
-// To configure: Go to Project Settings > Script Properties and set:
-//   - PROJECT_ID: Your Google Cloud project ID
-//   - LOCATION: API location (default: global)
-//   - MODEL: Gemini model name (default: gemini-3-flash-preview)
-// ===========================================
+
 const SCRIPT_PROPS = PropertiesService.getScriptProperties();
 const CONFIG = {
-  PROJECT_ID: SCRIPT_PROPS.getProperty('PROJECT_ID') || 'your-project-id',
+  PROJECT_ID: SCRIPT_PROPS.getProperty('PROJECT_ID'),
   LOCATION: SCRIPT_PROPS.getProperty('LOCATION') || 'global',
   MODEL: SCRIPT_PROPS.getProperty('MODEL') || 'gemini-3-flash-preview',
+  LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  HISTORY_KEY: 'demo_history',
-  MAX_HISTORY: 10,
-  APP_VERSION: 'v4.4',
-  UPDATE_LOG: [
-    { version: 'v1.1.0', date: '2026-02-05', note: 'Dynamic update logs enabled via GitHub API.' }
-  ]
+  APP_VERSION: 'v5.0-public'
 };
+
+
+
+// ===========================================
+// Utility & Diagnostics
+// ===========================================
+
+function forceAuthorizeSpreadsheet() {
+  const dummySheetUrl = 'https://docs.google.com/spreadsheets/d/1Usj83O0qT2nIoaeyXbn5IqPY2KVdaV2G3UP_suBmIaw/edit';
+  try {
+    const ss = SpreadsheetApp.openByUrl(dummySheetUrl);
+    console.log('[AUTH-FORCE] Successfully opened dummy sheet. If you see this, you are authorized!');
+    return JSON.stringify({ success: true, message: 'Authorization forced. Check Logger logs if it works!' });
+  } catch (e) {
+    if (e.message.includes('権限')) {
+      console.log('[AUTH-FORCE] Authority error found. This is expected if you are not yet authorized. Running this function should have triggered the popup!');
+      throw new Error('Please click Review Permissions to authorize Spreadsheet access.');
+    } else {
+      console.log('[AUTH-FORCE] Unknown error: ' + e.message);
+      return JSON.stringify({ success: false, error: 'Unexpected error: ' + e.message });
+    }
+  }
+}
+
+function resetAllUserProperties() {
+  const props = PropertiesService.getUserProperties();
+  props.deleteAllProperties();
+  console.log('[STORAGE-RESET] All UserProperties cleared successfully.');
+  return JSON.stringify({ success: true, message: 'All UserProperties cleared.' });
+}
+
 
 // ===========================================
 // Web App Entry Point
@@ -34,28 +57,80 @@ const CONFIG = {
 function doGet() {
   const template = HtmlService.createTemplateFromFile('index');
   
-  // Use manual versioning for the sidebar display label
   template.appVersion = CONFIG.APP_VERSION;
   template.updateLog = JSON.stringify(fetchGitLogs());
   template.projectId = CONFIG.PROJECT_ID;
+  template.userEmail = Session.getActiveUser().getEmail();
   
   return template.evaluate()
-    .setTitle('GE Demo Generator (go/ge-demo-generator)')
+    .setTitle('Gemini Enterprise Demo Generator')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-// ===========================================
-// Main Processing
-// ===========================================
+function checkSpreadsheet() {
+  if (!CONFIG.LOG_SHEET_URL) {
+    return JSON.stringify({ success: false, error: 'No LOG_SHEET_URL configured' });
+  }
+  try {
+    const ss = SpreadsheetApp.openByUrl(CONFIG.LOG_SHEET_URL);
+    return JSON.stringify({ success: true, message: 'Logger Sheet Connected: ' + ss.getName() });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: 'Failed to access sheet: ' + e.message });
+  }
+}
+
+function logUsageToSheet(logEntry) {
+  console.log('[LOGGING] Attempting to log usage. LOG_SHEET_URL length:', CONFIG.LOG_SHEET_URL ? CONFIG.LOG_SHEET_URL.length : 0);
+  
+  if (!CONFIG.LOG_SHEET_URL) {
+    console.log('[LOGGING] No LOG_SHEET_URL configured, skipping spreadsheet log.');
+    return;
+  }
+  
+  try {
+    console.log('[LOGGING] Opening spreadsheet...');
+    const ss = SpreadsheetApp.openByUrl(CONFIG.LOG_SHEET_URL);
+    console.log('[LOGGING] Spreadsheet opened:', ss.getName());
+    let sheet = ss.getSheetByName('Usage_Logs') || ss.getSheets()[0]; // Look for Usage_Logs first, fallback to first sheet
+    console.log('[LOGGING] Logging to sheet tab:', sheet.getName());
+    
+    const timestamp = new Date().toISOString();
+    
+    const durationSecs = Math.floor(logEntry.durationMs / 1000);
+    const mins = Math.floor(durationSecs / 60);
+    const secs = durationSecs % 60;
+    const durationStr = `${mins}m ${secs}s`;
+
+    const rowData = [
+      timestamp,
+      logEntry.datasetId || 'N/A',
+      logEntry.status || 'N/A',
+      durationStr,
+      logEntry.rowCount || 0,
+      logEntry.tableCount || 0,
+      logEntry.publicDatasetFlag ? 'Yes' : 'No',
+      logEntry.tableNames || 'N/A',
+      logEntry.errorClass || 'N/A'
+    ];
+
+    // If empty sheet, write header
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(['Timestamp', 'Dataset ID', 'Status', 'Duration', 'Req. Rows', 'Req. Tables', 'Public Dataset', 'Table Names', 'Error Class']);
+    }
+    
+    sheet.appendRow(rowData);
+    console.log('[LOGGING] Successfully logged usage to sheet. Data row:', rowData);
+  } catch (e) {
+    console.error('[LOGGING] Failed to log usage to sheet:', e.message);
+  }
+}
 
 /**
  * Main function to generate the demo artifacts
- * @param {string} userGoal - User's business problem
- * @param {Object} options - Customization options
- * @returns {Object} Generation result
  */
 function generateDemo(userGoal, options = {}) {
+  const startTime = Date.now();
   const defaultOptions = {
     rowCount: 100,
     tableCount: 3,
@@ -64,7 +139,6 @@ function generateDemo(userGoal, options = {}) {
   };
   options = { ...defaultOptions, ...options };
   
-  // If not using public dataset, ignore any ID or discovery
   if (!options.usePublicDataset) {
     options.publicDatasetId = null;
   }
@@ -78,7 +152,7 @@ function generateDemo(userGoal, options = {}) {
     dataPreview: [],
     systemInstruction: null,
     setupScript: null,
-    rawTables: [], // Added to return raw data to the UI
+    rawTables: [],
     suffix: null,
     domainName: null,
     referenceDate: null,
@@ -97,21 +171,16 @@ function generateDemo(userGoal, options = {}) {
     validateGeneratedData(planResult, maxRows);
     result.steps[1] = { step: 2, status: 'completed', message: 'Validation complete' };
     
-    // Step 3: Skipping Server-side Ingestion (For Portability)
-    result.steps.push({ step: 3, status: 'completed', message: 'Portability enabled: Dataset will be created in your environment' });
-    
-    // Generate unique suffix and base names
+    // Step 3: Suffix generation
     const suffix = Utilities.getUuid().replace(/-/g, '').substring(0, 8);
-    const baseName = generateBaseName(userGoal, suffix); // Descriptive name like "retail-inventory-suffix"
+    const baseName = generateBaseName(userGoal, suffix);
     const dirName = "demo-" + baseName;
     const datasetId = ("demo_" + baseName).replace(/-/g, '_');
     
     result.datasetId = datasetId;
+    result.userGoal = userGoal;
     result.dataPreview = planResult.dataPreview;
     result.rawTables = planResult.tables;
-    
-    // Step 4: Setup Script Generation
-    result.steps.push({ step: 4, status: 'running', message: 'Generating portable setup script...' });
     result.suffix = suffix;
     result.domainName = baseName.substring(0, baseName.lastIndexOf('-' + suffix));
     result.dirName = dirName;
@@ -131,32 +200,29 @@ function generateDemo(userGoal, options = {}) {
       tables: planResult.tables,
       userGoal: userGoal
     });
-    result.steps[3] = { step: 4, status: 'completed', message: 'Generation complete' };
+    result.steps.push({ step: 4, status: 'completed', message: 'Generation complete' });
     
     result.success = true;
     
-    // Save to history
-    saveHistory({
-      timestamp: new Date().toISOString(),
-      userGoal: userGoal,
-      options: options,
+    
+    // Save to telemetry and log to sheet
+    const durationMs = Date.now() - startTime;
+    const telemetry = {
       datasetId: datasetId,
-      publicDatasetId: planResult.publicDatasetId,
-      result: {
-        dataPreview: result.dataPreview,
-        systemInstruction: result.systemInstruction,
-        referenceDate: result.referenceDate,
-        demoGuide: result.demoGuide,
-        appliedFactors: result.appliedFactors,
-        setupScript: result.setupScript,
-        rawTables: result.rawTables,
-        suffix: result.suffix,
-        domainName: result.domainName,
-        dirName: result.dirName,
-        appliedFactors: result.appliedFactors
-      }
-    });
+      status: 'Success',
+      durationMs: durationMs,
+      rowCount: options.rowCount,
+      tableCount: options.tableCount,
+      publicDatasetFlag: options.usePublicDataset,
+      tableNames: result.rawTables ? result.rawTables.map(t => t.tableName).join(', ') : 'N/A',
+      errorClass: null
+    };
 
+    try {
+      logUsageToSheet(telemetry);
+    } catch (logErr) {
+      console.error('[LOGGING-CRITICAL] Failed to log usage to sheet in generate:', logErr.message);
+    }
     
   } catch (error) {
     result.error = error.message;
@@ -164,6 +230,24 @@ function generateDemo(userGoal, options = {}) {
     if (lastStep) {
       lastStep.status = 'error';
       lastStep.message = error.message;
+    }
+    
+    // Log failure telemetry
+    const durationMs = Date.now() - startTime;
+    const failureTelemetry = {
+      datasetId: result.datasetId || 'Unknown',
+      status: 'Failure',
+      durationMs: durationMs,
+      rowCount: options.rowCount,
+      tableCount: options.tableCount,
+      publicDatasetFlag: options.usePublicDataset,
+      tableNames: result.rawTables ? result.rawTables.map(t => t.tableName).join(', ') : 'N/A',
+      errorClass: error.message
+    };
+    try {
+      logUsageToSheet(failureTelemetry);
+    } catch (logErr) {
+      console.error('[LOGGING-CRITICAL] Failed to log failure to sheet:', logErr.message);
     }
   }
   
@@ -306,6 +390,7 @@ function planAndGenerateData(userGoal, options) {
     systemInstruction: parsed.systemInstruction,
     referenceDate: parsed.referenceDate || '2023-11-01',
     publicDatasetId: parsed.publicDatasetId || options.publicDatasetId,
+    oneSentenceSummary: parsed.oneSentenceSummary || null,
     demoGuide: parsed.demoGuide,
     appliedFactors: parsed.appliedFactors || null,
     dataPreview: dataPreview
@@ -397,6 +482,7 @@ Output in the following JSON format. Output **pure JSON only without code blocks
   "systemInstruction": "Specific instruction for the agent (3-5 sentences). Focus on defining the persona and domain expertise. Instruct the agent to wait for user input before acting, but emphasize autonomous persistence in error recovery once a goal is assigned.",
   "referenceDate": "YYYY-MM-DD",
   "publicDatasetId": "bigquery-public-data.dataset.table",
+  "oneSentenceSummary": "A concise, professional one-sentence summary of the business challenge and the generated solution.",
   "appliedFactors": {
     "temporalPatterns": ["List of 2-3 specific temporal patterns applied (e.g., 'Weekday lunch surge', 'Month-end reconciliation spike')"],
     "correlations": ["List of 2-3 specific data correlations applied (e.g., 'Region-specific product preference', 'High-tier customer loyalty frequency')"],
@@ -913,40 +999,37 @@ set -e
 
     echo ""
     echo "🌍 Deleting Gemini Enterprise registration (App/Agent)..."
-    # 1. First, list all engines and check for name match or link match
-    ENGINES_JSON=\$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
-      "https://discoveryengine.googleapis.com/v1alpha/projects/\$PROJECT_ID/locations/global/collections/default_collection/engines")
-    
-    # Try to find engine matching name directly
-    ENGINE_NAME=\$(echo "\$ENGINES_JSON" | jq -r --arg dir "${dirName}" '.engines[]? | select(.displayName == $dir) | .name' 2>/dev/null | head -n 1)
-    
-    if [ ! -z "\$ENGINE_NAME" ] && [ "\$ENGINE_NAME" != "null" ]; then
-      # If the whole Engine (App) matches, delete it (this removes all agents under it)
-      echo "   � Deleting entire Gemini Enterprise App: \${dirName}..."
-      curl -s -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
-        "https://discoveryengine.googleapis.com/v1alpha/\$ENGINE_NAME" && echo "   ✅ Gemini Enterprise App deleted." || echo "   ⚠️  Failed to delete Gemini Enterprise App."
-    else
-      # 2. If no engine match, scan for individual agents within existing engines
-      echo "   🔍 Searching for individual agent registrations..."
-      for E_NAME in \$(echo "\$ENGINES_JSON" | jq -r '.engines[]? | .name'); do
-        # List assistants for this engine
-        ASSISTANTS=\$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" "https://discoveryengine.googleapis.com/v1alpha/\${E_NAME}/assistants")
-        for A_NAME in \$(echo "\$ASSISTANTS" | jq -r '.assistants[]? | .name'); do
-          # List agents for this assistant
-          AGENTS_JSON=\$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" "https://discoveryengine.googleapis.com/v1alpha/\${A_NAME}/agents?pageSize=100")
-          
-          # Find agent by display name OR by Reasoning Engine link
-          TARGET_AGENT_NAME=\$(echo "\$AGENTS_JSON" | jq -r --arg dir "${dirName}" --arg suf "${suffix}" --arg re "\$RE_ID_NUM" '.agents[]? | select(.displayName == $dir or (.displayName | endswith($suf)) or (.adkAgentDefinition.provisionedReasoningEngine.reasoningEngine | contains($re))) | .name' 2>/dev/null | head -n 1)
+    # Search all common locations
+    for LOC in "global" "us" "eu"; do
+      ENGINES_JSON=$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
+        "https://discoveryengine.googleapis.com/v1alpha/projects/\$PROJECT_ID/locations/\$LOC/collections/default_collection/engines")
+      
+      # Try to find engine matching name directly in this location
+      ENGINE_NAME=$(echo "\$ENGINES_JSON" | jq -r --arg dir "${dirName}" '.engines[]? | select(.displayName == $dir) | .name' 2>/dev/null | head -n 1)
+      
+      if [ ! -z "\$ENGINE_NAME" ] && [ "\$ENGINE_NAME" != "null" ]; then
+        echo "   🗑 Deleting Gemini Enterprise App: \${dirName} (Location: \$LOC)..."
+        curl -s -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
+          "https://discoveryengine.googleapis.com/v1alpha/\$ENGINE_NAME" && echo "   ✅ Gemini Enterprise App deleted." || echo "   ⚠️  Failed to delete Gemini Enterprise App."
+        break
+      fi
+
+      # 2. If no engine match, scan for individual agents within EXISTING engines in this location
+      for E_NAME in $(echo "\$ENGINES_JSON" | jq -r '.engines[]? | .name'); do
+        ASSISTANTS=$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" "https://discoveryengine.googleapis.com/v1alpha/\${E_NAME}/assistants")
+        for A_NAME in $(echo "\$ASSISTANTS" | jq -r '.assistants[]? | .name'); do
+          AGENTS_JSON=$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" "https://discoveryengine.googleapis.com/v1alpha/\${A_NAME}/agents?pageSize=100")
+          TARGET_AGENT_NAME=$(echo "\$AGENTS_JSON" | jq -r --arg dir "${dirName}" --arg suf "${suffix}" --arg re "\$RE_ID_NUM" '.agents[]? | select(.displayName == $dir or (.displayName | endswith($suf)) or (.adkAgentDefinition.provisionedReasoningEngine.reasoningEngine | contains($re))) | .name' 2>/dev/null | head -n 1)
           
           if [ ! -z "\$TARGET_AGENT_NAME" ] && [ "\$TARGET_AGENT_NAME" != "null" ]; then
-            echo "   🗑 Unregistering agent: \${TARGET_AGENT_NAME}..."
+            echo "   🗑 Unregistering agent: \${TARGET_AGENT_NAME} (Location: \$LOC)..."
             curl -s -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
               "https://discoveryengine.googleapis.com/v1alpha/\$TARGET_AGENT_NAME" && echo "   ✅ Gemini Enterprise Agent unlisted." || echo "   ⚠️  Failed to unlist Gemini Enterprise Agent."
-            break 2
+            break 3
           fi
         done
       done
-    fi
+    done
     
     echo ""
     echo "📂 Deleting local directory and uv cache: ~/${dirName}..."
@@ -1019,8 +1102,8 @@ echo "      - Deploys the agent to a public, unauthenticated URL."
 echo "      - Automates API enablement, Docker build, and IAM roles."
 echo "      - Warning: Organization policies may block public ingress."
 echo ""
-echo "  [3] Gemini Enterprise (Vertex AI Agent Engine)"
-echo "      - Automated Production-ready deployment."
+echo "  [3] Deploy to Gemini Enterprise"
+echo "      - Automated Agent Engine deployment."
 echo "      - Registers your agent to Gemini Enterprise."
 echo ""
 read -p "Enter Choice [1, 2 or 3] (Default: 1): " DEPLOY_CHOICE
@@ -1599,11 +1682,11 @@ __all__ = ["root_agent"]
 __AGENT_EOF__
 
 
-# --- 8. Production Infrastructure (Specific to Gemini Enterprise) ---
+# --- 8. Agent Engine & Gemini Enterprise Infrastructure ---
 if [ "$DEPLOY_CHOICE" = "3" ]; then
   # Automate 'agent-starter-pack enhance'
   echo ""
-  echo "🔧 Initializing production infrastructure (enhance)..."
+  echo "🔧 Initializing Agent Engine infrastructure..."
   # We MUST be in the adk_agent directory for enhance to handle mcp_app correctly
   cd adk_agent
   export UV_LINK_MODE=copy
@@ -1632,11 +1715,15 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
   
   echo ""
   echo "🤖 Step 2/2: Registering Agent to Gemini Enterprise..."
-  # Count apps using the same API-based approach as cleanup logic
+  # Count apps across all common locations
   TOKEN=$(gcloud auth print-access-token)
-  ENGINES_JSON=$(curl -s -H "Authorization: Bearer $TOKEN" -H "X-Goog-User-Project: $PROJECT_ID" \
-      "https://discoveryengine.googleapis.com/v1alpha/projects/$PROJECT_ID/locations/global/collections/default_collection/engines")
-  APP_COUNT=$(echo "$ENGINES_JSON" | jq -r ".engines | length" 2>/dev/null || echo "0")
+  APP_COUNT=0
+  for LOC in "global" "us" "eu"; do
+    JSON=$(curl -s -H "Authorization: Bearer $TOKEN" -H "X-Goog-User-Project: $PROJECT_ID" \
+        "https://discoveryengine.googleapis.com/v1alpha/projects/$PROJECT_ID/locations/$LOC/collections/default_collection/engines")
+    COUNT=$(echo "$JSON" | jq -r ".engines | length" 2>/dev/null || echo "0")
+    APP_COUNT=$((APP_COUNT + COUNT))
+  done
   
   if [ "$APP_COUNT" = "1" ]; then
     echo "✅ Found exactly one Gemini Enterprise app. Automating registration..."
@@ -1644,13 +1731,14 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
     (printf "Y\\nY\\n1\\n"; yes "") | make register-gemini-enterprise
   else
     if [ "$APP_COUNT" = "0" ]; then
-      echo "⚠️ No Gemini Enterprise apps found. You might need to create one first."
+      echo "⚠️ No Gemini Enterprise apps found in 'global', 'us', or 'eu'. You might need to create one first."
     else
-      echo "💡 Found $APP_COUNT apps. Please select one manually:"
+      echo "💡 Found $APP_COUNT apps across regions. Please select one manually:"
     fi
     # Fallback: Automated defaults (Y, Y) + interactive app selection
     (printf "Y\\nY\\n"; cat) | make register-gemini-enterprise
   fi
+
   cd ..
   
   clear
@@ -1771,7 +1859,10 @@ cd adk_agent
 function callVertexAIWithRetry(prompt) { return executeWithRetry(() => callVertexAI(prompt)); }
 
 function callVertexAI(prompt) {
-  const url = `https://aiplatform.googleapis.com/v1/projects/${CONFIG.PROJECT_ID}/locations/${CONFIG.LOCATION}/publishers/google/models/${CONFIG.MODEL}:generateContent`;
+  let location = CONFIG.LOCATION || 'global';
+  const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
+  const url = `https://${host}/v1/projects/${CONFIG.PROJECT_ID}/locations/${location}/publishers/google/models/${CONFIG.MODEL}:generateContent`;
+  
   const payload = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 65535 } };
   const response = UrlFetchApp.fetch(url, { method: 'POST', contentType: 'application/json', headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() }, payload: JSON.stringify(payload), muteHttpExceptions: true });
   if (response.getResponseCode() !== 200) throw new Error(`AI Error: ${response.getContentText()}`);
@@ -1783,7 +1874,10 @@ function callVertexAI(prompt) {
  * Used for discovering real BigQuery public dataset IDs.
  */
 function callVertexAIWithSearch(prompt) {
-  const url = `https://aiplatform.googleapis.com/v1/projects/${CONFIG.PROJECT_ID}/locations/${CONFIG.LOCATION}/publishers/google/models/${CONFIG.MODEL}:generateContent`;
+  let location = CONFIG.LOCATION || 'global';
+  const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
+  const url = `https://${host}/v1/projects/${CONFIG.PROJECT_ID}/locations/${location}/publishers/google/models/${CONFIG.MODEL}:generateContent`;
+  
   const payload = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     tools: [{ googleSearch: {} }],
@@ -1809,187 +1903,8 @@ function executeWithRetry(fn) {
   throw lastError;
 }
 
-function saveHistory(entry) {
-  const props = PropertiesService.getScriptProperties();
-  const historyKey = CONFIG.HISTORY_KEY;
-  let history = JSON.parse(props.getProperty(historyKey) || '[]');
-  
-  // To keep history light, we store only metadata in the main list
-  // The heavy result data is stored in separate chunked keys
-  const storageId = `demo_data_${new Date(entry.timestamp).getTime()}`;
-  
-  // OPTIMIZATION: Remove large, redundant fields before storing result chunks.
-  // setupScript and dataPreview can be reconstructed from rawTables.
-  const optimizedResult = { ...entry.result };
-  delete optimizedResult.setupScript;
-  delete optimizedResult.dataPreview;
 
-  const dataToStore = JSON.stringify(optimizedResult);
-  
-  // Store the payload in chunks
-  saveLargeData(props, storageId, dataToStore);
-  
-  // Remove the large result from the index entry
-  const indexEntry = { ...entry };
-  delete indexEntry.result;
-  indexEntry.storageId = storageId;
-  
-  history.unshift(indexEntry);
-  
-  // Clean up old entries' extra data if exceeding limit
-  while (history.length > CONFIG.MAX_HISTORY) {
-    const expired = history.pop();
-    if (expired.storageId) {
-      deleteLargeData(props, expired.storageId);
-    }
-  }
-  
-  props.setProperty(historyKey, JSON.stringify(history));
-  
-  // Safety: evict oldest entries if total storage approaches 500KB limit
-  const SAFE_LIMIT = 480000; // 500KB - 20KB safety margin
-  const allProps = props.getProperties();
-  let totalSize = Object.entries(allProps).reduce((sum, [k, v]) => sum + k.length + v.length, 0);
-  while (totalSize > SAFE_LIMIT && history.length > 1) {
-    const oldest = history.pop();
-    if (oldest.storageId) {
-      deleteLargeData(props, oldest.storageId);
-    }
-    props.setProperty(historyKey, JSON.stringify(history));
-    // Recalculate after eviction
-    const updatedProps = props.getProperties();
-    totalSize = Object.entries(updatedProps).reduce((sum, [k, v]) => sum + k.length + v.length, 0);
-  }
-}
 
-function getHistory() { 
-  return JSON.parse(PropertiesService.getScriptProperties().getProperty(CONFIG.HISTORY_KEY) || '[]'); 
-}
-
-/**
- * Retrieves a full history item including its chunked result data
- */
-function getHistoryItem(timestamp) {
-  const props = PropertiesService.getScriptProperties();
-  const history = JSON.parse(props.getProperty(CONFIG.HISTORY_KEY) || '[]');
-  const entry = history.find(h => h.timestamp === timestamp);
-  
-  if (entry && entry.storageId) {
-    const dataStr = getLargeData(props, entry.storageId);
-    if (dataStr) {
-      entry.result = JSON.parse(dataStr);
-      
-      // RECONSTRUCTION: Restore setupScript and dataPreview on the fly
-      if (entry.result.rawTables) {
-        if (!entry.result.setupScript) {
-          entry.result.setupScript = generateSetupScript({
-            datasetId: entry.datasetId,
-            systemInstruction: entry.result.systemInstruction,
-            referenceDate: entry.result.referenceDate,
-            publicDatasetId: entry.publicDatasetId,
-            suffix: entry.result.suffix,
-            dirName: entry.result.dirName,
-            tables: entry.result.rawTables,
-            userGoal: entry.userGoal
-          });
-        }
-        
-        // Always reconstruct preview to ensure it matches current UI capabilities (e.g. show all rows)
-        entry.result.dataPreview = entry.result.rawTables.map(table => {
-          const lines = table.csvData.trim().split('\n');
-          const headers = parseCSVLine(lines[0]);
-          const previewRows = lines.slice(1).map(line => {
-            const values = parseCSVLine(line);
-            const row = {};
-            headers.forEach((h, i) => { row[h.trim()] = values[i] || ''; });
-            return row;
-          });
-          return {
-            tableName: table.tableName,
-            headers: headers,
-            rows: previewRows,
-            totalRows: lines.length - 1
-          };
-        });
-      }
-    }
-  }
-  return entry;
-}
-
-/**
- * Deletes a specific history item and its chunked data
- */
-function deleteHistoryItem(timestamp) {
-  const props = PropertiesService.getScriptProperties();
-  let history = JSON.parse(props.getProperty(CONFIG.HISTORY_KEY) || '[]');
-  
-  const index = history.findIndex(h => h.timestamp === timestamp);
-  if (index !== -1) {
-    const entry = history[index];
-    if (entry.storageId) {
-      deleteLargeData(props, entry.storageId);
-    }
-    history.splice(index, 1);
-    props.setProperty(CONFIG.HISTORY_KEY, JSON.stringify(history));
-  }
-  return { success: true };
-}
-
-function clearHistory() { 
-  const props = PropertiesService.getScriptProperties();
-  const history = JSON.parse(props.getProperty(CONFIG.HISTORY_KEY) || '[]');
-  
-  // Clear all chunked data associated with history items
-  history.forEach(entry => {
-    if (entry.storageId) {
-      deleteLargeData(props, entry.storageId);
-    }
-  });
-  
-  props.deleteProperty(CONFIG.HISTORY_KEY);
-  return { success: true }; 
-}
-
-// --- Large Data Chunking Helpers ---
-
-/**
- * GAS PropertiesService has a 9KB limit per key.
- * This helper splits data into multiple chunks.
- */
-function saveLargeData(props, baseKey, data) {
-  const CHUNK_SIZE = 8000; // Safe margin below 9216 bytes
-  const totalChunks = Math.ceil(data.length / CHUNK_SIZE);
-  
-  for (let i = 0; i < totalChunks; i++) {
-    const chunk = data.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-    props.setProperty(`${baseKey}_chunk_${i}`, chunk);
-  }
-  props.setProperty(`${baseKey}_meta`, JSON.stringify({ totalChunks: totalChunks }));
-}
-
-function getLargeData(props, baseKey) {
-  const metaStr = props.getProperty(`${baseKey}_meta`);
-  if (!metaStr) return null;
-  
-  const meta = JSON.parse(metaStr);
-  let data = '';
-  for (let i = 0; i < meta.totalChunks; i++) {
-    data += props.getProperty(`${baseKey}_chunk_${i}`) || '';
-  }
-  return data;
-}
-
-function deleteLargeData(props, baseKey) {
-  const metaStr = props.getProperty(`${baseKey}_meta`);
-  if (!metaStr) return;
-  
-  const meta = JSON.parse(metaStr);
-  for (let i = 0; i < meta.totalChunks; i++) {
-    props.deleteProperty(`${baseKey}_chunk_${i}`);
-  }
-  props.deleteProperty(`${baseKey}_meta`);
-}
 
 /**
  * Fetches recent commit history from GitHub API as update logs.
@@ -2006,8 +1921,6 @@ function fetchGitLogs() {
     if (response.getResponseCode() === 200) {
       const commits = JSON.parse(response.getContentText());
       return commits.map(c => {
-        // Extract version from commit message if it follows "v1.0.0: message" or "feat(v1.0.0): message"
-        // Otherwise use short SHA. This allows the UI version to auto-update on every commit.
         const msg = c.commit.message.split('\n')[0];
         const versionMatch = msg.match(/v\d+\.\d+\.\d+/);
         const version = versionMatch ? versionMatch[0] : c.sha.substring(0, 7);
@@ -2022,7 +1935,7 @@ function fetchGitLogs() {
   } catch (e) {
     // console.log('GitHub API Error:', e.message);
   }
-  return CONFIG.UPDATE_LOG; // Fallback
+  return CONFIG.UPDATE_LOG; 
 }
 
 function updateSystemInstruction(setupScript, newInstruction) {
@@ -2030,3 +1943,6 @@ function updateSystemInstruction(setupScript, newInstruction) {
   return setupScript.replace(/(1\.\s+\*\*BigQuery toolset:\*\*.*?\n)([\s\S]*?)(\n\s+2\.\s+\*\*Maps Toolset:\*\*)/, `$1${escaped}$3`);
 }
 
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
