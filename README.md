@@ -46,8 +46,8 @@ bash setup-demo-xxx.sh --cleanup
 ## 🔒 Security & Privacy
 
 *   This tool generates **synthetic data**. Do not use sensitive or PII data in the generator prompt.
-*   History is stored locally in your Google account's **UserProperties**.
-*   No external databases (Sheets, Drive, or Global logs) are used in this version.
+*   Usage metrics (Timestamp, Dataset ID, Duration, etc.) can be logged to a Google Sheet if configured.
+*   No user history is stored in this version.
 
 ---
 **License**: MIT  
