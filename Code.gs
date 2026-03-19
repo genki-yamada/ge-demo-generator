@@ -1499,7 +1499,6 @@ try:
                                 continue
                         raise
         MCPTool.run_async = _patched_run_async
-        print("  [DEBUG] MCPTool.run_async patched with Deep Drip Sequential lock.")
     except Exception as e:
         print(f"  [DEBUG] Failed to patch MCPTool.run_async: {e}")
 
@@ -1696,9 +1695,9 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
   echo "🔧 Applying project name customizations..."
   rm -f .resource_name
   # Replace name in adk_agent/pyproject.toml (Tool normalizes adk_agent -> adk-agent)
-  sed -i "s/name *= *[\\\"']adk[-_]agent[\\\"']/name = \\\"${dirName}\\\"/" pyproject.toml
+  perl -pi -e "s/name *= *[\\\"']adk[-_]agent[\\\"']/name = \\\"${dirName}\\\"/" pyproject.toml
   # Replace default name in deploy.py
-  sed -i "s/default *= *[\\\"']adk[-_]agent[\\\"']/default=\\\"${dirName}\\\"/" mcp_app/app_utils/deploy.py 2>/dev/null || true
+  perl -pi -e "s/default *= *[\\\"']adk[-_]agent[\\\"']/default=\\\"${dirName}\\\"/" mcp_app/app_utils/deploy.py 2>/dev/null || true
   cd ..
 fi
 
