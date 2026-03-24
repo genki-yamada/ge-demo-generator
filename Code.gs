@@ -17,7 +17,7 @@ const CONFIG = {
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v5.0-public'
+  APP_VERSION: 'v6.1-public'
 };
 
 
@@ -1355,6 +1355,7 @@ cat <<'__PYPROJ_EOF__' > pyproject.toml
 name = "mcp-agent"
 version = "0.1.0"
 dependencies = ["google-adk>=1.0.0", "google-genai>=1.9.0"]
+requires-python = ">=3.10,<3.13"
 [tool.adk]
 project_type = "agent"
 __PYPROJ_EOF__
@@ -1771,6 +1772,15 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
   rm -f .resource_name
   # Replace name in adk_agent/pyproject.toml (Tool normalizes adk_agent -> adk-agent)
   perl -pi -e "s/name *= *[\\\"']adk[-_]agent[\\\"']/name = \\\"${dirName}\\\"/" pyproject.toml
+  # Constrain python version to avoid uv resolution errors on python 3.13
+  if grep -q "^requires-python" pyproject.toml; then
+    perl -pi -e 's/^requires-python\\s*=.*/requires-python = ">=3.10,<3.13"/' pyproject.toml
+  else
+    perl -pi -e 's/(\\[project\\])/$1\\nrequires-python = ">=3.10,<3.13"/' pyproject.toml
+  fi
+  if ! grep -q "\\[tool\\.uv\\]" pyproject.toml; then
+    printf '\n[tool.uv]\nenvironments = [\n    "sys_platform == \\"'linux'\\""\n]\n' >> pyproject.toml
+  fi
   # Replace default name in deploy.py
   perl -pi -e "s/default *= *[\\\"']adk[-_]agent[\\\"']/default=\\\"${dirName}\\\"/" mcp_app/app_utils/deploy.py 2>/dev/null || true
   cd ..
