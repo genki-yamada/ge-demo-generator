@@ -55,6 +55,15 @@ function resetAllUserProperties() {
 // Web App Entry Point
 // ===========================================
 function doGet() {
+  const configError = checkConfiguration();
+  if (configError) {
+    const template = HtmlService.createTemplateFromFile('SetupError');
+    template.errorMessage = configError;
+    return template.evaluate()
+      .setTitle('Setup Required - GE Demo Generator')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+  }
+
   const template = HtmlService.createTemplateFromFile('index');
   
   template.appVersion = CONFIG.APP_VERSION;
@@ -67,6 +76,23 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
+
+/**
+ * Validates that all required script properties are set.
+ * Returns an error message if missing, or null if valid.
+ */
+function checkConfiguration() {
+  const missing = [];
+  if (!CONFIG.PROJECT_ID) missing.push('PROJECT_ID');
+  if (!CONFIG.LOG_SHEET_URL) missing.push('LOG_SHEET_URL');
+  
+  if (missing.length > 0) {
+    return 'The following mandatory Script Properties are missing: ' + missing.join(', ') + 
+           '. Please run initializeProject() from the Apps Script editor or set them manually in Project Settings.';
+  }
+  return null;
+}
+
 
 function checkSpreadsheet() {
   if (!CONFIG.LOG_SHEET_URL) {
@@ -188,6 +214,7 @@ function generateDemo(userGoal, options = {}) {
     result.referenceDate = planResult.referenceDate;
     result.publicDatasetId = planResult.publicDatasetId;
     result.demoGuide = planResult.demoGuide;
+    result.externalFiles = planResult.externalFiles || [];
     result.appliedFactors = planResult.appliedFactors || {};
 
     result.setupScript = generateSetupScript({
@@ -392,6 +419,7 @@ function planAndGenerateData(userGoal, options) {
     publicDatasetId: parsed.publicDatasetId || options.publicDatasetId,
     oneSentenceSummary: parsed.oneSentenceSummary || null,
     demoGuide: parsed.demoGuide,
+    externalFiles: parsed.externalFiles || [],
     appliedFactors: parsed.appliedFactors || null,
     dataPreview: dataPreview
   };
@@ -410,6 +438,14 @@ function buildPlanningPrompt(userGoal, options) {
 Design and generate a demo dataset based on the following business problem.
 
 **DOMAIN ADAPTATION**: Carefully analyze the business problem below to identify the industry, job function, and operational context. Adapt ALL data generation (table structures, column names, values, relationships) to match that specific domain. Do not default to generic examples or assume a particular industry unless explicitly stated.
+
+- **🚀 THEME: Mundane but High Impact Operations Automation (including GTM/Sales/Marketing)**: 
+    - **Focus**: Tedious, manual, friction-heavy tasks (often involving data reconciliation, auditing, or compliance checks) that occupy hours of human time but have high stakes (revenue recognition, compliance, SLA breaches, pipeline leakages).
+    - **Examples**: 
+        - **Operations**: Auditing invoices/quotes (PDF) against transactional databases (BigQuery) to find pricing anomalies.
+        - **Logistics/Supply Chain**: Cross-referencing shipping logs (text) with inventory master data to resolve stock discrepancies or delay root-causes.
+        - **Sales/Marketing (GTM)**: Identifying duplicates or scoring anomalies in lead data across silos (CRM vs Marketing Hub), discount override auditing, validating contracts against billings, segment overlap anomalies, RFP comparisons vs inventory capabilities.
+    - **Constraint**: Avoid "surface-level high-level analytics" (e.g., "Analyze market trends and give a pie chart"). Instead, focus on "finding concrete inconsistencies, matching records across silos, and flagging rule violations (auditing)".
 
 ## Business Problem
 ${userGoal}
@@ -469,6 +505,22 @@ If the business problem mentions a **specific company, organization, or brand**,
 Output in the following JSON format. Output **pure JSON only without code blocks**.
 
 {
+  "externalFiles": [
+    {
+      "id": "file1",
+      "fileName": "invoice_reconciliation_audit.pdf",
+      "mimeType": "application/pdf",
+      "fileContent": "# Invoice Audit Report\\n\\n## Summary\\nAudit of recent vendor invoices against procurement logs.\\n\\n## Found Discrepancies\\n- Invoice INV-7829: Unit price differs by 12% from system purchase order.\\n- Invoice INV-7830: Shipped quantity does not match received warehouse logs.\\n\\n## Rules to Apply\\n- Flag if discrepancy > 5%\\n- Escalate if total deviation > $1000",
+      "description": "Description of the file and its usage context."
+    },
+    {
+      "id": "file2",
+      "fileName": "inventory_log_export.xlsx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "fileContent": "Date\\tProduct\\tQuantity\\tStatus\\n2023-11-01\\tProduct A\\t100\\tIn-Stock\\n2023-11-02\\tProduct B\\t50\\tLow-Stock",
+      "description": "Complex semi-structured data log in TSV format."
+    }
+  ],
   "tables": [
     {
       "tableName": "Table name (English, snake_case)",
@@ -490,33 +542,56 @@ Output in the following JSON format. Output **pure JSON only without code blocks
   },
   "demoGuide": [
     {
-      "title": "Descriptive title of the analysis (e.g., 'Geospatial Delay Root Cause Analysis')",
-      "prompt": "Full prompt for the user to copy. Rules: 1. Do NOT mention specific table or column names (the agent must find them). 2. Present as a complex business question. 3. Synergize BigQuery analytics with Google Maps (location grounding) and Public Datasets where available."
+      "title": "Descriptive title of the analysis (e.g., 'Geospatial Root Cause Analysis')",
+      "prompt": "Full prompt for the user to copy. Rules: 1. Do NOT mention specific table or column names (the agent must find them). 2. Present as a complex business question. 3. Synergize system data analysis with location/geospatial capabilities if applicable. 4. NEVER use product names like 'BigQuery', 'Google Maps', 'Looker' in the prompt. Use generic terms like 'the system records', 'the map data', 'historical logs'. If a file is required, use generic phrasing ('the uploaded file').",
+      "requiredFileId": "file1 or empty",
+      "tags": ["Select tags like 'Finance', 'Geospatial', 'Reconciliation'"]
     }
   ]
 }
 
 ## Critical Notes
 - **DEMO PROMPTS (CRITICAL)**: Generate EXACTLY 5 structured demo prompts that showcase the agent's "reasoning" and "tool-use" capabilities.
-    1. **NO TABLES/COLUMNS**: Do NOT mention \`production_batches\`, \`port_id\`, etc. in the prompt text.
-    2. **TOOL SYNERGY**: At least one prompt MUST require the agent to use BOTH BigQuery (for historical trends/metrics) and Google Maps (for travel times, routes, or place details) to answer.
-    3. **PROBLEM-CENTRIC**: Focus on high-level business goals (e.g., "Identify the financial impact of logistics delays in coastal regions and propose an optimized route for the highest-value shipments").
+    - **NO FILENAMES (CRITICAL)**: DO NOT include specific file names or extensions (e.g., 'market_report_2024', 'data.tsv') in the prompt text. Use generic phrasing.
+    1. **DISTRIBUTION & ADVANCED PROGRESSION (CRITICAL)**: At least 3 prompts MUST be "No file required". Generate prompts in a progressive advanced arc:
+        - Prompt 1: Advanced Multi-Table Correlation (Join multiple tables right off the bat, no simple aggregations).
+        - Prompt 2: Deep-dive Audit / Root Cause Analysis (Utilizing the generated Excel/TSV log file for verification).
+        - Prompt 3: Unstructured Data Fusion (AWT - Utilizing the generated PDF report for cross-referencing).
+        - Prompt 4: Geospatial Context (Map + DB).
+        - Prompt 5: Executive Strategic "What-if" Scenario.
+    2. **PERSONA ROTATION (CRITICAL)**: Vary the tone and perspective by rotating personas for each prompt (e.g., CFO, Ops Manager, Regional Director, Front-line Lead).
+    3. **EXTERNAL DATA NECESSITY & LOGICAL CONSISTENCY (CRITICAL)**: You MUST generate exactly one PDF file AND exactly one Excel file (.xlsx) unless it is completely impossible for the business context. The files generated MUST be external data (not inside the current system) and MUST be unstructured or semi-structured in format.
+        - **LOGICAL LINKAGE**: ALL discrepancies or specific transaction IDs (e.g., "INV-7829") mentioned in the external file content MUST correspond to standard records that ACTUALLY EXIST inside the generated BigQuery CSV tables. Do NOT make up transaction IDs in the external file that do not exist in the database tables. This allows the user to find the anomaly by comparing the external file against the database.
+    3. **FILE FORMAT & REALISM (CRITICAL)**: 
+        - For PDF files, generate **substantial, realistic, and highly structured business document content (at least 1,500 characters)** with clear titles, multiple sections using Markdown headings (e.g., '# Summary', '## Background', '### Details'), and bullet points ('- '). It MUST be unstructured text in a rich report format. 
+            - **CHART TRANSLATION**: When including data chart placeholders '[CHART: Title, ... ]', you **MUST translate the Title and Metric Labels into the language of the business problem** (e.g., if the problem is in Japanese, translate 'Metrics' to Japanese).
+            - **MARKDOWN LIMITATIONS**: Only use Markdown for structural elements: headings ('#', '##', '###') and lists ('-'). **DO NOT use inline styles like bold ('**bold**') or italics ('*italics*') within running text**, as the simple PDF renderer cannot interpret partial styles inside a single line. Standard running text should be plain sentences.
+            - **Rich Visuals**: Include at least one data chart placeholder in the format '[CHART: Title, Metric1=Value1, Metric2=Value2, ...]' to simulate visuals. Do NOT use simple CSV or tiny tables for PDFs!
+        - For Excel files, ensure the fileName ends with '.xlsx' and provide **complex, semi-structured datasets in TSV (Tab-separated values) format using \t as a delimiter** that simulate real business spreadsheets (MANDATORY: Generate 40 to 80 rows of detail data. DO NOT summarize or truncate. Replicate a realistic full set of logs/records).
+            - **SEPARATORS (CRITICAL)**: **Use \t (Tab) as the column separator**, NOT commas. Commas are reserved for human-friendly currency formatting within fields.
+            - **COMPOSITE LAYOUT**: Include a report title and a Summary KPI section at the top, a blank line list separator, and then the Detailed Data table below.
+            - **HARDCODED UNITS & FORMATTING**: Include units (e.g., 円, L, kg, %) inside the data cells itself as strings. Use thousand-comma separators for money values — this is permitted and safe since you are using Tabs as separators! (e.g., "150,000円").
+            - **RICH QUALITATIVE COMMENTS**: Include a "Remarks/Notes" column with realistic, verbose business comments (e.g., "Delayed due to traffic accident on Route 1").
+    4. **NO TABLES/COLUMNS**: Do NOT mention 'production_batches', 'port_id', etc. in the prompt text.
+    5. **GEOSPATIAL SYNERGY**: At least one prompt MUST require the agent to use BOTH system data (for historical metrics) and location/map data (for travel times, routes, or place details) to answer. Use generic terms like 'location data' or 'map information' instead of 'Google Maps'.
+    5. **PROBLEM-CENTRIC**: Focus on high-level business goals (e.g., "Identify the financial impact of logistics delays in coastal regions and propose an optimized route for the highest-value shipments").
 - **MAXIMUM DATA (CRITICAL)**: You MUST generate **exactly ${maxRows} rows** for every table. Do NOT use "etc.", "...", or any placeholder to truncate data. This is a technical requirement for a simulation.
 - **RELATIONAL INTEGRITY & NAMING**: 
-    1. **Primary/Foreign Keys MUST follow the format \`[entity]_id\`** (e.g., \`talent_id\`, \`theater_id\`).
-    2. **STRICT SYMMETRY**: Foreign Keys MUST have the EXACT same name as the Primary Key they reference. Do NOT use prefixes like \`main_\` or \`ref_\` for ID columns.
-    3. **STAR SCHEMA PREFERENCE**: When generating multiple tables, favor a "Star Schema" approach. Include at least one central "Dimension/Master" table (e.g., \`products\`, \`locations\`, \`customers\`) that other "Fact/Log" tables reference. This ensures better data connectivity and analytical depth.
+    1. **Primary/Foreign Keys MUST follow the format '[entity]_id'** (e.g., 'talent_id', 'theater_id').
+    2. **STRICT SYMMETRY**: Foreign Keys MUST have the EXACT same name as the Primary Key they reference. Do NOT use prefixes like 'main_' or 'ref_' for ID columns.
+    3. **STAR SCHEMA PREFERENCE**: When generating multiple tables, favor a "Star Schema" approach. Include at least one central "Dimension/Master" table (e.g., 'products', 'locations', 'customers') that other "Fact/Log" tables reference. This ensures better data connectivity and analytical depth.
     4. **NO ISOLATED TABLES (CRITICAL)**: Every table MUST be connected to at least one other table. Isolated tables (islands) are strictly forbidden. Ensure that all tables can be joined together directly or through an intermediary table.
     5. Tables MUST be designed for joining.
 - **LANGUAGE CONSISTENCY (CRITICAL)**: Detect the language used in the "Business Problem" above. You MUST use this same language for ALL user-facing fields, including:
     - Table and Column descriptions
     - STRING values in the CSV data (e.g., product names, categories, person names, names of things)
-    - \`systemInstruction\`
-    - \`appliedFactors\` descriptions
-    - \`demoGuide\` titles and prompts
+    - systemInstruction
+    - appliedFactors descriptions
+    - demoGuide titles and prompts
+    - externalFiles fileName and fileContent
 - **TECHNICAL NAMES (CRITICAL)**: Table names, column names, and ALL ID fields (primary/foreign keys) MUST use English (snake_case) for technical compatibility and data integrity. Do NOT translate technical identifiers.
 - **ABSTRACT INSTRUCTIONS**: Do NOT mention column names in prompts.
-- **STRICT CSV FORMATTING**:
+- **STRICT CSV FORMATTING**: 
     1. **ALWAYS wrap text-based values** (STRING) in double quotes.
     2. **DO NOT wrap numeric values** (INTEGER, FLOAT) in quotes.
 `;
@@ -1710,6 +1785,13 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
   
   echo "🤖 Step 1/2: Deploying to Vertex AI Agent Engine..."
   cd adk_agent
+  
+  # Prevent 'No space left on device' errors in environments like Cloud Shell
+  if command -v uv >/dev/null 2>&1; then
+    uv cache clean || true
+  fi
+  export UV_NO_CACHE=1
+  
   make deploy
   
   echo ""

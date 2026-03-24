@@ -7,6 +7,8 @@
   <title>ADK Agent Demo Generator</title>
   <script src="https://cdn.tailwindcss.com"></script> <!-- Tailwind CDN used for portability in GAS environment -->
   <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -1719,6 +1721,24 @@
             </div>
           </div>
 
+          <!-- External Files Section -->
+          <div id="externalFilesSection" class="hidden mb-10 p-6 bg-amber-500/5 rounded-3xl border border-amber-500/20 shadow-xl">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500 text-white font-bold text-sm shadow-md shadow-amber-500/40">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+              </span>
+              <div>
+                <h3 class="text-sm font-bold text-white uppercase tracking-tight">External Domain Files</h3>
+                <p class="text-[10px] text-gray-500">Download these files and upload them to the agent chat if required</p>
+              </div>
+            </div>
+            <div id="externalFilesList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- JS will inject file cards here -->
+            </div>
+          </div>
+
           <div class="flex items-center justify-between mb-6">
             <label
               class="block text-[11px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
@@ -2589,21 +2609,62 @@
       currentSuffix = res.suffix || '';
       currentDomainName = res.domainName || '';
 
+      // External Files Population
+      const extFilesSection = document.getElementById('externalFilesSection');
+      const extFilesList = document.getElementById('externalFilesList');
+      if (extFilesSection && extFilesList) {
+        extFilesList.innerHTML = '';
+        if (res.externalFiles && res.externalFiles.length > 0) {
+          extFilesSection.classList.remove('hidden');
+          res.externalFiles.forEach((file, index) => {
+            const isExcel = file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.fileName.endsWith('.xlsx') || file.fileName.endsWith('.csv');
+            const fileTypeLabel = isExcel ? 'Excel (.xlsx)' : 'PDF (.pdf)';
+            const fileIcon = isExcel ? '📊' : '📄';
+            
+            const div = document.createElement('div');
+            div.className = "flex flex-col justify-between p-4 rounded-xl bg-black/40 border border-white/5 group hover:border-amber-500/30 transition-all shadow-lg";
+            div.innerHTML = `
+              <div>
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-xl">${fileIcon}</span>
+                  <span class="text-[12px] font-bold text-white font-mono break-all">${file.fileName}</span>
+                </div>
+                <p class="text-[11px] text-gray-400 mb-3">${file.description || 'No description'}</p>
+                <div class="text-[10px] text-gray-500 mb-2">Type: ${fileTypeLabel}</div>
+              </div>
+              <button onclick="${isExcel ? 'downloadExternalExcel' : 'downloadExternalPDF'}(${index})" class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-amber-500/20 hover:bg-amber-500 text-amber-400 font-bold rounded-lg text-[11px] transition-all uppercase tracking-wider border border-amber-500/30">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                Download
+              </button>
+            `;
+            extFilesList.appendChild(div);
+          });
+        } else {
+          extFilesSection.classList.add('hidden');
+        }
+      }
+
       // Guide
       const guideContainer = document.getElementById('demoGuideSteps');
       guideContainer.innerHTML = '';
       if (res.demoGuide && res.demoGuide.length) {
         res.demoGuide.forEach((step, i) => {
           const title = step.title || `Scenario ${i + 1}`;
-          const prompt = step.prompt || step;
+          const prompt = typeof step === 'object' ? step.prompt : step;
+          const isAWT = typeof step === 'object' && step.requiredFileId ? true : false;
+          const tags = typeof step === 'object' && step.tags ? step.tags : [];
 
           const div = document.createElement('div');
           div.className = "flex flex-col gap-3 p-5 rounded-2xl bg-black/40 border border-white/5 group hover:border-emerald-500/30 transition-all shadow-xl";
           div.innerHTML = `
                <div class="flex items-center justify-between gap-3">
-                  <div class="flex items-center gap-3">
+                  <div class="flex items-center gap-3 flex-wrap">
                     <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 w-6 h-6 rounded-lg flex items-center justify-center shadow-inner tracking-tighter">${i + 1}</span>
                     <p class="text-[11px] font-bold text-gray-300 uppercase tracking-widest">${title}</p>
+                    ${isAWT ? `<span class="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">AWT</span>` : ''}
+                    ${tags.map(tag => `<span class="text-[9px] font-medium text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">${tag}</span>`).join('')}
                   </div>
                   <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/5 border border-emerald-500/10">
                     <span class="relative flex h-1.5 w-1.5">
@@ -3052,6 +3113,323 @@
     }
     function downloadScript() { if (currentData) downloadFile(currentData.setupScript, 'setup.sh', 'text/x-shellscript'); }
     function downloadAllCSV() { if (currentData && currentData.rawTables) currentData.rawTables.forEach(t => downloadFile(t.csvData, `${t.tableName}.csv`, 'text/csv')); }
+
+    window.downloadExternalPDF = function(index) {
+      if (!currentData || !currentData.externalFiles || !currentData.externalFiles[index]) return;
+      const file = currentData.externalFiles[index];
+      if (!window.jspdf) { console.error('jsPDF not loaded'); return; }
+      const { jsPDF } = window.jspdf;
+      
+      const scale = 2;
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const pageWidth = 210; // mm
+      const pageHeight = 297; // mm
+      const pxWidth = 800 * scale; 
+      const pxHeight = 1131 * scale;
+      
+      canvas.width = pxWidth;
+      canvas.height = pxHeight;
+      
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, pxWidth, pxHeight);
+      
+      ctx.fillStyle = "#000000";
+      ctx.font = `${12 * scale}px "Helvetica Neue", Helvetica, Arial, "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif`;
+      
+      const content = file.fileContent || file.csvContent || '';
+      const rows = content.split('\n');
+      
+      let y = 30 * scale;
+      const margin = 20 * scale;
+      const maxWidth = pxWidth - (margin * 2);
+      
+      const logoSize = 18 * scale;
+      const logoX = margin;
+      const logoY = y;
+      
+      let hash = 0;
+      const nameForHash = (typeof currentDomainName === 'string' && currentDomainName.trim().length > 0) ? currentDomainName : "Demo Corp";
+      for (let i = 0; i < nameForHash.length; i++) {
+        hash = (hash << 5) - hash + nameForHash.charCodeAt(i);
+        hash = hash & hash;
+      }
+      const absHash = Math.abs(hash);
+      const hue = absHash % 360;
+      
+      const gradient = ctx.createLinearGradient(logoX, logoY, logoX + logoSize, logoY + logoSize);
+      gradient.addColorStop(0, `hsl(${hue}, 80%, 55%)`);
+      gradient.addColorStop(1, `hsl(${(hue + 40) % 360}, 80%, 40%)`); 
+      
+      ctx.fillStyle = gradient;
+      const shapeType = absHash % 3;
+      
+      if (shapeType === 0) {
+        ctx.beginPath();
+        ctx.arc(logoX + (logoSize / 2), logoY + (logoSize / 2), logoSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (shapeType === 1) {
+        ctx.fillRect(logoX, logoY, logoSize, logoSize);
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(logoX + (logoSize / 2), logoY);
+        ctx.lineTo(logoX + logoSize, logoY + (logoSize / 2));
+        ctx.lineTo(logoX + (logoSize / 2), logoY + logoSize);
+        ctx.lineTo(logoX, logoY + (logoSize / 2));
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      const domainInitial = (typeof currentDomainName === 'string' && currentDomainName.trim().length > 0) ? currentDomainName.trim().substring(0, 1).toUpperCase() : 'D';
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `bold ${11 * scale}px "Hiragino Sans", Meiryo, sans-serif`;
+      ctx.fillText(domainInitial, logoX + (5.5 * scale), logoY + (12 * scale));
+      
+      ctx.fillStyle = "#202124";
+      ctx.font = `bold ${12 * scale}px "Hiragino Sans", Meiryo, sans-serif`;
+      const brandText = (typeof currentDomainName === 'string' && currentDomainName.trim().length > 0) ? currentDomainName : "Demo Corp";
+      ctx.fillText(brandText, logoX + logoSize + (8 * scale), logoY + (12 * scale));
+      
+      ctx.fillStyle = "#70757a";
+      ctx.font = `${9 * scale}px "Hiragino Sans", Meiryo, sans-serif`;
+      ctx.fillText("Generated Business Intelligence Document", logoX + logoSize + (8 * scale), logoY + (22 * scale));
+      
+      y += Math.max(logoSize, 22 * scale) + (15 * scale);
+      
+      ctx.strokeStyle = "#e8eaed";
+      ctx.lineWidth = 1 * scale;
+      ctx.beginPath();
+      ctx.moveTo(margin, y);
+      ctx.lineTo(pxWidth - margin, y);
+      ctx.stroke();
+      
+      y += 20 * scale;
+      
+      ctx.font = `${12 * scale}px "Helvetica Neue", Helvetica, Arial, "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif`;
+      
+      const doc = new jsPDF();
+      let pdfPageCount = 1;
+
+      function checkNewPage(neededHeight) {
+        if (y + neededHeight > pxHeight - margin) {
+          const imgData = canvas.toDataURL('image/png');
+          doc.addImage(imgData, 'PNG', 0, 0, 210, 297);
+          
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, pxWidth, pxHeight);
+          ctx.fillStyle = "#000000";
+          y = margin;
+          
+          doc.addPage();
+          pdfPageCount++;
+        }
+      }
+
+      rows.forEach(row => {
+        const trimmed = row.trim();
+        if (!trimmed) {
+          y += 10 * scale;
+          return;
+        }
+
+        if (trimmed.startsWith('[CHART:')) {
+          const match = trimmed.match(/\[CHART:\s*([^,\]]+),\s*([^\]]+)\]/);
+          if (match) {
+            const title = match[1].trim();
+            const dataStr = match[2].trim();
+            const pairs = dataStr.split(',').map(p => p.trim());
+            
+            checkNewPage(140 * scale);
+            
+            ctx.fillStyle = '#f9f9fa';
+            ctx.fillRect(margin, y, maxWidth, 100 * scale);
+            ctx.strokeStyle = '#e1e4e8';
+            ctx.strokeRect(margin, y, maxWidth, 100 * scale);
+            
+            ctx.fillStyle = '#1a1d21';
+            ctx.font = `bold ${12 * scale}px "Hiragino Sans", Meiryo, sans-serif`;
+            ctx.fillText(title, margin + (15 * scale), y + (20 * scale));
+            
+            let barY = y + (35 * scale);
+            const maxBarWidth = maxWidth - (60 * scale);
+            
+            let maxValue = 1;
+            pairs.forEach(p => {
+              const val = parseFloat(p.split('=')[1]);
+              if (val > maxValue) maxValue = val;
+            });
+
+            pairs.forEach((p, idx) => {
+              const parts = p.split('=');
+              const label = parts[0].trim();
+              const value = parseFloat(parts[1]) || 0;
+              const barWidth = (value / maxValue) * maxBarWidth;
+
+              ctx.fillStyle = '#4a4a4a';
+              ctx.font = `${10 * scale}px "Hiragino Sans", Meiryo, sans-serif`;
+              ctx.fillText(label, margin + (15 * scale), barY + (8 * scale));
+
+              const colorPalette = ['#4285f4', '#34a853', '#fbbc05', '#ea4335', '#a142f4'];
+              ctx.fillStyle = colorPalette[idx % colorPalette.length];
+              ctx.fillRect(margin + (120 * scale), barY, barWidth, 12 * scale);
+
+              ctx.fillStyle = '#000000';
+              ctx.fillText(value.toString(), margin + (120 * scale) + barWidth + (5 * scale), barY + (9 * scale));
+
+              barY += 16 * scale;
+            });
+
+            y += 120 * scale;
+            return;
+          }
+        }
+
+        if (trimmed.startsWith('|')) {
+          let cells = trimmed.split('|').map(c => c.trim());
+          if (trimmed.startsWith('|')) cells.shift();
+          if (trimmed.endsWith('|')) cells.pop();
+          
+          if (cells.length > 0) {
+            checkNewPage(24 * scale);
+            
+            const numCols = cells.length;
+            const colWidth = maxWidth / numCols;
+            
+            ctx.font = `${11 * scale}px "Hiragino Sans", Meiryo, sans-serif`;
+            ctx.fillStyle = '#3c4043';
+            ctx.strokeStyle = '#e1e4e8';
+
+            const isSeparator = cells.every(c => c.match(/^[:\-\s]+$/));
+            if (isSeparator) {
+              ctx.fillStyle = '#1a1d21';
+              ctx.fillRect(margin, y - (2 * scale), maxWidth, 2 * scale);
+              return;
+            }
+
+            cells.forEach((cell, idx) => {
+              const cellX = margin + (idx * colWidth);
+              
+              let textToDraw = cell;
+              let metrics = ctx.measureText(textToDraw);
+              
+              while (metrics.width > colWidth - (10 * scale) && textToDraw.length > 0) {
+                textToDraw = textToDraw.substring(0, textToDraw.length - 1);
+                metrics = ctx.measureText(textToDraw + '...');
+              }
+              if (textToDraw !== cell) textToDraw += '...';
+
+              ctx.strokeRect(cellX, y, colWidth, 20 * scale);
+              ctx.fillText(textToDraw, cellX + (5 * scale), y + (14 * scale));
+            });
+
+            y += 20 * scale;
+            return;
+          }
+        }
+
+        let currentMargin = margin;
+        let fontSize = 11;
+        let isBold = false;
+        let isList = false;
+        let textToDraw = trimmed;
+
+        if (trimmed.startsWith('# ')) {
+          fontSize = 15;
+          isBold = true;
+          textToDraw = trimmed.substring(2);
+          y += 5 * scale;
+        } else if (trimmed.startsWith('## ')) {
+          fontSize = 13;
+          isBold = true;
+          textToDraw = trimmed.substring(3);
+          y += 3 * scale;
+        } else if (trimmed.startsWith('### ')) {
+          fontSize = 11.5;
+          isBold = true;
+          textToDraw = trimmed.substring(4);
+          y += 2 * scale;
+        } else if (trimmed.startsWith('- ')) {
+          isList = true;
+          currentMargin = margin + (15 * scale);
+          textToDraw = trimmed.substring(2);
+        }
+
+        ctx.font = `${isBold ? 'bold ' : ''}${fontSize * scale}px "Hiragino Sans", Meiryo, sans-serif`;
+        ctx.fillStyle = trimmed.startsWith('#') || trimmed.startsWith('##') ? '#1a1d21' : '#3c4043';
+
+        if (trimmed.startsWith('# ')) {
+          ctx.fillStyle = '#e8f0fe';
+          ctx.fillRect(margin, y - (14 * scale), maxWidth, 20 * scale);
+          ctx.fillStyle = '#1a73e8';
+          ctx.fillRect(margin, y - (14 * scale), 4 * scale, 20 * scale);
+          ctx.fillStyle = '#1a1d21';
+        } else if (isList) {
+          ctx.fillStyle = '#1a73e8';
+          ctx.beginPath();
+          ctx.arc(margin + (5 * scale), y - (3 * scale), 2.5 * scale, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#3c4043';
+        }
+
+        const words = textToDraw.split('');
+        let line = '';
+        const limitWidth = pxWidth - currentMargin - margin;
+
+        for (let n = 0; n < words.length; n++) {
+          let testLine = line + words[n];
+          let metrics = ctx.measureText(testLine);
+          if (metrics.width > limitWidth && n > 0) {
+            checkNewPage(16 * scale);
+            ctx.fillText(line, currentMargin, y);
+            line = words[n];
+            y += (fontSize + 4) * scale;
+          } else {
+            line = testLine;
+          }
+        }
+        checkNewPage(16 * scale);
+        ctx.fillText(line, currentMargin, y);
+        y += (fontSize + 6) * scale;
+
+        if (trimmed.startsWith('# ')) y += 8 * scale;
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      doc.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+
+      doc.save(file.fileName);
+    };
+
+    window.downloadExternalExcel = function(index) {
+      if (!currentData || !currentData.externalFiles || !currentData.externalFiles[index]) return;
+      const file = currentData.externalFiles[index];
+      if (!window.XLSX) { console.error('SheetJS not loaded'); return; }
+      const content = file.fileContent || file.csvContent || '';
+      const rows = content.split('\n').map(row => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < row.length; i++) {
+          const char = row[i];
+          if (row[i] === '"') {
+            inQuotes = !inQuotes;
+          } else if (row[i] === '\t' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim());
+        return result.map(c => c.replace(/^"|"$/g, ''));
+      });
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+      const finalFileName = file.fileName.endsWith('.csv') ? file.fileName.replace('.csv', '.xlsx') : file.fileName;
+      XLSX.writeFile(wb, finalFileName);
+    };
+
 
     /**
      * Unified clipboard utility
