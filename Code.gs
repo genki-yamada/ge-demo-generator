@@ -106,6 +106,36 @@ function checkSpreadsheet() {
   }
 }
 
+/**
+ * One-time initialization function to set up Script Properties.
+ * Run this from the Apps Script editor after setting your values.
+ * 
+ * @param {string} projectId - Your Google Cloud Project ID
+ * @param {string} logSheetUrl - URL of your usage log spreadsheet (optional)
+ */
+function initializeProject(projectId, logSheetUrl) {
+  if (!projectId) {
+    throw new Error('PROJECT_ID is mandatory for initialization.');
+  }
+
+  const scriptProps = PropertiesService.getScriptProperties();
+  const currentProps = scriptProps.getProperties();
+
+  const newProps = {
+    PROJECT_ID: projectId, 
+    LOCATION: currentProps.LOCATION || 'global',
+    MODEL: currentProps.MODEL || 'gemini-3.1-pro-preview',
+    LOG_SHEET_URL: logSheetUrl || currentProps.LOG_SHEET_URL || ''
+  };
+  
+  // Scopes detection (SpreadsheetApp)
+  try { if (newProps.LOG_SHEET_URL) SpreadsheetApp.openByUrl(newProps.LOG_SHEET_URL); } catch(e) {}
+  
+  scriptProps.setProperties(newProps);
+  console.log('Project initialized. Properties updated: ' + Object.keys(newProps).join(', '));
+  return 'Initialization complete. Properties set/merged: ' + Object.keys(newProps).join(', ');
+}
+
 function logUsageToSheet(logEntry) {
   console.log('[LOGGING] Attempting to log usage. LOG_SHEET_URL length:', CONFIG.LOG_SHEET_URL ? CONFIG.LOG_SHEET_URL.length : 0);
   
@@ -118,7 +148,11 @@ function logUsageToSheet(logEntry) {
     console.log('[LOGGING] Opening spreadsheet...');
     const ss = SpreadsheetApp.openByUrl(CONFIG.LOG_SHEET_URL);
     console.log('[LOGGING] Spreadsheet opened:', ss.getName());
-    let sheet = ss.getSheetByName('Usage_Logs') || ss.getSheets()[0]; // Look for Usage_Logs first, fallback to first sheet
+    let sheet = ss.getSheetByName('Usage_Logs');
+    if (!sheet) {
+      sheet = ss.insertSheet('Usage_Logs');
+      console.log('[LOGGING] Created Usage_Logs sheet.');
+    }
     console.log('[LOGGING] Logging to sheet tab:', sheet.getName());
     
     const timestamp = new Date().toISOString();
