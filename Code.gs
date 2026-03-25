@@ -2037,3 +2037,122 @@ function updateSystemInstruction(setupScript, newInstruction) {
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
+
+/**
+ * Generates a text-based PDF from content using DocumentApp.
+ * @param {string} content - The content to written into the PDF.
+ * @param {string} fileName - The name of the generated PDF file.
+ * @returns {object} { success: boolean, base64: string, error?: string }
+ */
+function generatePdfFromServer(content, fileName) {
+  try {
+    const doc = DocumentApp.create('Temp PDF Generation');
+    const body = doc.getBody();
+    
+    function applyBold(element, text) {
+      if (!text) return;
+      const parts = text.split('**');
+      if (parts.length <= 1) return;
+      
+      let newText = '';
+      const boldRanges = [];
+      
+      for (let i = 0; i < parts.length; i++) {
+        if (i % 2 === 1) { // It's a bold part
+          const start = newText.length;
+          newText += parts[i];
+          const end = newText.length - 1;
+          boldRanges.push({start, end});
+        } else {
+          newText += parts[i];
+        }
+      }
+      
+      element.setText(newText);
+      const textElement = element.editAsText();
+      boldRanges.forEach(range => {
+        textElement.setBold(range.start, range.end, true);
+      });
+    }
+    
+    const lines = content.split('\n');
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        body.appendParagraph('');
+        return;
+      }
+      
+      if (trimmed.startsWith('# ')) {
+        const p = body.appendParagraph(trimmed.substring(2)).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+        applyBold(p, trimmed.substring(2));
+      } else if (trimmed.startsWith('## ')) {
+        const p = body.appendParagraph(trimmed.substring(3)).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+        applyBold(p, trimmed.substring(3));
+      } else if (trimmed.startsWith('### ')) {
+        const p = body.appendParagraph(trimmed.substring(4)).setHeading(DocumentApp.ParagraphHeading.HEADING3);
+        applyBold(p, trimmed.substring(4));
+      } else if (trimmed.startsWith('- ')) {
+        const li = body.appendListItem(trimmed.substring(2));
+        applyBold(li, trimmed.substring(2));
+      } else if (trimmed.startsWith('[CHART:')) {
+        const match = trimmed.match(/\[CHART:\s*(BAR|PIE|LINE)?,?\s*([^,\]]+),\s*([^\]]+)\]/i);
+        if (match) {
+          const type = (match[1] || 'BAR').toUpperCase();
+          const title = match[2].trim();
+          const dataStr = match[3].trim();
+          const pairs = dataStr.split(',').map(p => p.trim());
+          
+          const dataTable = Charts.newDataTable();
+          dataTable.addColumn(Charts.ColumnType.STRING, "Item");
+          dataTable.addColumn(Charts.ColumnType.NUMBER, "Value");
+          
+          pairs.forEach(p => {
+             const parts = p.split('=');
+             if (parts.length === 2) {
+               dataTable.addRow([parts[0].trim(), parseFloat(parts[1].trim()) || 0]);
+             }
+          });
+          
+          let builder;
+          if (type === 'PIE') {
+             builder = Charts.newPieChart();
+          } else if (type === 'LINE') {
+             builder = Charts.newLineChart();
+          } else {
+             builder = Charts.newBarChart();
+          }
+          
+          const chart = builder
+               .setDataTable(dataTable.build())
+               .setTitle(title)
+               .setDimensions(600, 300)
+               .build();
+          
+          const imageBlob = chart.getAs('image/png');
+          body.appendImage(imageBlob);
+        } else {
+           const p = body.appendParagraph(trimmed);
+           applyBold(p, trimmed);
+        }
+      } else {
+        const p = body.appendParagraph(trimmed);
+        applyBold(p, trimmed);
+      }
+    });
+    
+    doc.saveAndClose();
+    
+    const pdfBlob = doc.getAs('application/pdf');
+    pdfBlob.setName(fileName);
+    
+    const base64 = Utilities.base64Encode(pdfBlob.getBytes());
+    
+    DriveApp.getFileById(doc.getId()).setTrashed(true);
+    
+    return { success: true, base64: base64 };
+  } catch (e) {
+    console.error('PDF generation failed:', e.message);
+    return { success: false, error: e.message };
+  }
+}
