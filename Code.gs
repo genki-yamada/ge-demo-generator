@@ -1779,7 +1779,7 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
     perl -pi -e 's/(\\[project\\])/$1\\nrequires-python = ">=3.10,<3.13"/' pyproject.toml
   fi
   if ! grep -q "\\[tool\\.uv\\]" pyproject.toml; then
-    printf '\n[tool.uv]\nenvironments = [\n    "sys_platform == \\"'linux'\\""\n]\n' >> pyproject.toml
+    printf '\n[tool.uv]\nenvironments = [\n    "sys_platform == \\\\\\"linux\\\\\\""\n]\n' >> pyproject.toml
   fi
   # Replace default name in deploy.py
   perl -pi -e "s/default *= *[\\\"']adk[-_]agent[\\\"']/default=\\\"${dirName}\\\"/" mcp_app/app_utils/deploy.py 2>/dev/null || true
