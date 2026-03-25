@@ -1319,13 +1319,13 @@ for ROLE in "\${ROLES_TO_GRANT[@]}"; do
 done
 
 # Check for BQ permissions (with timeout to prevent hanging on new projects)
-echo "🛡 Checking permissions..."
+echo "🛡 Checking BigQuery permissions..."
 CAN_MK_BQ=$(timeout 30 bq ls --project_id="$PROJECT_ID" 2>&1 || echo "timeout_or_error")
 if [[ $CAN_MK_BQ == *"Access Denied"* ]]; then
   echo "❌ Error: Your account doesn't have BigQuery access in this project."
   exit 1
 fi
-echo "✅ Permissions OK"
+echo "✅ BigQuery Permissions OK"
 
 # --- 3. Data Provisioning ---
 ${bqCommands}
@@ -1930,8 +1930,8 @@ echo "💡 TIPS:"
 echo "   • To STOP the UI:    Press Ctrl+C"
 echo "   • To RESTART the UI: Run the following commands:"
 echo ""
-echo "     cd ~/${dirName}/adk_agent"
-echo "     ../.venv/bin/adk web --port \$PORT"
+echo "     cd ~/\${dirName}/adk_agent"
+echo "     ../.venv/bin/adk web --port \$PORT --allow_origins=\"*\""
 echo ""
 echo "   • To CLEANUP:        bash setup-${dirName}.sh --cleanup"
 echo ""
@@ -1939,7 +1939,7 @@ echo "========================================================="
 echo ""
 
 cd adk_agent
-../.venv/bin/adk web --port \$PORT
+../.venv/bin/adk web --port \$PORT --allow_origins="*"
 `;
 }
 
