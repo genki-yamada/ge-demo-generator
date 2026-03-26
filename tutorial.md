@@ -60,7 +60,7 @@ cd $(ls -d demo-*/ | head -n 1)adk_agent
 Run the agent using the virtual environment installed by the script:
 
 ```bash
-../.venv/bin/adk web
+../.venv/bin/adk web --allow_origins="*"
 ```
 
 ---
