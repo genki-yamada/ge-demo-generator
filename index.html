@@ -2674,9 +2674,10 @@
                     <span class="text-[9px] font-bold text-emerald-500/80 uppercase tracking-tighter">Recommended</span>
                   </div>
                </div>
-                <div class="relative bg-black/60 rounded-xl p-4 border border-white/5 group-hover:border-emerald-500/20 transition-all min-w-0">
-                  <p class="text-[13px] text-sky-200 select-all leading-relaxed font-mono">${prompt}</p>
-                  <button onclick="copyToClipboard(this.previousElementSibling.innerText)" class="absolute top-2 right-2 p-2 rounded-lg bg-white/5 text-gray-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all" title="Copy prompt">
+                <div class="relative bg-black/60 rounded-xl p-4 border border-white/5 hover:border-emerald-500/30 transition-all min-w-0 group/copy">
+                  <p class="text-[13px] text-sky-200 select-text leading-relaxed font-mono">${prompt}</p>
+                  <button onclick="copyToClipboard(this.previousElementSibling.innerText)" class="absolute top-3 right-3 p-2 rounded-lg bg-emerald-500/10 backdrop-blur-md text-emerald-400/70 opacity-0 group-hover/copy:opacity-100 transition-all border border-emerald-500/20 shadow-lg hover:text-emerald-300 hover:bg-emerald-500/30 hover:border-emerald-500/50 active:bg-emerald-500 active:text-white active:border-emerald-400 active:scale-95 flex items-center gap-1.5 cursor-pointer duration-200" title="Copy prompt">
+                    <span class="text-[10px] font-bold tracking-wide">COPY</span>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                   </button>
                </div>
