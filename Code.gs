@@ -17,7 +17,7 @@ const CONFIG = {
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v6.1-public'
+  APP_VERSION: 'v6.21-public'
 };
 
 
@@ -1049,6 +1049,11 @@ function generateSetupScript(params) {
 
 set -e
 
+# --- Network resiliency for package installation ---
+echo "⚙️  Configuring robust network timeouts for package resolution..."
+export UV_HTTP_TIMEOUT=600
+export UV_RETRIES=10
+
 # --- Cleanup Mode Handler ---
   if [ "$1" = "--cleanup" ] || [ "$1" = "-c" ]; then
     echo ""
@@ -1215,8 +1220,15 @@ echo "  [3] Deploy to Gemini Enterprise"
 echo "      - Automated Agent Engine deployment."
 echo "      - Registers your agent to Gemini Enterprise."
 echo ""
-read -p "Enter Choice [1, 2 or 3] (Default: 1): " DEPLOY_CHOICE
-DEPLOY_CHOICE=\${DEPLOY_CHOICE:-1}
+DEPLOY_CHOICE=""
+while [[ ! "\$DEPLOY_CHOICE" =~ ^[1-3]$ ]]; do
+  read -p "Enter Choice [1, 2 or 3]: " DEPLOY_CHOICE
+  # Remove trailing carriage return in case of running in some environments like Cygwin or Cloud Shell with weird tty mapping
+  DEPLOY_CHOICE=$(echo "\$DEPLOY_CHOICE" | tr -d '\\r\\n\\t ')
+  if [[ ! "\$DEPLOY_CHOICE" =~ ^[1-3]$ ]]; then
+    echo "⚠️  Invalid choice. Please enter 1, 2, or 3 explicitly."
+  fi
+done
 
 # Immediate check for Gemini Enterprise
 if [ "\$DEPLOY_CHOICE" = "3" ]; then
