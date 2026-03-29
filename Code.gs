@@ -1087,7 +1087,15 @@ export UV_RETRIES=10
     echo "🔑 Deleting Maps API Key: MCP-Demo-Key-${suffix}..."
     KEY_NAME=$(gcloud alpha services api-keys list --filter="displayName:MCP-Demo-Key-${suffix}" --format="value(name)" 2>/dev/null || echo "")
     if [ ! -z "\$KEY_NAME" ]; then
-      gcloud alpha services api-keys delete "\$KEY_NAME" --quiet 2>/dev/null && echo "   ✅ API Key deleted." || echo "   ⚠️  Failed to delete API Key."
+      DELETED_ALL=true
+      for KN in \$KEY_NAME; do
+        gcloud alpha services api-keys delete "\$KN" --quiet 2>/dev/null || DELETED_ALL=false
+      done
+      if \$DELETED_ALL; then
+        echo "   ✅ API Key deleted."
+      else
+        echo "   ⚠️  Failed to delete one or more API Keys."
+      fi
     else
       echo "   ⚠️  API Key not found or already deleted."
     fi
@@ -1107,7 +1115,7 @@ export UV_RETRIES=10
     if [ ! -z "\$RE_NAME" ] && [ "\$RE_NAME" != "null" ]; then
       RE_ID_NUM=\$(echo "\$RE_NAME" | grep -oE "[0-9]+$")
       curl -s -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
-        "https://us-central1-aiplatform.googleapis.com/v1/\$RE_NAME?force=true" && echo "   ✅ Agent Engine instance deleted." || echo "   ⚠️  Failed to delete Agent Engine instance."
+        "https://us-central1-aiplatform.googleapis.com/v1/\$RE_NAME?force=true" > /dev/null && echo "   ✅ Agent Engine instance deleted." || echo "   ⚠️  Failed to delete Agent Engine instance."
     else
       echo "   ⚠️  Agent Engine instance not found matching '${dirName}' or suffix '${suffix}'."
     fi
@@ -1119,27 +1127,17 @@ export UV_RETRIES=10
       ENGINES_JSON=$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
         "https://discoveryengine.googleapis.com/v1alpha/projects/\$PROJECT_ID/locations/\$LOC/collections/default_collection/engines")
       
-      # Try to find engine matching name directly in this location
-      ENGINE_NAME=$(echo "\$ENGINES_JSON" | jq -r --arg dir "${dirName}" '.engines[]? | select(.displayName == $dir) | .name' 2>/dev/null | head -n 1)
-      
-      if [ ! -z "\$ENGINE_NAME" ] && [ "\$ENGINE_NAME" != "null" ]; then
-        echo "   🗑 Deleting Gemini Enterprise App: ${dirName} (Location: \$LOC)..."
-        curl -s -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
-          "https://discoveryengine.googleapis.com/v1alpha/\$ENGINE_NAME" && echo "   ✅ Gemini Enterprise App deleted." || echo "   ⚠️  Failed to delete Gemini Enterprise App."
-        break
-      fi
-
       # 2. If no engine match, scan for individual agents within EXISTING engines in this location
       for E_NAME in $(echo "\$ENGINES_JSON" | jq -r '.engines[]? | .name'); do
         ASSISTANTS=$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" "https://discoveryengine.googleapis.com/v1alpha/\${E_NAME}/assistants")
         for A_NAME in $(echo "\$ASSISTANTS" | jq -r '.assistants[]? | .name'); do
           AGENTS_JSON=$(curl -s -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" "https://discoveryengine.googleapis.com/v1alpha/\${A_NAME}/agents?pageSize=100")
-          TARGET_AGENT_NAME=$(echo "\$AGENTS_JSON" | jq -r --arg dir "${dirName}" --arg suf "${suffix}" --arg re "\$RE_ID_NUM" '.agents[]? | select(.displayName == $dir or (.displayName | endswith($suf)) or (.adkAgentDefinition.provisionedReasoningEngine.reasoningEngine | contains($re))) | .name' 2>/dev/null | head -n 1)
+          TARGET_AGENT_NAME=$(echo "\$AGENTS_JSON" | jq -r --arg dir "${dirName}" --arg suf "${suffix}" --arg re "\$RE_ID_NUM" '.agents[]? | select(.displayName == $dir or (try (.displayName | strings | endswith($suf)) catch false) or ($re != "" and (try (.adkAgentDefinition.provisionedReasoningEngine.reasoningEngine | strings | contains($re)) catch false))) | .name' 2>/dev/null | head -n 1)
           
           if [ ! -z "\$TARGET_AGENT_NAME" ] && [ "\$TARGET_AGENT_NAME" != "null" ]; then
-            echo "   🗑 Unregistering agent: \${TARGET_AGENT_NAME} (Location: \$LOC)..."
-            curl -s -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
-              "https://discoveryengine.googleapis.com/v1alpha/\$TARGET_AGENT_NAME" && echo "   ✅ Gemini Enterprise Agent unlisted." || echo "   ⚠️  Failed to unlist Gemini Enterprise Agent."
+            echo "   🗑 Unregistering Gemini Enterprise Agent: \${TARGET_AGENT_NAME} (Location: \$LOC)..."
+            curl -s --fail -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
+              "https://discoveryengine.googleapis.com/v1alpha/\$TARGET_AGENT_NAME" > /dev/null && echo "   ✅ Gemini Enterprise Agent unlisted." || echo "   ⚠️  Failed to unlist Gemini Enterprise Agent."
             break 3
           fi
         done
@@ -1712,7 +1710,7 @@ import os
 # Force project ID and location BEFORE importing ADK/genai
 # =============================================================================
 os.environ["GOOGLE_CLOUD_PROJECT"] = "$PROJECT_ID"
-os.environ["LOGS_BUCKET_NAME"] = "ge-mcp-images-${dirName}"
+os.environ["GCS_IMAGE_BUCKET"] = "ge-mcp-images-${dirName}"
 # Force global location for Gemini 3 models
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 
@@ -1840,7 +1838,7 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
   echo "🔧 Applying project name customizations..."
   rm -f .resource_name
   # Replace name in adk_agent/pyproject.toml (Tool normalizes adk_agent -> adk-agent)
-  perl -pi -e "s/name *= *[\\\"']adk[-_]agent[\\\"']/name = \\\"${dirName}\\\"/" pyproject.toml
+  perl -pi -e "s/name *= *[\"\']mcp[-_]agent[\"\']/name = \"${dirName}\"/" pyproject.toml
   # Constrain python version to avoid uv resolution errors on python 3.13
   if grep -q "^requires-python" pyproject.toml; then
     perl -pi -e 's/^requires-python\\s*=.*/requires-python = ">=3.10,<3.13"/' pyproject.toml
