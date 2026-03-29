@@ -1712,7 +1712,7 @@ import os
 # Force project ID and location BEFORE importing ADK/genai
 # =============================================================================
 os.environ["GOOGLE_CLOUD_PROJECT"] = "$PROJECT_ID"
-os.environ["GCS_IMAGE_BUCKET"] = "ge-mcp-images-${dirName}"
+os.environ["LOGS_BUCKET_NAME"] = "ge-mcp-images-${dirName}"
 # Force global location for Gemini 3 models
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 
