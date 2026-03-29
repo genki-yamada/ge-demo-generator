@@ -1,5 +1,5 @@
 /**
- * GAS BigQuery MCP Demo Generator - Backend
+ * GE Demo Generator - Backend
  * 
  * Dynamically generates a portable AI agent demo environment 
  * using BigQuery and Maps MCP servers.
@@ -17,7 +17,7 @@ const CONFIG = {
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v6.21-public'
+  APP_VERSION: 'v7.0-public'
 };
 
 
@@ -1067,6 +1067,7 @@ export UV_RETRIES=10
     echo "  • Cloud Run Service: ${dirName} (if deployed)"
     echo "  • Agent Engine (Reasoning Engine) instance: ${dirName}"
     echo "  • Gemini Enterprise registration (App): ${dirName}"
+    echo "  • GCS Bucket for Images: ge-mcp-images-${dirName}"
     echo "  • Local Directory: ~/${dirName}"
     echo ""
     read -p "Are you sure you want to proceed? (y/n) " -n 1 -r
@@ -1122,7 +1123,7 @@ export UV_RETRIES=10
       ENGINE_NAME=$(echo "\$ENGINES_JSON" | jq -r --arg dir "${dirName}" '.engines[]? | select(.displayName == $dir) | .name' 2>/dev/null | head -n 1)
       
       if [ ! -z "\$ENGINE_NAME" ] && [ "\$ENGINE_NAME" != "null" ]; then
-        echo "   🗑 Deleting Gemini Enterprise App: \${dirName} (Location: \$LOC)..."
+        echo "   🗑 Deleting Gemini Enterprise App: ${dirName} (Location: \$LOC)..."
         curl -s -X DELETE -H "Authorization: Bearer \$TOKEN" -H "X-Goog-User-Project: \$PROJECT_ID" \
           "https://discoveryengine.googleapis.com/v1alpha/\$ENGINE_NAME" && echo "   ✅ Gemini Enterprise App deleted." || echo "   ⚠️  Failed to delete Gemini Enterprise App."
         break
@@ -1145,6 +1146,10 @@ export UV_RETRIES=10
       done
     done
     
+    echo ""
+    echo "🗑️  Deleting GCS Bucket for Images: ge-mcp-images-${dirName}..."
+    gcloud storage rm --recursive gs://ge-mcp-images-${dirName} 2>/dev/null && echo "   ✅ Bucket deleted." || echo "   ⚠️  Bucket not found or already deleted."
+
     echo ""
     echo "📂 Deleting local directory and uv cache: ~/${dirName}..."
     cd ~
@@ -1329,7 +1334,7 @@ check_and_grant_role() {
 }
 
 # Grant specific roles required for MCP tool execution and BigQuery access
-for ROLE in "roles/mcp.toolUser" "roles/bigquery.jobUser" "roles/bigquery.dataViewer" "roles/serviceusage.serviceUsageConsumer"; do
+for ROLE in "roles/mcp.toolUser" "roles/bigquery.jobUser" "roles/bigquery.dataViewer" "roles/serviceusage.serviceUsageConsumer" "roles/storage.admin" "roles/iam.serviceAccountTokenCreator"; do
   check_and_grant_role "$PROJECT_ID" "\$RE_SA" "\$ROLE"
 done
 
@@ -1351,7 +1356,7 @@ gcloud beta services mcp enable mapstools.googleapis.com --project="$PROJECT_ID"
 echo "🔐 Configuring user permissions for local execution..."
 USER_ACCOUNT=$(gcloud config get-value account 2>/dev/null)
 # For Cloud Run deployment, the user needs roles to build and deploy
-ROLES_TO_GRANT=("roles/mcp.toolUser" "roles/serviceusage.serviceUsageConsumer")
+ROLES_TO_GRANT=("roles/mcp.toolUser" "roles/serviceusage.serviceUsageConsumer" "roles/storage.admin")
 if [ "$DEPLOY_CHOICE" = "2" ]; then
   ROLES_TO_GRANT+=("roles/run.admin" "roles/cloudbuild.builds.builder" "roles/iam.serviceAccountUser" "roles/artifactregistry.admin")
 fi
@@ -1374,6 +1379,9 @@ fi
 echo "✅ BigQuery Permissions OK"
 
 # --- 3. Data Provisioning ---
+echo "🗄 Creating GCS Bucket for Images: ge-mcp-images-${dirName}..."
+gcloud storage buckets create gs://ge-mcp-images-${dirName} --project="\$PROJECT_ID" 2>/dev/null || echo "    ✅ Bucket already exists."
+
 ${bqCommands}
 
 # --- 4. Project Setup (Flat Structure) ---
@@ -1393,6 +1401,7 @@ google-genai>=1.9.0
 python-dotenv>=1.0.0
 vertexai>=1.0.0
 db-dtypes>=1.0.0
+google-cloud-storage>=2.14.0
 __REQ_EOF__
 
 # Generate pyproject.toml required for adk project type
@@ -1400,7 +1409,7 @@ cat <<'__PYPROJ_EOF__' > pyproject.toml
 [project]
 name = "mcp-agent"
 version = "0.1.0"
-dependencies = ["google-adk>=1.0.0", "google-genai>=1.9.0"]
+dependencies = ["google-adk>=1.0.0", "google-genai>=1.9.0", "google-cloud-storage>=2.14.0"]
 requires-python = ">=3.10,<3.13"
 [tool.adk]
 project_type = "agent"
@@ -1507,9 +1516,11 @@ from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnecti
 import httpx
 import anyio
 import time
+import uuid
+from google.adk.tools import ToolContext
+from google.genai import client as genai_client, types as genai_types
 
-# Enforce sequential execution across all tools to prevent session termination
-_tool_semaphore = asyncio.Semaphore(1)
+
 
 def get_project_id():
     """Robustly retrieves the project ID from env, .env, or credentials."""
@@ -1583,75 +1594,8 @@ try:
     # 1. HTTP/2 Disable for stability
     httpx.AsyncClient.__init__ = _patched_client_init
     httpx.AsyncClient.send = _patched_send
-    
-    # 2. Sequential MCP Initialization Patch
-    _orig_get_tools = MCPToolset.get_tools
-    async def _patched_get_tools(self, *args, **kwargs):
-        async with _tool_semaphore:
-            return await _orig_get_tools(self, *args, **kwargs)
-    MCPToolset.get_tools = _patched_get_tools
-
-    # 3. Deep Drip & Global Lock Recovery (Phase 4)
-    try:
-        _orig_run_async = MCPTool.run_async
-        async def _patched_run_async(self, *args, **kwargs):
-            # The lock must surround the ENTIRE retry loop to prevent concurrent 
-            # "retry stampedes" that crash the session manager.
-            async with _tool_semaphore:
-                max_retries = 3
-                for attempt in range(max_retries + 1):
-                    try:
-                        result = await _orig_run_async(self, *args, **kwargs)
-                        # [Deep Drip] Add a small delay AFTER success to let the SSE pipe breathe
-                        await asyncio.sleep(1.5)
-                        return result
-                    except Exception as e:
-                        err_msg = str(e).lower()
-                        # Catch both explicit McpError and raw strings from lower levels
-                        if ("session terminated" in err_msg or "mcperror" in err_msg or "broken pipe" in err_msg or "protocol error" in err_msg or "eos" in err_msg) and attempt < max_retries:
-                            backoff_time = 5 * (2 ** attempt)
-                            print(f"  [DEBUG] MCP Session failure: {err_msg}. Recovering ({attempt + 1}/{max_retries})... Waiting {backoff_time}s")
-                            await asyncio.sleep(backoff_time) 
-                            continue
-                        elif '429' in str(e) or 'resource exhausted' in err_msg:
-                            if attempt < max_retries:
-                                backoff_time = 5 * (2 ** attempt)
-                                print(f"  [DEBUG] ⚠️ MCP Resource exhausted (429). Cooling down for {backoff_time}s...")
-                                await asyncio.sleep(backoff_time)
-                                continue
-                        raise
-        MCPTool.run_async = _patched_run_async
-    except Exception as e:
-        print(f"  [DEBUG] Failed to patch MCPTool.run_async: {e}")
-
 except Exception as e:
     print(f"  [DEBUG] Stability patches not applied: {e}")
-
-
-# Prevent AnyIO cross-task cancellation errors
-import anyio._backends._asyncio
-_orig_cancel_exit = anyio._backends._asyncio.CancelScope.__exit__
-def _patched_cancel_exit(self, etype, exc, tb):
-    try: return _orig_cancel_exit(self, etype, exc, tb)
-    except RuntimeError as e:
-        if "different task" in str(e): return False
-        raise
-anyio._backends._asyncio.CancelScope.__exit__ = _patched_cancel_exit
-
-# Prevent telemetry serialization failures for complex tool outputs
-try:
-    from opentelemetry.sdk.trace import Span
-    import json
-    def _safe_stringify(value):
-        if isinstance(value, (dict, list)):
-            try: return json.dumps(value, ensure_ascii=False, default=str)
-            except: return str(value)
-        return value
-    _orig_set_attribute = Span.set_attribute
-    def _patched_set_attribute(self, key, value):
-        return _orig_set_attribute(self, key, _safe_stringify(value))
-    Span.set_attribute = _patched_set_attribute
-except: pass
 
 # =============================================================================
 # 🔧 MCP Toolset Configuration
@@ -1692,6 +1636,72 @@ def get_maps_mcp_toolset():
         },
         timeout=300
     ))
+
+async def generate_image(prompt: str, tool_context: ToolContext) -> dict:
+    """Generates an image based on the given prompt.
+    
+    This tool creates visual assets like infographics, charts, or scenes. It automatically 
+    stores the image in the current environment's artifact service (GCS or Local).
+    
+    Args:
+        prompt: A highly detailed, descriptive prompt for the image. Include stylistic instructions (e.g., 'photorealistic', 'flat design', 'neon corporate colors').
+        
+    Returns:
+        dict containing status, filename, and version or error details.
+    """
+    filename = f"image_{uuid.uuid4().hex[:8]}.png"
+    client = genai_client.Client(http_options={'api_version': 'v1'})
+    
+    try:
+        from google.genai import types
+        # Generate image via the GenerateContent API
+        result = await asyncio.to_thread(
+            client.models.generate_content,
+            model='gemini-3.1-flash-image-preview',
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=prompt)]
+                )
+            ],
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+                image_config=types.ImageConfig(
+                    aspect_ratio="16:9",
+                    output_mime_type="image/png",
+                )
+            )
+        )
+    except Exception as e:
+        return {"status": "error", "error": f"API Error generating image: {str(e)}"}
+    
+    if not result.candidates or not result.candidates[0].content.parts:
+        return {"status": "error", "error": f"Failed to generate image for prompt: {prompt}"}
+        
+    image_bytes = None
+    for part in result.candidates[0].content.parts:
+        if part.inline_data:
+            image_bytes = part.inline_data.data
+            break
+            
+    if not image_bytes:
+        return {"status": "error", "error": f"No image bytes found in the response for prompt: {prompt}"}
+    
+    # Save the artifact for ADK Web UI attachment processing.
+    # We must use types.Part and the native save_artifact method.
+    try:
+        from google.genai import types
+        image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
+        # save_artifact populates event.actions.artifact_delta which the UI uses to render
+        version = await tool_context.save_artifact(filename=filename, artifact=image_part)
+        return {
+            "status": "success", 
+            "filename": filename, 
+            "version": version, 
+            "message": f"Successfully generated image and saved as {filename} (version {version})."
+        }
+    except Exception as e:
+        return {"status": "error", "error": f"Image generated, but failed to save to Artifact Service: {str(e)}"}
 __TOOLS_EOF__
 
 cat <<__AGENT_EOF__ > adk_agent/mcp_app/agent.py
@@ -1702,6 +1712,7 @@ import os
 # Force project ID and location BEFORE importing ADK/genai
 # =============================================================================
 os.environ["GOOGLE_CLOUD_PROJECT"] = "$PROJECT_ID"
+os.environ["GCS_IMAGE_BUCKET"] = "ge-mcp-images-${dirName}"
 # Force global location for Gemini 3 models
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 
@@ -1712,6 +1723,8 @@ from . import tools
 from google.adk.agents import LlmAgent
 from google.adk.models import Gemini
 from google.genai import types
+from google.adk.apps.app import App, EventsCompactionConfig
+from google.adk.plugins import ReflectAndRetryToolPlugin, LoggingPlugin
 
 PROJECT_ID = "$PROJECT_ID"
 
@@ -1793,13 +1806,23 @@ root_agent = LlmAgent(
     model=gemini_model,
     name='root_agent',
     instruction=instruction,
-    tools=[maps_toolset, bigquery_toolset]
+    tools=[maps_toolset, bigquery_toolset, tools.generate_image]
 )
 
-# Export only the root_agent. 
-# The 'uvx agent-starter-pack enhance' command will automatically wrap this
-# in an App container and generate the entry point for Agent Engine.
-__all__ = ["root_agent"]
+app = App(
+    name="mcp_app",
+    root_agent=root_agent,
+    plugins=[
+        ReflectAndRetryToolPlugin(), 
+        LoggingPlugin()
+    ],
+    events_compaction_config=EventsCompactionConfig(
+        compaction_interval=20, 
+        overlap_size=3
+    )
+)
+
+__all__ = ["root_agent", "app"]
 __AGENT_EOF__
 
 
@@ -1976,7 +1999,7 @@ echo "💡 TIPS:"
 echo "   • To STOP the UI:    Press Ctrl+C"
 echo "   • To RESTART the UI: Run the following commands:"
 echo ""
-echo "     cd ~/\${dirName}/adk_agent"
+echo "     cd ~/${dirName}/adk_agent"
 echo "     ../.venv/bin/adk web --port \$PORT --allow_origins=\"*\""
 echo ""
 echo "   • To CLEANUP:        bash setup-${dirName}.sh --cleanup"
