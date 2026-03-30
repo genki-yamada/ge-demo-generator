@@ -1037,8 +1037,8 @@ function generateSetupScript(params) {
     bqCommands += `fi\n\n`;
   }
 
-  // Robustly escape instruction for a text file
-  const rawInstruction = systemInstruction;
+  // Robustly escape instruction for an unquoted bash heredoc
+  const rawInstruction = systemInstruction.replace(/[\\$`]/g, match => '\\' + match);
 
   return `#!/bin/bash
 # ===========================================
@@ -1067,7 +1067,8 @@ export UV_RETRIES=10
     echo "  • Cloud Run Service: ${dirName} (if deployed)"
     echo "  • Agent Engine (Reasoning Engine) instance: ${dirName}"
     echo "  • Gemini Enterprise registration (App): ${dirName}"
-    echo "  • GCS Bucket for Images: ge-mcp-images-${dirName}"
+    SANITIZED_DIR_NAME=$(echo "${dirName}" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]/-/g')
+    echo "  • GCS Bucket for Images: image-$SANITIZED_DIR_NAME-*"
     echo "  • Local Directory: ~/${dirName}"
     echo ""
     read -p "Are you sure you want to proceed? (y/n) " -n 1 -r
@@ -1145,8 +1146,8 @@ export UV_RETRIES=10
     done
     
     echo ""
-    echo "🗑️  Deleting GCS Bucket for Images: ge-mcp-images-${dirName}..."
-    gcloud storage rm --recursive gs://ge-mcp-images-${dirName} 2>/dev/null && echo "   ✅ Bucket deleted." || echo "   ⚠️  Bucket not found or already deleted."
+    echo "🪣 Deleting GCS Bucket for Images..."
+    gcloud storage rm --recursive "gs://image-$SANITIZED_DIR_NAME-*" --project="$PROJECT_ID" --quiet 2>/dev/null && echo "   ✅ GCS Buckets deleted." || echo "   ⚠️  GCS Buckets not found or already deleted."
 
     echo ""
     echo "📂 Deleting local directory and uv cache: ~/${dirName}..."
@@ -1377,9 +1378,6 @@ fi
 echo "✅ BigQuery Permissions OK"
 
 # --- 3. Data Provisioning ---
-echo "🗄 Creating GCS Bucket for Images: ge-mcp-images-${dirName}..."
-gcloud storage buckets create gs://ge-mcp-images-${dirName} --project="\$PROJECT_ID" 2>/dev/null || echo "    ✅ Bucket already exists."
-
 ${bqCommands}
 
 # --- 4. Project Setup (Flat Structure) ---
@@ -1635,7 +1633,7 @@ def get_maps_mcp_toolset():
         timeout=300
     ))
 
-async def generate_image(prompt: str, tool_context: ToolContext) -> dict:
+async def generate_image(prompt: str, tool_context: ToolContext) -> str:
     """Generates an image based on the given prompt.
     
     This tool creates visual assets like infographics, charts, or scenes. It automatically 
@@ -1645,10 +1643,19 @@ async def generate_image(prompt: str, tool_context: ToolContext) -> dict:
         prompt: A highly detailed, descriptive prompt for the image. Include stylistic instructions (e.g., 'photorealistic', 'flat design', 'neon corporate colors').
         
     Returns:
-        dict containing status, filename, and version or error details.
+        dict containing status, filename, and visual markdown string.
     """
     filename = f"image_{uuid.uuid4().hex[:8]}.png"
-    client = genai_client.Client(http_options={'api_version': 'v1'})
+    
+    import os
+    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT")
+    client = genai_client.Client(
+        vertexai=True, 
+        location=location, 
+        project=project,
+        http_options={'api_version': 'v1'}
+    )
     
     try:
         from google.genai import types
@@ -1685,21 +1692,42 @@ async def generate_image(prompt: str, tool_context: ToolContext) -> dict:
     if not image_bytes:
         return {"status": "error", "error": f"No image bytes found in the response for prompt: {prompt}"}
     
-    # Save the artifact for ADK Web UI attachment processing.
-    # We must use types.Part and the native save_artifact method.
     try:
         from google.genai import types
         image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
-        # save_artifact populates event.actions.artifact_delta which the UI uses to render
+        
+        bucket_name = os.environ.get("LOGS_BUCKET_NAME")
+        if bucket_name:
+            import logging
+            import datetime
+            from google.cloud import storage
+            storage_client = storage.Client()
+            bucket = storage_client.bucket(bucket_name)
+            blob = bucket.blob(f"images/{filename}")
+            blob.upload_from_string(image_bytes, content_type="image/png")
+            uri = f"gs://{bucket_name}/images/{filename}"
+            logging.info(f"Image uploaded to {uri}")
+            
+            try:
+                # Attempt to generate a Signed URL. Note: this requires the running Service
+                # Account to have the 'Service Account Token Creator' IAM role.
+                signed_url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=datetime.timedelta(days=7),
+                    method="GET"
+                )
+                markdown = f"![Generated Image]({signed_url})"
+            except Exception as e:
+                logging.warning(f"Failed to generate signed URL. Verify 'Service Account Token Creator' role: {e}")
+                markdown = f"*[Image generated securely. View in GCP Console: {uri}]*"
+
+            return f"Image successfully generated:\\n\\n{markdown}\\n\\n(Saved to Cloud Storage at {uri})"
+            
+        # Save locally for ADK Web/Cloud Run Memory testing
         version = await tool_context.save_artifact(filename=filename, artifact=image_part)
-        return {
-            "status": "success", 
-            "filename": filename, 
-            "version": version, 
-            "message": f"Successfully generated image and saved as {filename} (version {version})."
-        }
+        return f"Image successfully generated and displayed to the user as '{filename}'. IMPORTANT: Do NOT include any markdown image links like [![image]({filename})] in your response."
     except Exception as e:
-        return {"status": "error", "error": f"Image generated, but failed to save to Artifact Service: {str(e)}"}
+        return {"status": "error", "error": f"Image generated, but failed to save/upload: {str(e)}"}
 __TOOLS_EOF__
 
 cat <<__AGENT_EOF__ > adk_agent/mcp_app/agent.py
@@ -1710,7 +1738,6 @@ import os
 # Force project ID and location BEFORE importing ADK/genai
 # =============================================================================
 os.environ["GOOGLE_CLOUD_PROJECT"] = "$PROJECT_ID"
-os.environ["GCS_IMAGE_BUCKET"] = "ge-mcp-images-${dirName}"
 # Force global location for Gemini 3 models
 os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 
@@ -1838,7 +1865,7 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
   echo "🔧 Applying project name customizations..."
   rm -f .resource_name
   # Replace name in adk_agent/pyproject.toml (Tool normalizes adk_agent -> adk-agent)
-  perl -pi -e "s/name *= *[\"\']mcp[-_]agent[\"\']/name = \"${dirName}\"/" pyproject.toml
+  perl -pi -e "s/name *= *[\\\"']mcp[-_]agent[\\\"']/name = \\\"${dirName}\\\"/" pyproject.toml
   # Constrain python version to avoid uv resolution errors on python 3.13
   if grep -q "^requires-python" pyproject.toml; then
     perl -pi -e 's/^requires-python\\s*=.*/requires-python = ">=3.10,<3.13"/' pyproject.toml
@@ -1850,6 +1877,21 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
   fi
   # Replace default name in deploy.py
   perl -pi -e "s/default *= *[\\\"']adk[-_]agent[\\\"']/default=\\\"${dirName}\\\"/" mcp_app/app_utils/deploy.py 2>/dev/null || true
+  
+  # Prepare GCS Bucket for Images
+  SANITIZED_DIR_NAME=$(echo "${dirName}" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]/-/g')
+  IMAGE_BUCKET="image-$SANITIZED_DIR_NAME-\${PROJECT_NUMBER:-$RANDOM}"
+  echo "🔧 Preparing Cloud Storage bucket for Agent Engine artifacts: $IMAGE_BUCKET"
+  if ! gcloud storage buckets describe "gs://$IMAGE_BUCKET" >/dev/null 2>&1; then
+    gcloud storage buckets create "gs://$IMAGE_BUCKET" --project="$PROJECT_ID" --location="US" --uniform-bucket-level-access
+  fi
+  
+  # Inject bucket name into environment via .env (for local testing)
+  echo "LOGS_BUCKET_NAME=$IMAGE_BUCKET" >> .env
+  
+  # Inject it directly into agent.py so the deployed Agent Engine knows about it
+  echo "os.environ['LOGS_BUCKET_NAME'] = '$IMAGE_BUCKET'" >> mcp_app/agent.py
+  
   cd ..
 fi
 
