@@ -1183,12 +1183,18 @@ fi
 
 # --- 1.1 Authentication & Permissions Check ---
 echo "🔐 Checking authentication..."
+if ! gcloud auth application-default print-access-token >/dev/null 2>&1 || ! gcloud auth print-access-token >/dev/null 2>&1; then
+  echo "❌ Error: Google Cloud credentials have expired or are missing."
+  echo "💡 Please run the following commands to re-authenticate:"
+  echo "    gcloud auth login"
+  echo "    gcloud auth application-default login"
+  echo "Then re-run this setup script."
+  exit 1
+fi
+
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null || echo "")
 if [ -z "$PROJECT_NUMBER" ]; then
-  echo "❌ Error: Could not retrieve project details. This usually means you are not authenticated or the project ID is invalid."
-  echo "Please run the following commands and try again:"
-  echo "  1. gcloud auth login"
-  echo "  2. gcloud auth application-default login"
+  echo "❌ Error: Could not retrieve project details. The project ID might be invalid or you lack permissions."
   exit 1
 fi
 
@@ -1515,6 +1521,14 @@ import time
 import uuid
 from google.adk.tools import ToolContext
 from google.genai import client as genai_client, types as genai_types
+import json
+
+_orig_default = json.JSONEncoder.default
+def _patched_default(self, obj):
+    if isinstance(obj, genai_types.Part):
+        return obj.model_dump(exclude_none=True)
+    return _orig_default(self, obj)
+json.JSONEncoder.default = _patched_default
 
 
 
@@ -1633,21 +1647,23 @@ def get_maps_mcp_toolset():
         timeout=300
     ))
 
-async def generate_image(prompt: str, tool_context: ToolContext) -> str:
+async def generate_image(prompt: str, tool_context: ToolContext) -> list:
     """Generates an image based on the given prompt.
     
     This tool creates visual assets like infographics, charts, or scenes. It automatically 
-    stores the image in the current environment's artifact service (GCS or Local).
+    stores the image in the current environment's artifact service (GCS or Local). It returns
+    a list of google.genai.types.Part objects for native rendering in the Gemini Enterprise Chat UI.
     
     Args:
         prompt: A highly detailed, descriptive prompt for the image. Include stylistic instructions (e.g., 'photorealistic', 'flat design', 'neon corporate colors').
         
     Returns:
-        dict containing status, filename, and visual markdown string.
+        A list of google.genai.types.Part objects, including a text part and an image part.
     """
     filename = f"image_{uuid.uuid4().hex[:8]}.png"
     
     import os
+    import logging
     location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
     project = os.environ.get("GOOGLE_CLOUD_PROJECT")
     client = genai_client.Client(
@@ -1656,9 +1672,9 @@ async def generate_image(prompt: str, tool_context: ToolContext) -> str:
         project=project,
         http_options={'api_version': 'v1'}
     )
+    from google.genai import types
     
     try:
-        from google.genai import types
         # Generate image via the GenerateContent API
         result = await asyncio.to_thread(
             client.models.generate_content,
@@ -1678,10 +1694,12 @@ async def generate_image(prompt: str, tool_context: ToolContext) -> str:
             )
         )
     except Exception as e:
-        return {"status": "error", "error": f"API Error generating image: {str(e)}"}
+        logging.error(f"API Error generating image: {e}")
+        return [types.Part.from_text(text=f"API Error generating image: {str(e)}")]
     
     if not result.candidates or not result.candidates[0].content.parts:
-        return {"status": "error", "error": f"Failed to generate image for prompt: {prompt}"}
+        logging.warning(f"Failed to generate image for prompt: {prompt}")
+        return [types.Part.from_text(text=f"Failed to generate image for prompt: {prompt}")]
         
     image_bytes = None
     for part in result.candidates[0].content.parts:
@@ -1690,44 +1708,34 @@ async def generate_image(prompt: str, tool_context: ToolContext) -> str:
             break
             
     if not image_bytes:
-        return {"status": "error", "error": f"No image bytes found in the response for prompt: {prompt}"}
+        logging.warning(f"No image bytes found in the response for prompt: {prompt}")
+        return [types.Part.from_text(text=f"No image bytes found in the response for prompt: {prompt}")]
     
     try:
-        from google.genai import types
-        image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
-        
         bucket_name = os.environ.get("LOGS_BUCKET_NAME")
         if bucket_name:
-            import logging
             import datetime
             from google.cloud import storage
             storage_client = storage.Client()
             bucket = storage_client.bucket(bucket_name)
             blob = bucket.blob(f"images/{filename}")
             blob.upload_from_string(image_bytes, content_type="image/png")
-            uri = f"gs://{bucket_name}/images/{filename}"
-            logging.info(f"Image uploaded to {uri}")
+            gs_uri = f"gs://{bucket_name}/images/{filename}"
+            auth_url = f"https://storage.cloud.google.com/{bucket_name}/images/{filename}"
+            logging.info(f"Image uploaded to {gs_uri} (Public URL: {auth_url})")
             
-            try:
-                # Attempt to generate a Signed URL. Note: this requires the running Service
-                # Account to have the 'Service Account Token Creator' IAM role.
-                signed_url = blob.generate_signed_url(
-                    version="v4",
-                    expiration=datetime.timedelta(days=7),
-                    method="GET"
-                )
-                markdown = f"![Generated Image]({signed_url})"
-            except Exception as e:
-                logging.warning(f"Failed to generate signed URL. Verify 'Service Account Token Creator' role: {e}")
-                markdown = f"*[Image generated securely. View in GCP Console: {uri}]*"
-
-            return f"Image successfully generated:\\n\\n{markdown}\\n\\n(Saved to Cloud Storage at {uri})"
+            return [
+                types.Part.from_text(text=f"Image successfully generated and saved to {gs_uri}. Authenticated URL for viewing: {auth_url}"),
+                types.Part.from_uri(file_uri=gs_uri, mime_type="image/png")
+            ]
             
         # Save locally for ADK Web/Cloud Run Memory testing
+        image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
         version = await tool_context.save_artifact(filename=filename, artifact=image_part)
-        return f"Image successfully generated and displayed to the user as '{filename}'. IMPORTANT: Do NOT include any markdown image links like [![image]({filename})] in your response."
+        return [types.Part.from_text(text=f"Image successfully generated and displayed as '{filename}'.")]
     except Exception as e:
-        return {"status": "error", "error": f"Image generated, but failed to save/upload: {str(e)}"}
+        logging.error(f"Image generated, but failed to save/upload: {e}")
+        return [types.Part.from_text(text=f"Image generated, but failed to save/upload: {str(e)}")]
 __TOOLS_EOF__
 
 cat <<__AGENT_EOF__ > adk_agent/mcp_app/agent.py
@@ -1781,6 +1789,11 @@ Help the user answer questions by strategically combining insights from BigQuery
 
 ---------------------------------------------------
 CRITICAL OPERATIONAL RULES:
+- VISUAL ASSETS & IMAGES (STRICT RULE):
+    * You are FORBIDDEN from using standard Markdown image syntax (![]()). It causes fatal security violations in the UI.
+    * Use the following exact template to present images to the user:
+      **Image:** [Brief image description] (Reference: AUTHENTICATED_URL)
+    * Use the authenticated URL returned by the generate_image tool.
 - DATA DISCOVERY & ACCURACY (HIGHEST PRIORITY): 
     * ADAPTIVE DISCOVERY: Use \\\`get_table_info\\\` only when necessary to confirm schemas for a specific query. 
     * DO NOT ASSUME column names (e.g., 'region', 'category', 'prefecture') exist without checking. Hallucinating columns causes fatal errors.
@@ -1831,7 +1844,12 @@ root_agent = LlmAgent(
     model=gemini_model,
     name='root_agent',
     instruction=instruction,
-    tools=[maps_toolset, bigquery_toolset, tools.generate_image]
+    tools=[maps_toolset, bigquery_toolset, tools.generate_image],
+    generate_content_config=types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(
+            include_thoughts=True
+        )
+    )
 )
 
 app = App(
@@ -1884,6 +1902,7 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
   echo "🔧 Preparing Cloud Storage bucket for Agent Engine artifacts: $IMAGE_BUCKET"
   if ! gcloud storage buckets describe "gs://$IMAGE_BUCKET" >/dev/null 2>&1; then
     gcloud storage buckets create "gs://$IMAGE_BUCKET" --project="$PROJECT_ID" --location="US" --uniform-bucket-level-access
+    gcloud storage buckets add-iam-policy-binding "gs://$IMAGE_BUCKET" --member="allUsers" --role="roles/storage.objectViewer"
   fi
   
   # Inject bucket name into environment via .env (for local testing)
