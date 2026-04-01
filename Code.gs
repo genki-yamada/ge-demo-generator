@@ -1789,11 +1789,13 @@ Help the user answer questions by strategically combining insights from BigQuery
 
 ---------------------------------------------------
 CRITICAL OPERATIONAL RULES:
-- VISUAL ASSETS & IMAGES (STRICT RULE):
-    * You are FORBIDDEN from using standard Markdown image syntax (![]()). It causes fatal security violations in the UI.
-    * Use the following exact template to present images to the user:
-      **Image:** [Brief image description] (Reference: AUTHENTICATED_URL)
-    * Use the authenticated URL returned by the generate_image tool.
+- VISUAL ASSETS & IMAGES:
+    * Your output MUST NOT contain any inline images.
+    * You are forbidden from using Markdown's ![alt text](url) syntax.
+    * If you need to reference an image from tools or guidelines, describe it textually and provide the viewing link as a standard hyperlink.
+    * Correct Usage: The official logo is a green apple. Data from: [Cymbal Brand Guidelines](https://storage.googleapis.com/...)
+    * Incorrect Usage: ![Cymbal Logo](https://storage.googleapis.com/...)
+
 - DATA DISCOVERY & ACCURACY (HIGHEST PRIORITY): 
     * ADAPTIVE DISCOVERY: Use \\\`get_table_info\\\` only when necessary to confirm schemas for a specific query. 
     * DO NOT ASSUME column names (e.g., 'region', 'category', 'prefecture') exist without checking. Hallucinating columns causes fatal errors.
@@ -1946,8 +1948,8 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
   
   if [ "$APP_COUNT" = "1" ]; then
     echo "✅ Found exactly one Gemini Enterprise app. Automating registration..."
-    # Y (Agent ID) -> Y (Project ID) -> 1 (App Selection) -> Any subsequent defaults (yes "")
-    (printf "Y\\nY\\n1\\n"; yes "") | make register-gemini-enterprise
+    # Y (Agent ID) -> Y (Project ID) -> Default (App Selection) -> Y (Use this app?) -> Any subsequent defaults (yes "")
+    (printf "Y\\nY\\n\\nY\\n"; yes "") | make register-gemini-enterprise
   else
     if [ "$APP_COUNT" = "0" ]; then
       echo "⚠️ No Gemini Enterprise apps found in 'global', 'us', or 'eu'. You might need to create one first."
