@@ -1118,7 +1118,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
-              <span>Estimated: 1-3 minutes depending on data complexity</span>
+              <span>Estimated: 5-8 minutes depending on data complexity</span>
             </div>
             <button onclick="cancelGeneration()"
               class="px-4 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-[9px] font-bold uppercase tracking-widest transition-all active:scale-95">
@@ -1975,7 +1975,7 @@
           { tag: 'ai', msg: 'Optimizing agent reasoning chains...' },
           { tag: 'success', msg: 'Resource bundling complete.' },
           { tag: 'info', msg: 'Finalizing executable artifact...' },
-          { tag: 'wait', msg: 'Waiting for response... (this may take a minute)' }
+          { tag: 'wait', msg: 'Waiting for response... (this may take 5-8 minutes)' }
         ]
       },
       timer: null,
@@ -2515,7 +2515,7 @@
         s1.classList.add('step-completed');
         s1.querySelector('.step-message').innerText = 'Logic synthesis successful';
         s2.querySelector('.step-icon').className = 'step-icon w-6 h-6 rounded bg-sky-500/20 text-sky-400 flex items-center justify-center text-[10px] font-bold animate-pulse';
-        s2.querySelector('.step-message').innerText = 'Bundling assets... (this may take a minute)';
+        s2.querySelector('.step-message').innerText = 'Bundling assets... (this may take 5-8 minutes)';
       }, 25000); // More realistic ~25s timing
 
       google.script.run

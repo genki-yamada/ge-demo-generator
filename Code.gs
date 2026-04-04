@@ -1067,8 +1067,7 @@ export UV_RETRIES=10
     echo "  • Cloud Run Service: ${dirName} (if deployed)"
     echo "  • Agent Engine (Reasoning Engine) instance: ${dirName}"
     echo "  • Gemini Enterprise registration (App): ${dirName}"
-    SANITIZED_DIR_NAME=$(echo "${dirName}" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]/-/g')
-    echo "  • GCS Bucket for Images: image-$SANITIZED_DIR_NAME-*"
+
     echo "  • Local Directory: ~/${dirName}"
     echo ""
     read -p "Are you sure you want to proceed? (y/n) " -n 1 -r
@@ -1145,9 +1144,7 @@ export UV_RETRIES=10
       done
     done
     
-    echo ""
-    echo "🪣 Deleting GCS Bucket for Images..."
-    gcloud storage rm --recursive "gs://image-$SANITIZED_DIR_NAME-*" --project="$PROJECT_ID" --quiet 2>/dev/null && echo "   ✅ GCS Buckets deleted." || echo "   ⚠️  GCS Buckets not found or already deleted."
+
 
     echo ""
     echo "📂 Deleting local directory and uv cache: ~/${dirName}..."
@@ -1712,30 +1709,13 @@ async def generate_image(prompt: str, tool_context: ToolContext) -> list:
         return [types.Part.from_text(text=f"No image bytes found in the response for prompt: {prompt}")]
     
     try:
-        bucket_name = os.environ.get("LOGS_BUCKET_NAME")
-        if bucket_name:
-            import datetime
-            from google.cloud import storage
-            storage_client = storage.Client()
-            bucket = storage_client.bucket(bucket_name)
-            blob = bucket.blob(f"images/{filename}")
-            blob.upload_from_string(image_bytes, content_type="image/png")
-            gs_uri = f"gs://{bucket_name}/images/{filename}"
-            auth_url = f"https://storage.cloud.google.com/{bucket_name}/images/{filename}"
-            logging.info(f"Image uploaded to {gs_uri} (Public URL: {auth_url})")
-            
-            return [
-                types.Part.from_text(text=f"Image successfully generated and saved to {gs_uri}. Authenticated URL for viewing: {auth_url}"),
-                types.Part.from_uri(file_uri=gs_uri, mime_type="image/png")
-            ]
-            
-        # Save locally for ADK Web/Cloud Run Memory testing
-        image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
-        version = await tool_context.save_artifact(filename=filename, artifact=image_part)
-        return [types.Part.from_text(text=f"Image successfully generated and displayed as '{filename}'.")]
+        # Store image bytes in session state instead of GCS or artifact
+        tool_context.session.state['pending_generated_image'] = image_bytes
+        logging.info(f"Image generated and stored in session state.")
+        return [types.Part.from_text(text=f"Image generated successfully and stored in session state.")]
     except Exception as e:
-        logging.error(f"Image generated, but failed to save/upload: {e}")
-        return [types.Part.from_text(text=f"Image generated, but failed to save/upload: {str(e)}")]
+        logging.error(f"Image generated, but failed to store in session: {e}")
+        return [types.Part.from_text(text=f"Image generated, but failed to store in session: {str(e)}")]
 __TOOLS_EOF__
 
 cat <<__AGENT_EOF__ > adk_agent/mcp_app/agent.py
@@ -1758,6 +1738,8 @@ from google.adk.models import Gemini
 from google.genai import types
 from google.adk.apps.app import App, EventsCompactionConfig
 from google.adk.plugins import ReflectAndRetryToolPlugin, LoggingPlugin
+from google.adk.agents.callback_context import CallbackContext
+from google.adk.models.llm_response import LlmResponse
 
 PROJECT_ID = "$PROJECT_ID"
 
@@ -1842,11 +1824,28 @@ gemini_model = Gemini(
     )
 )
 
+async def inject_image_callback(callback_context: CallbackContext, llm_response: LlmResponse) -> LlmResponse | None:
+    """Injects the generated image into the final LLM response."""
+    if llm_response and llm_response.content and llm_response.content.parts:
+        for part in llm_response.content.parts:
+            if part.function_call:
+                return llm_response
+        
+    image_bytes = callback_context.session.state.pop('pending_generated_image', None)
+    
+    if image_bytes and llm_response and llm_response.content:
+        llm_response.content.parts.append(
+            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+        )
+        
+    return llm_response
+
 root_agent = LlmAgent(
     model=gemini_model,
     name='root_agent',
     instruction=instruction,
     tools=[maps_toolset, bigquery_toolset, tools.generate_image],
+    after_model_callback=inject_image_callback,
     generate_content_config=types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(
             include_thoughts=True
@@ -1898,20 +1897,7 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
   # Replace default name in deploy.py
   perl -pi -e "s/default *= *[\\\"']adk[-_]agent[\\\"']/default=\\\"${dirName}\\\"/" mcp_app/app_utils/deploy.py 2>/dev/null || true
   
-  # Prepare GCS Bucket for Images
-  SANITIZED_DIR_NAME=$(echo "${dirName}" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]/-/g')
-  IMAGE_BUCKET="image-$SANITIZED_DIR_NAME-\${PROJECT_NUMBER:-$RANDOM}"
-  echo "🔧 Preparing Cloud Storage bucket for Agent Engine artifacts: $IMAGE_BUCKET"
-  if ! gcloud storage buckets describe "gs://$IMAGE_BUCKET" >/dev/null 2>&1; then
-    gcloud storage buckets create "gs://$IMAGE_BUCKET" --project="$PROJECT_ID" --location="US" --uniform-bucket-level-access
-    gcloud storage buckets add-iam-policy-binding "gs://$IMAGE_BUCKET" --member="allUsers" --role="roles/storage.objectViewer"
-  fi
-  
-  # Inject bucket name into environment via .env (for local testing)
-  echo "LOGS_BUCKET_NAME=$IMAGE_BUCKET" >> .env
-  
-  # Inject it directly into agent.py so the deployed Agent Engine knows about it
-  echo "os.environ['LOGS_BUCKET_NAME'] = '$IMAGE_BUCKET'" >> mcp_app/agent.py
+
   
   cd ..
 fi
