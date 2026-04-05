@@ -17,7 +17,7 @@ const CONFIG = {
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v7.0-public'
+  APP_VERSION: 'v7.1-public'
 };
 
 
@@ -486,8 +486,9 @@ ${userGoal}
 
 ## Requirements
 - Number of tables: ${options.tableCount}
-- Rows per table: **Target exactly ${maxRows} diverse rows** per table.
-- Columns per table: **Target 6-10 descriptive columns** per table to ensure analytical depth.
+- Table Design & Row Counts (Star Schema Strategy):
+    - **Master/Dimension Tables** (e.g., products, facilities, users): Target **10-15 columns** (high depth with rich attributes) and **30-50 rows** (to manage token limits).
+    - **Transaction/Log Tables** (e.g., sales, access logs, events): Target **4-6 columns** (lean) and target at least 80 rows (up to **${maxRows} rows**).
 ${publicDatasetInfo}
 
 ## REALISTIC DATA SYNTHESIS (CRITICAL)
@@ -520,7 +521,7 @@ Use **actual real-world data** wherever possible to maximize authenticity:
 - **Geographic Locations**: Use real city names, regions, and countries. Match locations to the business context (e.g., major retail markets, manufacturing hubs)
 - **Person Names**: Use culturally appropriate, realistic names for the stated region/language (e.g., Japanese names for Japan-based scenarios)
 - **Numerical Values**: Use realistic price points, quantities, and metrics based on real-world benchmarks (e.g., actual market prices, typical order volumes)
-- **Dates**: Use recent, realistic dates anchored to the referenceDate
+- **Dates**: Use recent, realistic dates anchored to the referenceDate. For `DATE` columns, use `YYYY-MM-DD`. For `TIMESTAMP` columns, use `YYYY-MM-DD HH:MM:SS` format. Do not use plain dates in timestamp columns.
 
 **DO NOT invent fictional brands, fake product names, or placeholder values like "Product A" or "Company XYZ".**
 
@@ -534,6 +535,18 @@ If the business problem mentions a **specific company, organization, or brand**,
 **If you are unsure whether a specific entity belongs to the mentioned company, DO NOT include it. It is better to use fewer but accurate data points than to include factually incorrect associations.**
 
 **If NO specific company/organization is mentioned in the business problem**: Create a COHERENT fictional business context. Choose ONE realistic company profile (industry vertical, size, geography) and generate ALL data as if it belongs to this single hypothetical entity. Ensure internal consistency - all facilities, products, and personnel should belong to the same fictional organization. Do NOT mix data from multiple unrelated real-world companies.
+
+### 6. Audit Seeds
+Inject intentional discrepancies between data silos to enable "Detective/Auditing" demos:
+- **Discrepancy**: A transaction ID or price in the external file (PDF/Excel) should *slightly* mismatch the record in BigQuery (e.g., Invoice says $120, BigQuery says $100).
+- **Rule Violation**: Some records should violate business rules (e.g., discount applied without approval code).
+
+### 7. Visual Seeds
+Incorporate visual attributes into the database schema ONLY when relevant to the business domain and restricted to appropriate asset-focused tables:
+- **Conditional Inclusion**: Only include descriptive visual attributes (e.g., colors, materials, styles) if the business problem involves industries where visual characteristics are key data points (e.g., Fashion, Retail, Product Marketing, Real Estate).
+- **Table Restriction**: Restrict these attributes to dedicated tables such as "Product Catalog", "Asset Master", or "Menu Items". Do NOT include them in transactional or unrelated master tables (e.g., Customer Master, Order Details).
+- **Analytical Context**: Rely primarily on the agent's system instructions to determine visual output styles (e.g., business slides, infographics) rather than forcing visual columns in the database schema.
+
 
 ## Output Format (JSON)
 Output in the following JSON format. Output **pure JSON only without code blocks**.
@@ -565,7 +578,7 @@ Output in the following JSON format. Output **pure JSON only without code blocks
       "csvData": "column1,column2,...\\nvalue1,value2,...\\n..."
     }
   ],
-  "systemInstruction": "Specific instruction for the agent (3-5 sentences). Focus on defining the persona and domain expertise. Instruct the agent to wait for user input before acting, but emphasize autonomous persistence in error recovery once a goal is assigned.",
+  "systemInstruction": "Specific instruction for the agent (3-5 sentences). 1. Define persona/expertise. 2. **EMPHASIZE WOW FACTORS**: Instruct the agent to perform **Cross-silo reasoning, Proactive investigation, and Actionable output generation** (e.g., drafting emails, SQL patches). 3. **VISUALIZATION**: Instruct the agent to use the 'generate_image' tool to create a visual representation of its findings and solutions when providing a final answer to the user's inquiry. **This visual MUST be in the style of a professional business document or slide (e.g., an Executive Summary card, a high-level business infographic, or a stylized data summary document) that summarizes the insights. The agent MUST use the following style elements by default: 'Professional business presentation slide', 'Consulting firm style' (McKinsey, BCG style), 'Clean layout', 'Structured design', 'Executive summary at the top', 'Data visualization', 'Infographic charts', 'Bullet points', 'Flowchart', 'Corporate blue and gray palette', 'Minimalist color scheme', 'High resolution', 'Crisp text placeholders', and 'Modern typography'. The agent MUST NOT generate simple photos or renders of the products themselves.** **CRITICAL**: The agent MUST ONLY generate these visuals for actual result outputs that answer the inquiry, and NOT for follow-up questions, clarifications, or intermediate responses. 4. Instruct to wait for user input before acting, but be persistent in error recovery. 5. **TRANSPARENCY & GROUNDING (CRITICAL)**: Instruct the agent to be highly transparent about its reasoning, explicitly mentioning which tables and files it is consulting and what specific values it found, to ensure the user can trace its logic back to the source data and avoid the perception of hallucination.",
   "referenceDate": "YYYY-MM-DD",
   "publicDatasetId": "bigquery-public-data.dataset.table",
   "oneSentenceSummary": "A concise, professional one-sentence summary of the business challenge and the generated solution.",
@@ -577,7 +590,7 @@ Output in the following JSON format. Output **pure JSON only without code blocks
   "demoGuide": [
     {
       "title": "Descriptive title of the analysis (e.g., 'Geospatial Root Cause Analysis')",
-      "prompt": "Full prompt for the user to copy. Rules: 1. Do NOT mention specific table or column names (the agent must find them). 2. Present as a complex business question. 3. Synergize system data analysis with location/geospatial capabilities if applicable. 4. NEVER use product names like 'BigQuery', 'Google Maps', 'Looker' in the prompt. Use generic terms like 'the system records', 'the map data', 'historical logs'. If a file is required, use generic phrasing ('the uploaded file').",
+      "prompt": "Full prompt for the user to copy. Rules: 1. Do NOT mention specific table or column names (the agent must find them). 2. Present as a complex business question. 3. Synergize system data analysis with location/geospatial capabilities if applicable. 4. NEVER use product names like 'BigQuery', 'Google Maps', 'Looker' in the prompt. Use generic terms like 'the system records', 'the map data', 'historical logs'. If a file is required, use generic phrasing ('the uploaded file'). 5. **PROMPT SOPHISTICATION**: Prompts must not be direct lookups. They must be open-ended, diagnostic, or strategic requiring multi-hop reasoning.",
       "requiredFileId": "file1 or empty",
       "tags": ["Select tags like 'Finance', 'Geospatial', 'Reconciliation'"]
     }
@@ -609,6 +622,8 @@ Output in the following JSON format. Output **pure JSON only without code blocks
     4. **NO TABLES/COLUMNS**: Do NOT mention 'production_batches', 'port_id', etc. in the prompt text.
     5. **GEOSPATIAL SYNERGY**: At least one prompt MUST require the agent to use BOTH system data (for historical metrics) and location/map data (for travel times, routes, or place details) to answer. Use generic terms like 'location data' or 'map information' instead of 'Google Maps'.
     5. **PROBLEM-CENTRIC**: Focus on high-level business goals (e.g., "Identify the financial impact of logistics delays in coastal regions and propose an optimized route for the highest-value shipments").
+- **DATA STORYTELLING & ANOMALIES (CRITICAL)**: You MUST seed at least one complex business anomaly across the tables. For example, a specific product category having a high return rate only in a specific region during a specific week, which correlates with a delivery carrier listed in the external log file. Do not make it obvious; the agent should need to join at least two tables and analyze trends to find it.
+- **FACTOR ADHERENCE (CRITICAL)**: The generated CSV data MUST strictly adhere to the patterns described in \`appliedFactors\` in your JSON response. If you list 'Temporal Pattern: Weekday lunch surge', the timestamped transaction data MUST show higher volumes during those hours.
 - **MAXIMUM DATA (CRITICAL)**: You MUST generate **exactly ${maxRows} rows** for every table. Do NOT use "etc.", "...", or any placeholder to truncate data. This is a technical requirement for a simulation.
 - **RELATIONAL INTEGRITY & NAMING**: 
     1. **Primary/Foreign Keys MUST follow the format '[entity]_id'** (e.g., 'talent_id', 'theater_id').
@@ -848,8 +863,13 @@ function validateAndRepairValue(value, type, columnName, rowIndex) {
       if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(trimmedVal)) {
         return { value: trimmedVal, repaired: false };
       }
-      // Generate fallback as date
-      return { value: generateDefaultValue('DATE', columnName, rowIndex), repaired: true };
+      // If it's a date, convert to timestamp
+      const tsDateMatch = trimmedVal.match(/^(\d{4}-\d{2}-\d{2})$/);
+      if (tsDateMatch) {
+        return { value: `${tsDateMatch[1]} 00:00:00 UTC`, repaired: true };
+      }
+      // Generate fallback as timestamp
+      return { value: generateDefaultValue('TIMESTAMP', columnName, rowIndex), repaired: true };
       
     default:
       // STRING type - accept as-is
