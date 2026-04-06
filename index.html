@@ -547,7 +547,7 @@
           </a>
           <a href="#section-step2" class="nav-item" data-section="section-step2">
             <div class="nav-dot"></div>
-            Step 2: Customize
+            Step 2: Review
           </a>
           <a href="#section-step3" class="nav-item" data-section="section-step3">
             <div class="nav-dot"></div>
@@ -557,10 +557,7 @@
             <div class="nav-dot"></div>
             Step 4: Run Demo
           </a>
-          <a href="#section-step5" class="nav-item" data-section="section-step5">
-            <div class="nav-dot"></div>
-            Step 5: Deploy to Gemini Enterprise
-          </a>
+
           <div class="px-3 mt-8 mb-4">
             <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Support</h3>
           </div>
@@ -1177,13 +1174,7 @@
                 <p class="text-xs text-gray-400">Once the script completes, launch the agent UI from Cloud Shell and use
                   the prompts in <b>Step 4</b>.</p>
               </div>
-              <div class="roadmap-step">
-                <div class="roadmap-dot"></div>
-                <h4 class="text-sm font-bold text-gray-200 uppercase tracking-tight mb-1">Step 5: Deploy to Gemini
-                  Enterprise</h4>
-                <p class="text-xs text-gray-400">Once verified, scale your demo by deploying to Vertex AI Agent Engine.
-                </p>
-              </div>
+
             </div>
           </div>
 
@@ -1192,7 +1183,7 @@
             <div class="flex items-center gap-3 mb-8">
               <span
                 class="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500 text-white font-bold shadow-lg shadow-sky-500/40">2</span>
-              <h2 class="text-xl font-bold text-white uppercase tracking-tight">Step 2: Review & Customize Assets</h2>
+              <h2 class="text-xl font-bold text-white uppercase tracking-tight">Step 2: Review</h2>
             </div>
 
             <!-- System Instruction -->
@@ -1486,8 +1477,9 @@
                       <h5 class="text-[11px] font-bold text-gray-300 uppercase tracking-wide">Local Host</h5>
                     </div>
                     <p class="text-[11px] text-gray-400 leading-relaxed">
-                      Runs the agent server locally. If you choose this, proceed to the <span
-                        class="text-emerald-400 font-bold">Next Step: Open Local Server</span> section below.
+                      Runs the agent server locally. When the script completes, click the
+                      <code class="text-emerald-300 font-mono bg-black/30 px-1.5 py-0.5 rounded">http://127.0.0.1:[PORT]</code>
+                      link shown in your terminal to open the UI.
                     </p>
                   </div>
                   <!-- Strategy 2 -->
@@ -1503,41 +1495,29 @@
                     </p>
                   </div>
                   <!-- Strategy 3 -->
-                  <div
-                    class="bg-black/40 border border-white/5 rounded-xl p-4 hover:border-purple-500/30 transition-all shadow-lg flex flex-col gap-2">
+                  <div class="bg-black/40 border border-white/5 rounded-xl p-3 hover:border-purple-500/30 transition-all shadow-lg flex flex-col gap-1">
                     <div class="flex items-center gap-2">
-                      <span
-                        class="w-5 h-5 rounded-md bg-purple-500/10 text-purple-400 flex items-center justify-center text-[10px] font-bold">3</span>
+                      <span class="w-5 h-5 rounded-md bg-purple-500/10 text-purple-400 flex items-center justify-center text-[10px] font-bold">3</span>
                       <h5 class="text-[11px] font-bold text-gray-300 uppercase tracking-wide">Gemini Enterprise</h5>
                     </div>
                     <p class="text-[11px] text-gray-400 leading-relaxed">
-                      Deploys to Reasoning Engine and registers it. If chosen, skip to <span
-                        class="text-purple-400 font-bold">Step 5: Deploy to Gemini Enterprise</span>.
+                      Deploys to Reasoning Engine. Requires a prerequisite instance.
                     </p>
+                    <p class="text-[10px] text-purple-300/80 leading-relaxed mt-1">
+                      Must ensure an instance is created in your project <b>before</b> running the script.
+                    </p>
+                    <a href="https://console.cloud.google.com/gemini-enterprise/apps" id="geminiEnterpriseLink" target="_blank" rel="noopener noreferrer" class="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/50 hover:bg-purple-500 text-white font-bold rounded-lg text-[9px] transition-all border border-purple-400/20 w-fit">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                      </svg>
+                      Create Instance
+                    </a>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Next Step: Open Local Server Banner -->
-            <div class="mt-8 p-5 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex items-start gap-4">
-              <div class="text-emerald-400 mt-0.5">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6">
-                  </path>
-                </svg>
-              </div>
-              <div class="flex-1">
-                <h4 class="text-[12px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Next Step: Open Local
-                  Server</h4>
-                <p class="text-[13px] text-emerald-300/80 leading-relaxed">
-                  When the script completes, click the
-                  <code
-                    class="text-emerald-300 font-mono bg-black/30 px-1.5 py-0.5 rounded">http://127.0.0.1:[PORT]</code>
-                  link shown in your terminal to open the UI.
-                </p>
-              </div>
-            </div>
+
           </div>
         </section>
 
@@ -1755,102 +1735,7 @@
           </div>
         </div>
 
-        <!-- Step 5: Agent Engine & Gemini Enterprise Deployment (Optional) -->
-        <section id="section-step5"
-          class="hidden glass rounded-3xl p-6 lg:p-8 mb-10 fade-in shadow-xl ring-2 ring-emerald-500/10">
-          <div class="flex items-center gap-3 mb-8">
-            <span
-              class="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-500/40 text-sm">5</span>
-            <div>
-              <div class="flex items-center gap-2">
-                <h2 class="text-xl font-bold text-white uppercase tracking-tight">Step 5: Deploy to Gemini Enterprise
-                </h2>
-                <span class="tooltip-container">
-                  <svg class="w-4 h-4 text-emerald-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <span class="tooltip-content">
-                    <strong>Vertex AI Agent Engine</strong> is the scalable hosting environment for Gemini
-                    Enterprise
-                    agents, providing security and global endpoints.
-                  </span>
-                </span>
-              </div>
-              <p class="text-[11px] text-gray-500">Scale your demo by deploying to Vertex AI Agent Engine and register
-                it to Gemini Enterprise</p>
-            </div>
-          </div>
 
-          <div class="space-y-6">
-            <!-- Step 1: Create Instance -->
-            <div
-              class="p-6 bg-white/5 rounded-3xl border border-white/10 group hover:border-purple-500/30 transition-all space-y-4 shadow-xl shadow-purple-900/5">
-              <div class="flex items-start gap-4">
-                <div
-                  class="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/20 text-purple-400 font-bold text-xs border border-purple-500/30 shrink-0 mt-1">
-                  1</div>
-                <div class="flex-1 space-y-4">
-                  <div>
-                    <h3 class="text-xs font-bold text-gray-200 uppercase tracking-widest mb-2">Create Gemini Enterprise
-                      Instance
-                    </h3>
-                    <p class="text-[12px] text-gray-400 leading-relaxed">
-                      Ensure a <b>Gemini Enterprise instance</b> has been created in your project. Click the button
-                      below to open
-                      the console and initialize the product.
-                    </p>
-                  </div>
-                  <a href="https://console.cloud.google.com/gemini-enterprise/apps" id="geminiEnterpriseLink"
-                    target="_blank" rel="noopener noreferrer"
-                    class="inline-flex items-center gap-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-[11px] transition-all shadow-lg uppercase tracking-wider group-hover:scale-105 active:scale-95 border border-purple-400/30">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                    </svg>
-                    Deploy Gemini Enterprise
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <!-- Step 2: Run Setup Script -->
-            <div
-              class="p-6 bg-white/5 rounded-3xl border border-white/10 group hover:border-emerald-500/30 transition-all space-y-4 shadow-xl shadow-emerald-900/5">
-              <div class="flex items-start gap-4">
-                <div
-                  class="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 font-bold text-xs border border-emerald-500/30 shrink-0 mt-1">
-                  2</div>
-                <div class="flex-1 space-y-4">
-                  <div>
-                    <h3 class="text-xs font-bold text-gray-200 uppercase tracking-widest mb-2">Execute Deployment Script
-                    </h3>
-                    <p class="text-[12px] text-gray-400 leading-relaxed">
-                      Navigate to your home directory and run the setup script you downloaded in step 3 using the
-                      command below.
-                      Select the <b>3rd deployment strategy</b> (Automated Agent Engine Deployment) when prompted.
-                    </p>
-                  </div>
-
-                  <div class="relative group min-w-0">
-                    <code id="step5SetupCommandBlock"
-                      class="block bg-black/60 rounded-xl p-5 text-[12px] font-mono text-emerald-400 border border-emerald-500/20 overflow-x-auto whitespace-pre-wrap break-all leading-relaxed pr-14 tracking-tight">cd ~ && bash setup.sh</code>
-                    <button onclick="copyToClipboard('cd ~ && bash ' + currentScriptFilename)"
-                      class="absolute top-3 right-3 p-2.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all shadow-xl border border-emerald-500/30">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
-                        </path>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-
-        </section>
       </div>
     </main>
 
@@ -2066,7 +1951,6 @@
       // Hide result sections
       document.getElementById('resultSection').classList.add('hidden');
       document.getElementById('section-step4').classList.add('hidden');
-      document.getElementById('section-step5').classList.add('hidden');
       document.getElementById('errorSection').classList.add('hidden');
       document.getElementById('stepsSection').classList.add('hidden');
 
@@ -2490,7 +2374,6 @@
       document.getElementById('resultSection').classList.add('hidden');
       document.getElementById('errorSection').classList.add('hidden');
       document.getElementById('section-step4').classList.add('hidden');
-      document.getElementById('section-step5').classList.add('hidden');
 
       // Reset progress UI
       const s1 = document.getElementById('progress-step-1');
@@ -2565,12 +2448,10 @@
     function showFinalResult(res) {
       document.getElementById('resultSection').classList.remove('hidden');
       document.getElementById('section-step4').classList.remove('hidden');
-      document.getElementById('section-step5').classList.remove('hidden');
       const scriptFilename = `setup-${res.dirName || 'demo'}.sh`;
       document.getElementById('setupCommand').innerText = `cat <<'__SETUP_SH__' > ${scriptFilename}\n${res.setupScript}\n__SETUP_SH__\nbash ${scriptFilename}`;
       currentSetupScript = res.setupScript;
       currentScriptFilename = scriptFilename;
-      document.getElementById('step5SetupCommandBlock').innerText = `cd ~ && bash ${scriptFilename}`;
       document.getElementById('systemInstruction').value = res.systemInstruction;
 
       if (res.userGoal) {
@@ -3100,8 +2981,6 @@
         .withSuccessHandler(newScript => {
           currentData.setupScript = newScript;
           document.getElementById('setupCommand').innerText = `cat <<'__SETUP_SH__' > ${currentScriptFilename}\n${newScript}\n__SETUP_SH__\nbash ${currentScriptFilename}`;
-
-          document.getElementById('step5SetupCommandBlock').innerText = `cd ~ && bash ${currentScriptFilename}`;
         })
         .updateSystemInstruction(currentData.setupScript, instr);
     }

@@ -17,7 +17,7 @@ const CONFIG = {
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v7.1-public'
+  APP_VERSION: 'v7.2-public'
 };
 
 
@@ -521,7 +521,7 @@ Use **actual real-world data** wherever possible to maximize authenticity:
 - **Geographic Locations**: Use real city names, regions, and countries. Match locations to the business context (e.g., major retail markets, manufacturing hubs)
 - **Person Names**: Use culturally appropriate, realistic names for the stated region/language (e.g., Japanese names for Japan-based scenarios)
 - **Numerical Values**: Use realistic price points, quantities, and metrics based on real-world benchmarks (e.g., actual market prices, typical order volumes)
-- **Dates**: Use recent, realistic dates anchored to the referenceDate. For `DATE` columns, use `YYYY-MM-DD`. For `TIMESTAMP` columns, use `YYYY-MM-DD HH:MM:SS` format. Do not use plain dates in timestamp columns.
+- **Dates**: Use recent, realistic dates anchored to the referenceDate. For \`DATE\` columns, use \`YYYY-MM-DD\`. For \`TIMESTAMP\` columns, use \`YYYY-MM-DD HH:MM:SS\` format. Do not use plain dates in timestamp columns.
 
 **DO NOT invent fictional brands, fake product names, or placeholder values like "Product A" or "Company XYZ".**
 
