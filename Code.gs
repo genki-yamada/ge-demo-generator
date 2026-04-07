@@ -156,6 +156,7 @@ function logUsageToSheet(logEntry) {
     console.log('[LOGGING] Logging to sheet tab:', sheet.getName());
     
     const timestamp = new Date().toISOString();
+    const userEmail = Session.getActiveUser().getEmail();
     
     const durationSecs = Math.floor(logEntry.durationMs / 1000);
     const mins = Math.floor(durationSecs / 60);
@@ -164,6 +165,7 @@ function logUsageToSheet(logEntry) {
 
     const rowData = [
       timestamp,
+      userEmail,
       logEntry.datasetId || 'N/A',
       logEntry.status || 'N/A',
       durationStr,
@@ -176,10 +178,58 @@ function logUsageToSheet(logEntry) {
 
     // If empty sheet, write header
     if (sheet.getLastRow() === 0) {
-      sheet.appendRow(['Timestamp', 'Dataset ID', 'Status', 'Duration', 'Req. Rows', 'Req. Tables', 'Public Dataset', 'Table Names', 'Error Class']);
+      sheet.appendRow(['Timestamp', 'User Email', 'Dataset ID', 'Status', 'Duration', 'Req. Rows', 'Req. Tables', 'Public Dataset', 'Table Names', 'Error Class']);
     }
     
     sheet.appendRow(rowData);
+    SpreadsheetApp.flush();
+    
+    // Convert User Email cell to People Smart Chip using Advanced Service
+    try {
+      const lastRow = sheet.getLastRow();
+      const sheetId = sheet.getSheetId();
+      const spreadsheetId = ss.getId();
+      
+      const requests = [
+        {
+          updateCells: {
+            range: {
+              sheetId: sheetId,
+              startRowIndex: lastRow - 1,
+              endRowIndex: lastRow,
+              startColumnIndex: 1,
+              endColumnIndex: 2
+            },
+            rows: [
+              {
+                values: [
+                  {
+                    userEnteredValue: { stringValue: "@" },
+                    chipRuns: [
+                      {
+                        startIndex: 0,
+                        chip: {
+                          personProperties: {
+                            email: userEmail,
+                            displayFormat: "EMAIL"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            fields: "userEnteredValue,chipRuns"
+          }
+        }
+      ];
+      
+      Sheets.Spreadsheets.batchUpdate({ requests: requests }, spreadsheetId);
+    } catch (chipErr) {
+      console.warn('⚠️ Could not insert People Chip via Advanced Service:', chipErr.message);
+    }
+    
     console.log('[LOGGING] Successfully logged usage to sheet. Data row:', rowData);
   } catch (e) {
     console.error('[LOGGING] Failed to log usage to sheet:', e.message);
