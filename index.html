@@ -5327,61 +5327,6 @@
       return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
 
-    // --- Activity Ticker (Header) ---
-    let tickerInterval = null;
-    let tickerIndex = 0;
-    let tickerPaused = false;
-
-    function renderActivityTicker() {
-      const stats = window._usageStats;
-      const wrapper = document.getElementById('activityTicker');
-      if (!wrapper) return;
-      if (!stats || !stats.recentActivity || stats.recentActivity.length === 0) {
-        wrapper.classList.add('hidden');
-        return;
-      }
-
-      wrapper.classList.remove('hidden');
-      // Show the parent activity module container
-      const module = document.getElementById('activityModule');
-      if (module) module.classList.remove('hidden');
-      if (!ticker) return;
-
-      const items = stats.recentActivity.slice(0, 10);
-      ticker.innerHTML = items.map((item, i) => {
-        const relTime = getRelativeTime(new Date(item.timestamp));
-        const goal = (item.userGoal || 'Demo').length > 70
-          ? item.userGoal.substring(0, 70) + '…'
-          : item.userGoal;
-        const locationLabel = item.location
-          ? `Someone in <span class="text-white font-medium">${item.location}</span>`
-          : 'A teammate';
-          <span class="text-[11px] text-gray-400">${locationLabel} generated <span class="text-gray-200 font-medium">${goal}</span></span>
-          <span class="text-[10px] text-gray-500 shrink-0">· ${relTime}</span>
-        </div>`;
-      }).join('');
-
-      // Start rotation
-      tickerIndex = 0;
-      if (tickerInterval) clearInterval(tickerInterval);
-      if (items.length > 1) {
-        tickerInterval = setInterval(() => {
-          if (tickerPaused) return;
-          allItems.forEach(el => el.classList.remove('active'));
-          tickerIndex = (tickerIndex + 1) % allItems.length;
-          allItems[tickerIndex].classList.add('active');
-        }, 5000);
-      }
-
-      // Pause on hover
-      wrapper.addEventListener('mouseenter', () => { tickerPaused = true; });
-      wrapper.addEventListener('mouseleave', () => { tickerPaused = false; });
-
-      // Update Community tab badge — count only activities from last 24h
-      const now24h = Date.now() - 24 * 60 * 60 * 1000;
-      const recentCount = items.filter(a => new Date(a.timestamp).getTime() > now24h).length;
-    }
-
 
     function copyShareLink() {
       const url = 'https://goo.gle/ge-demo-gen';
