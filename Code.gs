@@ -237,6 +237,16 @@ function initializeProject(projectId, logSheetUrl) {
   console.log('Project initialized. Properties updated: ' + Object.keys(newProps).join(', '));
   return 'Initialization complete. Properties set/merged: ' + Object.keys(newProps).join(', ');
 }
+
+/**
+ * Returns a Data Profile configuration that holistically controls
+ * table count, row density, and column strategy.
+ * @param {string} profileId - 'deep', 'standard', or 'wide'
+ * @returns {Object} profile configuration
+ * @private
+ */
+function getDataProfile_(profileId) {
+  const profiles = {
     deep: {
       id: 'deep',
       label: 'Deep Analysis',
