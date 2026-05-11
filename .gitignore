@@ -1,5 +1,6 @@
 # Apps Script / Clasp
 .clasp.json
+.clasp-*.json
 clasp.json
 base.clasp.json
 
@@ -24,9 +25,6 @@ Thumbs.db
 # Logs
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # IDEs and Editors
 .idea/
@@ -37,11 +35,6 @@ yarn-error.log*
 .settings/
 .classpath
 
-# Environment and Secrets
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.nvm/
-
+# Test and debug scripts
+test_*.sh
+test_*.py

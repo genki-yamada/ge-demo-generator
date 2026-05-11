@@ -41,7 +41,7 @@ The Demo Generator has synthesized a custom setup script for you. This script is
 
 Once the setup script from Step 1 finishes, it will display the exact command to launch your agent. **Please follow the instructions shown in your terminal.**
 
-### � Reference: How to launch manually
+### 📎 Reference: How to launch manually
 
 If you need to restart the agent or navigate manually, use these commands:
 
@@ -71,7 +71,19 @@ Once you see `Uvicorn running on http://127.0.0.1:8000`:
 
 1. Click the **Web Preview** button at the top right of the Cloud Shell window.
 2. Select **Preview on port 8000**.
-3. In the new tab, select the **mcp_app** and start a new session.
+3. In the new tab, select the **app** and start a new session.
+
+#### 💡 Real-Time Data Viewer Application
+If your setup included the Bento Grid operations console, you can inspect Firestore updates in real time:
+1. Open a new Cloud Shell terminal.
+2. Run the following inside the synthesized directory:
+   ```bash
+   cd viewer_app
+   # Start on alternative port, e.g., 8080
+   python3 -m http.server 8080
+   ```
+3. Use the Web Preview button to check **port 8080** to launch the dashboard console.
+
 
 ---
 
@@ -82,13 +94,15 @@ Use the **Step 4: Run Live Demo** section in your Demo Generator for tailored pr
 **Example Prompts:**
 - "Analyze sales trends using the BigQuery tool."
 - "Correlate demographic data with real-world locations via Google Maps."
-- "Predict future demand based on historical data."
+- "Update maintenance status on item #104 and post verification logs into Firestore."
+- "Approve the flagged safety incident and update the operations grid instantly."
+
 
 ---
 
-## Step 5: (Optional) Go Production
+## Step 5: (Optional) Deploy to Gemini Enterprise
 
-Ready to take your demo further? Deploy it to **Vertex AI Agent Engine** and register it as an official agent within **Gemini Enterprise**.
+Ready to take your demo further? Deploy it to **Cloud Run** and register it as an official agent within **Gemini Enterprise**.
 
 ### 1. Enhance Your Project
 Run this in your agent root directory (`adk_agent`):
@@ -101,10 +115,10 @@ uvx agent-starter-pack enhance
 > Continue with enhancement? [Y/n]: **Y**  
 > Select base template (1): **[Enter]**  
 > Select agent directory (1): **[Enter]**  
-> select a deployment target: **1 (agent_engine)**  
+> select a deployment target: **1 (cloud_run)**  
 > select a CI/CD runner: **1 (simple)**  
 
-### 2. Deploy to Engine
+### 2. Deploy to Cloud Run
 Once configured, copy and run the generated command. Use the **Update Existing** toggle if you wish to overwrite an existing agent resource, or **Create New** for a fresh deployment.
 
 ```bash
@@ -113,13 +127,13 @@ Once configured, copy and run the generated command. Use the **Update Existing**
 ```
 
 ### 3. Grant Execution Permissions
-If your agent encounters a 403 error when calling BigQuery, run these commands to grant the necessary roles to the Agent Engine service account:
+If your agent encounters a 403 error when calling BigQuery, run these commands to grant the necessary roles to the Cloud Run service account:
 
 ```bash
 PI=$(gcloud config get-value project)
 PN=$(gcloud projects list --filter="projectId:$PI" --format="value(projectNumber)")
-SA="service-$PN@gcp-sa-aiplatform-re.iam.gserviceaccount.com"
-# Grant roles to Reasoning Engine Service Agent
+SA="$PN-compute@developer.gserviceaccount.com"
+# Grant roles to Cloud Run Service Agent
 for ROLE in "roles/mcp.toolUser" "roles/bigquery.jobUser" "roles/bigquery.dataViewer" "roles/serviceusage.serviceUsageConsumer"; do
   gcloud projects add-iam-policy-binding $PI --member="serviceAccount:$SA" --role="$ROLE" --condition=None
 done
@@ -132,28 +146,42 @@ make register-gemini-enterprise
 
 ---
 
-## 🛠️ Troubleshooting: Reliability in Agent Engine
+## 🛠️ Troubleshooting: Reliability in Cloud Run
 
-If your agent occasionally stops responding or feels slow in Agent Engine:
+If your agent occasionally stops responding or feels slow in Cloud Run:
 
 ### 1. Handling "Cold Starts"
-Vertex AI Agent Engine (Reasoning Engine) may spin down containers after inactivity. The first request after a break might take longer as it loads heavy libraries (like `pandas` or `scikit-learn`). 
+Cloud Run may spin down instances after inactivity (cold starts). The first request after a break might take longer as it loads heavy libraries (like `pandas` or `scikit-learn`). 
 - **Tip**: Sending the same prompt again usually works as the container is then "warm."
-- **Solution**: For production, consider using a warmer service or reducing the number of heavy dependencies in your `requirements.txt`.
+- **Solution**: For scaled usage, consider using a warmer service or reducing the number of heavy dependencies in your `requirements.txt`.
 
 ### 2. BigQuery Token Lags
 Retrieving fresh auth tokens for BigQuery can sometimes add latency.
 - **Fix Applied**: Our generated `tools.py` now includes stability patches that cache tokens for 30 minutes to ensure smooth tool execution.
 
 ### 3. Execution Timeouts
-The default timeout for Agent Engine is 60 seconds. If your agent performs many sequential tool calls, it might hit this limit.
-- **Optimization**: Use `gemini-3-flash-preview` for high-speed reasoning, and try to keep tool queries efficient.
+The default timeout for Cloud Run is 60 seconds. If your agent performs many sequential tool calls, it might hit this limit.
+- **Optimization**: Use `gemini-3.1-pro-preview` for high-speed reasoning, and try to keep tool queries efficient.
 
 ### 4. 403 Insufficient Scope Errors
 If you see "Request had insufficient authentication scopes" in the logs:
 - **Solution**: Refresh your local credentials in Cloud Shell with mandatory scopes (Note: `maps-platform` is NOT a valid standalone scope; use `cloud-platform` instead):
   `gcloud auth application-default login --scopes="https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/bigquery,openid,https://www.googleapis.com/auth/userinfo.email"`
 - **Required Action**: After running the command, you MUST **restart the agent** (Ctrl+C and run the launch command again) to clear the cached tokens.
+
+### 5. Cloud Run Deployment Failures (Org Policies)
+If the setup fails to provision the Data Viewer application or the main Agent service:
+- **Cause**: Many enterprise GCP Projects restrict unauthenticated endpoints via organization policies (like `constraints/iam.allowedPolicyMemberDomains`).
+- **Mitigation**: The setup script is designed to print a warning and proceed even if the **Data Viewer** deployment fails due to ingress policies. You can still preview the multi-agent setup locally using `adk web` (Step 3).
+
+### 6. 403 Permission Denied on Tool Invocation
+If sub-agents fail to modify Firestore or pull from BigQuery:
+- **Action**: Ensure the default Cloud Run Compute Service Account (`[PROJECT_NUMBER]-compute@developer.gserviceaccount.com`) has been successfully provisioned with the following roles:
+  - `roles/mcp.toolUser`
+  - `roles/datastore.user` (For Firestore)
+  - `roles/bigquery.dataViewer` & `roles/bigquery.jobUser`
+  - `roles/aiplatform.user`
+
 
 ---
 
@@ -176,4 +204,4 @@ This will remove:
 ---
 
 ### Need Help?
-Contact [ryotat@google.com](mailto:ryotat@google.com) or refer to the [LaunchMyBakery](https://github.com/google/mcp/tree/main/examples/launchmybakery) documentation.
+Refer to the [GitHub Repository](https://github.com/ryotat7/ge-demo-generator) for documentation and architecture details.
