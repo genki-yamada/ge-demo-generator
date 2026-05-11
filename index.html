@@ -5384,7 +5384,7 @@
 
 
     function copyShareLink() {
-      const url = 'https://goto.google.com/ge-demo-gen';
+      const url = 'https://goo.gle/ge-demo-gen';
       navigator.clipboard.writeText(url).then(() => {
         const btn = document.getElementById('shareLinkBtn');
         const originalHTML = btn.innerHTML;
@@ -5399,7 +5399,7 @@
           btn.classList.remove('border-emerald-500/40');
         }, 2000);
       }).catch(() => {
-        window.showToast('Failed to copy. URL: goto.google.com/ge-demo-gen');
+        window.showToast('Failed to copy. URL: goo.gle/ge-demo-gen');
       });
     }
 
