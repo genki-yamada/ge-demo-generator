@@ -8068,49 +8068,69 @@ Output pure JSON only (no code blocks, no markdown):
 }
 
 /**
- * Merges a template scenario with company-specific research to create a customized goal.
- * @param {string} templateGoal - The original template scenario text
- * @param {Object} companyInfo - Research results from researchCompanyByDomain()
- * @returns {Object} { success: boolean, mergedGoal: string }
+ * Regenerates a business scenario (suggestedGoal) based on user-selected workflows.
+ * Called when the user customizes the workflow selection after domain research,
+ * ensuring the Business Scenario section stays consistent with the selected workflows.
+ * @param {Object} companyInfo - { companyName, industry, companySummary }
+ * @param {Array} selectedWorkflows - [{ name, reason }, ...]
+ * @returns {Object} { success: boolean, goal: string, error?: string }
  */
-function mergeTemplateWithCompanyInfo(templateGoal, companyInfo) {
-  if (!templateGoal || !companyInfo) {
-    return { success: false, error: 'Both template and company info are required.' };
+function regenerateGoalForWorkflows(companyInfo, selectedWorkflows) {
+  if (!companyInfo || !selectedWorkflows || selectedWorkflows.length === 0) {
+    return { success: false, error: 'Company info and at least one workflow are required.' };
   }
 
-  const prompt = `You are a business consultant specializing in AI agent demonstrations.
+  const responseLang = /[\u3000-\u9fff\uff00-\uffef]/.test(companyInfo.companySummary) ? '日本語' : 'English';
 
-Your task is to combine a TEMPLATE SCENARIO with REAL COMPANY INFORMATION to create a highly customized, realistic business scenario.
+  const prompt = `You are a business analyst creating an AI agent demo scenario.
 
-## Template Scenario
-${templateGoal}
+Given the company and selected workflows below, write a detailed business scenario (3-5 sentences) suitable as input for an AI agent demo generator.
 
-## Company Information
-- Company: ${companyInfo.companyName}
+## Company
+- Name: ${companyInfo.companyName}
 - Industry: ${companyInfo.industry}
 - Overview: ${companyInfo.companySummary}
-- Challenges: ${(companyInfo.businessChallenges || []).join('; ')}
-- Automatable Workflows: ${(companyInfo.workflows || []).filter(w => w.automatable).map(w => w.name).join(', ')}
+
+## Selected Workflows for AI Agent Automation
+${selectedWorkflows.map(w => `- ${w.name}: ${w.reason}`).join('\n')}
 
 ## Instructions
-1. Adapt the template scenario to this specific company's context, challenges, and workflows.
-2. Replace generic references with the actual company name, products, and operational details.
-3. Maintain the core agent-automation theme from the template but ground it in the company's real business context.
-4. The output should read as a natural, specific business problem description — NOT as a merged document.
-5. Keep the output to 3-5 sentences, written in the same language as the company information above.
-6. Focus on the theme of "Autonomous Action and Core System Optimization" — the agent should detect events, analyze data, and actively update systems.
+- Reference the actual company name and industry
+- Focus ONLY on the selected workflows above — do NOT introduce unrelated workflows
+- Describe a specific, actionable business problem that an AI agent could solve
+- Include realistic operational context (data sources, stakeholders, KPIs)
+- Theme: "Autonomous Action and Core System Optimization" — the agent should detect events, analyze data, and actively update core systems
+- Write entirely in ${responseLang}
 
-Output ONLY the merged scenario text. No JSON, no code blocks, no explanations.`;
+Output ONLY the scenario text. No JSON, no code blocks, no explanations.`;
 
   try {
-    const mergedGoal = callVertexAI(prompt);
-    return {
-      success: true,
-      mergedGoal: mergedGoal.trim()
+    let location = CONFIG.LOCATION || 'global';
+    const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
+    const model = 'gemini-3.1-flash-lite';
+    const url = `https://${host}/v1/projects/${CONFIG.PROJECT_ID}/locations/${location}/publishers/google/models/${model}:generateContent`;
+
+    const payload = {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
     };
+    const response = UrlFetchApp.fetch(url, {
+      method: 'POST',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    if (response.getResponseCode() !== 200) {
+      throw new Error('AI Error: ' + response.getContentText().substring(0, 200));
+    }
+
+    const text = JSON.parse(response.getContentText()).candidates[0].content.parts[0].text.trim();
+    return { success: true, goal: text };
   } catch (e) {
-    console.error('[MERGE] Error:', e.message);
-    return { success: false, error: 'Merge failed: ' + e.message };
+    console.error('[REGEN-GOAL] Error:', e.message);
+    return { success: false, error: e.message };
   }
 }
 
@@ -8138,7 +8158,8 @@ function callVertexAI(prompt) {
 function callVertexAIWithSearch(prompt) {
   let location = CONFIG.LOCATION || 'global';
   const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
-  const url = `https://${host}/v1/projects/${CONFIG.PROJECT_ID}/locations/${location}/publishers/google/models/${CONFIG.MODEL}:generateContent`;
+  const searchModel = 'gemini-3.1-flash-lite';
+  const url = `https://${host}/v1/projects/${CONFIG.PROJECT_ID}/locations/${location}/publishers/google/models/${searchModel}:generateContent`;
   
   const payload = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],

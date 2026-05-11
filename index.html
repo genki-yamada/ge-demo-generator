@@ -2619,8 +2619,43 @@
         reason: d.dataset.workflowReason
       }));
 
-      // Build Markdown-formatted scenario for better LLM comprehension
-      const d = cachedResearchData;
+      // Check if selection matches original automatable set
+      const originalAutoNames = (cachedResearchData.workflows || [])
+        .filter(w => w.automatable)
+        .map(w => w.name)
+        .sort();
+      const selectedNames = selectedWorkflows.map(w => w.name).sort();
+      const isUnchanged = JSON.stringify(originalAutoNames) === JSON.stringify(selectedNames);
+
+      if (isUnchanged) {
+        // No change — use original suggestedGoal directly
+        _buildAndApplyGoal(cachedResearchData, selectedWorkflows, cachedResearchData.suggestedGoal);
+      } else {
+        // Workflows changed — regenerate scenario via LLM
+        _showGoalRegenerating();
+        google.script.run
+          .withSuccessHandler(res => {
+            _hideGoalRegenerating();
+            const goal = (res && res.success) ? res.goal : cachedResearchData.suggestedGoal;
+            _buildAndApplyGoal(cachedResearchData, selectedWorkflows, goal);
+            if (res && res.success) {
+              showToast('✅ Scenario regenerated for selected workflows!');
+            }
+          })
+          .withFailureHandler(err => {
+            _hideGoalRegenerating();
+            // Fallback to original
+            _buildAndApplyGoal(cachedResearchData, selectedWorkflows, cachedResearchData.suggestedGoal);
+            showToast('⚠️ Scenario regeneration failed, using original.');
+          })
+          .regenerateGoalForWorkflows(
+            { companyName: cachedResearchData.companyName, industry: cachedResearchData.industry, companySummary: cachedResearchData.companySummary },
+            selectedWorkflows
+          );
+      }
+    }
+
+    function _buildAndApplyGoal(d, selectedWorkflows, scenarioText) {
       const lines = [];
       lines.push(`# ${d.companyName}（${d.industry}）`);
       lines.push('');
@@ -2633,9 +2668,26 @@
       selectedWorkflows.forEach(w => lines.push(`- **${w.name}**: ${w.reason}`));
       lines.push('');
       lines.push('## Business Scenario');
-      lines.push(d.suggestedGoal);
+      lines.push(scenarioText);
 
       _applyGoalText(lines.join('\n'), true);
+    }
+
+    function _showGoalRegenerating() {
+      const btn = document.querySelector('[onclick="applySelectedWorkflows()"]');
+      if (btn) {
+        btn.disabled = true;
+        btn._originalHTML = btn.innerHTML;
+        btn.innerHTML = '<div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Regenerating scenario...';
+      }
+    }
+
+    function _hideGoalRegenerating() {
+      const btn = document.querySelector('[onclick="applySelectedWorkflows()"]');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = btn._originalHTML || '🚀 Apply Selected Workflows';
+      }
     }
 
     function _applyGoalText(text, focusEditor) {
