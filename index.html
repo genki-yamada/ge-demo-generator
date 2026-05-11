@@ -5403,30 +5403,6 @@
       });
     }
 
-    // Fetch usage stats on page load (single call serves Stats + Ticker + Badge)
-    google.script.run
-      .withSuccessHandler(function(raw) {
-        try {
-          const stats = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          window._usageStats = stats;
-
-          // Pill badge (this week)
-          if (stats.thisWeekDemos > 0 || stats.thisWeekUsers > 0) {
-            // Handle singular/plural
-            document.getElementById('weeklyStatsBadge').classList.remove('hidden');
-            // Show the parent activity module container
-            const actModule = document.getElementById('activityModule');
-            if (actModule) actModule.classList.remove('hidden');
-          }
-
-          // Inline text (all-time cumulative)
-          if (stats.totalDemos > 0) {
-            if (stats.uniqueLocations > 0) {
-            }
-          }
-
-    
-
   </script>
 
 </body>
