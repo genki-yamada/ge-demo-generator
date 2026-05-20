@@ -79,7 +79,41 @@
       }
     }
 
-
+    /* Activity Ticker */
+    .activity-ticker {
+      position: relative;
+      height: 42px;
+      overflow: hidden;
+    }
+    .activity-ticker-item {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+      pointer-events: none;
+    }
+    .ticker-text-clamp {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      line-height: 1.5;
+    }
+    .activity-ticker-item.active {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .activity-ticker-item {
+        transition: none;
+      }
+    }
 
     /* Activity Module — Ambient Typography */
     .activity-module-font {
@@ -87,29 +121,67 @@
     }
     .stat-highlight {
       font-family: 'Space Grotesk', 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 13px;
-      background: linear-gradient(135deg, #6ee7b7, #2dd4bf);
+      font-weight: 800;
+      font-size: 20px;
+      background: linear-gradient(135deg, #6ee7b7, #2dd4bf, #34d399);
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
       color: transparent;
-      letter-spacing: -0.01em;
-    }
-    .activity-accent-left {
-      border: none;
-      border-left: 2px solid #10b981;
-      padding-left: 14px;
+      letter-spacing: -0.02em;
+      line-height: 1;
     }
     .stat-label {
       text-transform: uppercase;
       letter-spacing: 0.06em;
       font-weight: 500;
-      font-size: 10px;
-      color: #64748b;
+      font-size: 11px;
+      color: #94a3b8;
     }
     .pulse-dot-enhanced {
-      box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+    }
+    /* Activity Banner — Animated Gradient Border */
+    .activity-banner {
+      position: relative;
+      padding: 2px;
+      border-radius: 1rem;
+      background: linear-gradient(135deg, #10b981, #06b6d4, #0ea5e9, #10b981);
+      background-size: 300% 300%;
+      animation: bannerBorderGlow 6s ease infinite;
+      box-shadow: 0 0 24px rgba(16, 185, 129, 0.1), 0 0 48px rgba(6, 182, 212, 0.05);
+    }
+    .activity-banner-inner {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      padding: 1rem 1.5rem;
+      border-radius: calc(1rem - 2px);
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.88));
+      backdrop-filter: blur(12px);
+    }
+    .activity-banner-divider {
+      width: 1px;
+      align-self: stretch;
+      background: linear-gradient(to bottom, transparent, rgba(16, 185, 129, 0.3), transparent);
+      flex-shrink: 0;
+    }
+    @keyframes bannerBorderGlow {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    @media (max-width: 1023px) {
+      .activity-banner-inner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+      }
+      .activity-banner-divider {
+        width: 100%;
+        height: 1px;
+        align-self: auto;
+        background: linear-gradient(to right, transparent, rgba(16, 185, 129, 0.3), transparent);
+      }
     }
 
     .idea-chip {
@@ -297,6 +369,21 @@
       color: #a78bfa;
     }
 
+    .log-tag-success {
+      background: rgba(16, 185, 129, 0.1);
+      color: #10b981;
+    }
+
+    .log-tag-warn {
+      background: rgba(245, 158, 11, 0.1);
+      color: #f59e0b;
+    }
+
+    .log-tag-wait {
+      background: rgba(148, 163, 184, 0.1);
+      color: #94a3b8;
+    }
+
     /* Tooltip Styles */
     .tooltip-container {
       position: relative;
@@ -471,6 +558,7 @@
       background: #0ea5e9;
       box-shadow: 0 0 10px rgba(14, 165, 233, 0.5);
     }
+
 
 
     /* ER Diagram Styles */
@@ -821,6 +909,62 @@
       background-size: 200% auto;
       animation: featureShimmer 3s linear infinite;
     }
+    /* Details accordion chevron rotation */
+    details[open] .details-chevron {
+      transform: rotate(180deg);
+    }
+
+    /* Premium Synthesis Progress Dashboard */
+    .synthesis-node-pulse {
+      animation: synthesisNodePulse 2s infinite alternate ease-in-out;
+    }
+    @keyframes synthesisNodePulse {
+      0% { box-shadow: 0 0 8px rgba(14, 165, 233, 0.3), inset 0 0 4px rgba(14, 165, 233, 0.1); transform: scale(1); border-color: rgba(14, 165, 233, 0.3); }
+      100% { box-shadow: 0 0 24px rgba(14, 165, 233, 0.6), inset 0 0 8px rgba(14, 165, 233, 0.2); transform: scale(1.03); border-color: rgba(14, 165, 233, 0.6); }
+    }
+    .synthesis-node-pulse-success {
+      animation: synthesisNodePulseSuccess 2s infinite alternate ease-in-out;
+    }
+    @keyframes synthesisNodePulseSuccess {
+      0% { box-shadow: 0 0 8px rgba(16, 185, 129, 0.3), inset 0 0 4px rgba(16, 185, 129, 0.1); transform: scale(1); border-color: rgba(16, 185, 129, 0.3); }
+      100% { box-shadow: 0 0 24px rgba(16, 185, 129, 0.6), inset 0 0 8px rgba(16, 185, 129, 0.2); transform: scale(1.03); border-color: rgba(16, 185, 129, 0.6); }
+    }
+    .synthesis-flow-line {
+      stroke-dasharray: 6, 6;
+      stroke-dashoffset: 120;
+      animation: synthesisFlowLine 2s linear infinite;
+    }
+    @keyframes synthesisFlowLine {
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+    .checkmark-circle {
+      stroke-dasharray: 166;
+      stroke-dashoffset: 166;
+      stroke-width: 2;
+      stroke: #10b981;
+      fill: none;
+      animation: strokeCheck 0.4s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+    .checkmark-check {
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      stroke-width: 2;
+      stroke: #10b981;
+      fill: none;
+      animation: strokeCheck 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.3s forwards;
+    }
+    @keyframes strokeCheck {
+      100% {
+        stroke-dashoffset: 0;
+      }
+    }
+    .synthesis-done-badge {
+      background: rgba(16, 185, 129, 0.15) !important;
+      border-color: rgba(16, 185, 129, 0.3) !important;
+      color: #10b981 !important;
+    }
   </style>
 
 </head>
@@ -999,6 +1143,7 @@
 </div>
 
 
+
   <div class="max-w-[1780px] mx-auto flex h-screen overflow-hidden relative">
     <!-- Floating Sidebar Toggles (Visible when sidebars are closed) -->
     <button id="leftToggle" onclick="toggleLeftSidebar()"
@@ -1007,13 +1152,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path>
       </svg>
     </button>
-    <button id="rightToggle" onclick="toggleRightSidebar()"
-      class="absolute right-6 top-8 z-50 p-3 rounded-2xl glass text-sky-400 opacity-0 pointer-events-none transition-all hover:scale-110 shadow-2xl border border-sky-500/30">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
-      </svg>
-    </button>
-    <!-- Interactive Navigation Sidebar -->
+        <!-- Interactive Navigation Sidebar -->
     <aside id="leftSidebar"
       class="w-64 ml-6 my-6 hidden lg:flex flex-col glass rounded-3xl overflow-hidden shadow-2xl sidebar-transition z-20">
       <div class="p-6 h-full flex flex-col overflow-y-auto no-scrollbar">
@@ -1049,6 +1188,11 @@
           <div class="nav-dot"></div>
           About this toolkit
         </button>
+        <button onclick="openWhatsNew()" class="nav-item w-full text-left flex items-center">
+          <div class="nav-dot"></div>
+          <svg class="w-3.5 h-3.5 mr-1.5 inline-block text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          What's New
+        </button>
         <a href="https://github.com/ryotat7/ge-demo-generator" target="_blank"
           class="nav-item w-full text-left flex items-center">
           <div class="nav-dot"></div>
@@ -1063,9 +1207,7 @@
 
       <!-- Sidebar Footer: Author, Version & Update -->
       <div class="pt-6 mt-auto border-t border-white/5 space-y-4">
-
-
-        <div class="px-3 py-3 bg-white/5 rounded-2xl border border-white/5">
+         <div class="px-3 py-3 bg-white/5 rounded-2xl border border-white/5">
           <span class="text-[10px] font-medium text-gray-500 font-mono italic">
             <?= appVersion ?>
           </span>
@@ -1094,10 +1236,13 @@
             <!-- Fade Slides Container -->
             <div class="relative flex-1 h-[28px] text-xs text-gray-200 self-center flex items-center">
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-100 flex items-center">
+                <span>⚡ <strong>Default Model Updated:</strong> The default agent model has been upgraded to <strong>Gemini 3.5 Flash</strong>, delivering blazing fast speed and advanced reasoning capabilities out of the box!</span>
+              </div>
+              <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
                 <span>🧪 <strong>Agent Sandbox (Code Execution):</strong> Next '26 — Secure Python sandbox for advanced analysis, NLP & data science. <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/scale/sandbox/code-execution-overview" target="_blank" class="text-sky-400 underline cursor-pointer hover:text-sky-300 focus:outline-none">Learn more</a></span>
               </div>
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
-                <span>🧠 <strong>Dual-Agent Architecture:</strong> Root Agent (Gemini 3.1 Flash Lite GA) + Deep Analysis Agent (Gemini 3.1 Pro Preview) — fast response & deep reasoning in one.</span>
+                <span>🧠 <strong>Dual-Agent Architecture:</strong> Root Agent (Gemini 3.5 Flash) + Deep Analysis Agent (Gemini 3.5 Flash) — fast response & deep reasoning in one.</span>
               </div>
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
                 <span><svg class="w-3.5 h-3.5 inline-block -mt-0.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> <strong>External Data Sources:</strong> Browse our curated catalog of MCP servers — government data, finance, legal & more! <button onclick="openMcpModal()" class="text-sky-400 underline cursor-pointer hover:text-sky-300 focus:outline-none">Browse catalog</button></span>
@@ -1113,6 +1258,9 @@
               </div>
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
                 <span>🎨 <strong>Image Summaries:</strong> Intelligent generation of visual presentations for final result outputs.</span>
+              </div>
+              <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
+                <span>⚡ <strong>Autonomous Workflow Operator:</strong> Multi-step dependent workflows — the agent scans, classifies, processes & audits on your behalf.</span>
               </div>
             </div>
 
@@ -1142,32 +1290,9 @@
 
           <h1 class="text-3xl lg:text-4xl font-bold tracking-tight py-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400 text-center lg:text-left mb-3">
               GE Demo Generator
-              <a href="https://goo.gle/ge-demo-gen" target="_blank" class="inline-flex items-baseline gap-1 text-sm font-medium text-gray-500 hover:text-sky-400 transition-colors ml-3 align-baseline" style="font-size: 0.85rem; background: none; -webkit-background-clip: unset; background-clip: unset; -webkit-text-fill-color: unset;">
-                <span class="font-mono tracking-wider">goo.gle/ge-demo-gen</span>
-                <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align: baseline;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-              </a>
+              
           </h1>
-          <!-- Unified Activity Module: Ambient Typography + Left Accent -->
-          <div id="activityModule" class="hidden mb-4 flex flex-col justify-center gap-2 pt-3 pb-2 activity-accent-left activity-module-font">
-            <!-- Line 1: Aggregate stats -->
-            <div id="weeklyStatsBadge" class="hidden flex items-center gap-2" style="font-variant-numeric:tabular-nums">
-              <span class="relative flex h-2 w-2 shrink-0">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 pulse-dot-enhanced"></span>
-              </span>
-            </div>
-            <!-- Line 2: Live individual activity ticker -->
-            <div id="activityTicker" class="hidden">
-              <div class="flex items-center gap-2">
-                <span class="relative flex h-1.5 w-1.5 shrink-0">
-                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500/40"></span>
-                </span>
-                <div class="activity-ticker flex-1 min-w-0">
-                  <!-- Items injected by renderActivityTicker() -->
-                </div>
-              </div>
-            </div>
-          </div>
+
           <p
             class="text-gray-400 text-base text-center lg:text-left mx-auto lg:mx-0 leading-relaxed font-light">
             Instantly generate <b>custom demo environments</b> for any business domain. This tool <b>dynamically
@@ -1182,6 +1307,37 @@
               </svg>
             </button>
           </p>
+
+          <!-- Activity Module: Animated Gradient Banner -->
+          <div id="activityModule" class="hidden mt-5 mb-6 activity-module-font">
+            <div class="activity-banner">
+              <div class="activity-banner-inner">
+                <!-- Left: Aggregate Stats -->
+                <div id="weeklyStatsBadge" class="hidden flex items-center gap-3 flex-shrink-0" style="font-variant-numeric:tabular-nums">
+                  <span class="relative flex h-2.5 w-2.5 shrink-0">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 pulse-dot-enhanced"></span>
+                  </span>
+                  <div class="flex items-baseline gap-1.5 flex-wrap">
+                    <span class="stat-highlight" id="statTotalDemosBanner">—</span>
+                    <span class="stat-label">demos created by</span>
+                    <span class="stat-highlight" id="statTotalUsersBanner">—</span>
+                    <span class="stat-label">users across</span>
+                    <span class="stat-highlight" id="statTotalLocationsBanner">—</span>
+                    <span class="stat-label">offices</span>
+                  </div>
+                </div>
+                <!-- Divider -->
+                <div class="activity-banner-divider"></div>
+                <!-- Right: Live Activity Ticker -->
+                <div id="activityTicker" class="hidden flex-1 min-w-0">
+                  <div class="activity-ticker flex-1 min-w-0">
+                    <!-- Items injected by renderActivityTicker() -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div id="architectureContent"
             class="hidden mt-8 text-left bg-black/40 rounded-3xl border border-white/5 overflow-hidden animate-slide-down">
@@ -1325,8 +1481,7 @@
                       <p class="text-[13px] text-gray-300 leading-relaxed">
                         Need a full comprehensive explanation? Deep-dive into our architecture guidelines in the <a href="https://github.com/ryotat7/ge-demo-generator.git" target="_blank" class="text-sky-400 hover:underline underline-offset-4">GitHub Repository</a>.
                       </p>
-
-                    </div>
+                                          </div>
                   </div>
                 </div>
 
@@ -1591,11 +1746,13 @@
           </div>
 
 
+
           <!-- STEP 2 Container (Hidden initially, no header needed) -->
           <div id="step2Container" style="display: none;" class="opacity-0 translate-y-4 transition-all duration-500 mt-4 font-inter">
 
             <!-- MCP Added Alert List (Dynamic, supports multiple MCP servers) -->
             <div id="mcpStatusList" class="mt-2 flex flex-col gap-2 font-inter"></div>
+
 
 
             <!-- Generate Button -->
@@ -1661,23 +1818,118 @@
 
         <!-- Progress Indicator -->
         <section id="stepsSection" class="hidden glass rounded-2xl p-6 mb-10 fade-in border border-sky-500/30">
-          <div class="space-y-4">
-            <div id="progress-step-1" class="flex items-center gap-4 transition-all duration-300">
-              <div class="step-icon w-6 h-6 rounded bg-gray-700 flex items-center justify-center text-[10px] font-bold">
-                1</div>
-              <div class="flex-1">
-                <p class="text-[11px] font-bold text-gray-300 uppercase tracking-tighter">Domain Logic & Data Synthesis
-                </p>
-                <p class="text-[9px] text-gray-500 step-message italic">Synthesizing...</p>
+          <!-- Progress Header -->
+          <div class="flex items-center justify-between mb-4 pb-4 border-b border-white/5">
+            <div class="flex items-center gap-2">
+              <span class="relative flex h-2.5 w-2.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-500" id="synthesisGlowDot"></span>
+              </span>
+              <h3 class="text-sm font-bold text-white uppercase tracking-wider">logic synthesis & compilation</h3>
+            </div>
+            <div class="flex items-center gap-2 text-[10px] text-gray-400">
+              <span>Model:</span>
+              <span class="px-2 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 font-mono text-sky-400 font-semibold"><?= typeof generatorModel !== 'undefined' ? generatorModel : 'gemini-3.5-flash' ?></span>
+            </div>
+          </div>
+
+          <!-- Smooth Gradient Progress Bar -->
+          <div class="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden mb-6 relative">
+            <div id="synthesisProgressBar" class="bg-gradient-to-r from-sky-500 to-emerald-500 h-full w-0 transition-all duration-1000 ease-out"></div>
+          </div>
+
+          <!-- Two-Column Responsive Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Left Column: Steps Checklist & Tips -->
+            <div class="space-y-4 flex flex-col justify-between">
+              <div class="space-y-3">
+                <div id="progress-step-1" class="flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-white/5 transition-all duration-300">
+                  <div class="step-icon w-8 h-8 rounded-full bg-gray-800 text-gray-400 border border-white/10 flex items-center justify-center text-xs font-bold transition-all duration-300 shrink-0">
+                    1
+                  </div>
+                  <div class="flex-1">
+                    <p class="text-xs font-bold text-gray-300 uppercase tracking-tight">Domain Logic & Data Synthesis</p>
+                    <p class="text-[10px] text-gray-500 step-message italic mt-0.5">Waiting...</p>
+                  </div>
+                </div>
+                <div id="progress-step-2" class="flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-white/5 transition-all duration-300">
+                  <div class="step-icon w-8 h-8 rounded-full bg-gray-800 text-gray-400 border border-white/10 flex items-center justify-center text-xs font-bold transition-all duration-300 shrink-0">
+                    2
+                  </div>
+                  <div class="flex-1">
+                    <p class="text-xs font-bold text-gray-300 uppercase tracking-tight">Deployable Bundle Packaging</p>
+                    <p class="text-[10px] text-gray-500 step-message italic mt-0.5">Waiting...</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tips Carousel Container -->
+              <div class="p-4 rounded-xl border border-sky-500/10 bg-sky-500/5 relative overflow-hidden min-h-[100px] flex flex-col justify-between">
+                <div id="carouselTipText" class="transition-opacity duration-500 opacity-100">
+                  <h4 id="tipHeading" class="text-[11px] font-bold text-sky-400 uppercase tracking-wider mb-1">⚡ Dynamic Tip</h4>
+                  <p id="tipBody" class="text-[10px] text-gray-400 leading-relaxed font-sans">Tips are loading...</p>
+                </div>
+                <!-- Slide Indicators -->
+                <div class="flex items-center gap-1 mt-3 justify-end">
+                  <span class="w-1.5 h-1.5 rounded-full bg-sky-500 transition-all duration-300" id="tipDot0"></span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-gray-700 transition-all duration-300" id="tipDot1"></span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-gray-700 transition-all duration-300" id="tipDot2"></span>
+                </div>
               </div>
             </div>
-            <div id="progress-step-2" class="flex items-center gap-4 transition-all duration-300">
-              <div class="step-icon w-6 h-6 rounded bg-gray-700 flex items-center justify-center text-[10px] font-bold">
-                2</div>
-              <div class="flex-1">
-                <p class="text-[11px] font-bold text-gray-300 uppercase tracking-tighter">Deployable Bundle Packaging
-                </p>
-                <p class="text-[9px] text-gray-500 step-message italic">Waiting...</p>
+
+            <!-- Right Column: GCP Target Architecture Blueprint -->
+            <div>
+              <div class="rounded-xl border border-white/5 bg-black/20 p-4 flex flex-col justify-between h-full">
+                <div class="flex items-center justify-between mb-4">
+                  <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GCP Target Architecture</h4>
+                  <span class="text-[8px] bg-sky-500/10 border border-sky-500/20 text-sky-400 px-1.5 py-0.5 rounded font-mono">Live Blueprint</span>
+                </div>
+                <div class="flex items-center justify-center flex-1 py-4">
+                  <svg width="100%" height="180px" viewBox="0 0 320 220" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-gray-600">
+                    <!-- Base Connection Paths -->
+                    <path d="M 70 60 L 250 60" stroke="rgba(255,255,255,0.06)" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M 250 60 L 160 160" stroke="rgba(255,255,255,0.06)" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M 160 160 L 70 60" stroke="rgba(255,255,255,0.06)" stroke-width="2" stroke-linecap="round"/>
+
+                    <!-- Flowing Glowing Paths -->
+                    <path id="svg-path-bq-gemini" d="M 70 60 L 250 60" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="opacity-0 transition-all duration-500"/>
+                    <path id="svg-path-gemini-cr" d="M 250 60 L 160 160" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="opacity-0 transition-all duration-500"/>
+                    <path id="svg-path-cr-bq" d="M 160 160 L 70 60" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="opacity-0 transition-all duration-500"/>
+
+                    <!-- Database Node (BigQuery Cylinder) -->
+                    <g id="svg-node-bq" class="transition-all duration-500 text-gray-500">
+                      <!-- Background glow circle (must be underneath shapes, styled with fill/opacity) -->
+                      <circle cx="70" cy="60" r="32" class="svg-glow-circle opacity-0 transition-all duration-500" fill="currentColor"/>
+                      <!-- BigQuery shapes -->
+                      <ellipse cx="70" cy="50" rx="18" ry="7" fill="none" stroke="currentColor" stroke-width="2"/>
+                      <path d="M52 50 v18 a18 7 0 0 0 36 0 v-18" fill="none" stroke="currentColor" stroke-width="2"/>
+                      <path d="M52 58 a18 7 0 0 0 36 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                      <text x="70" y="85" text-anchor="middle" class="text-[9px] font-sans font-bold fill-current tracking-tighter" stroke="none">BigQuery</text>
+                    </g>
+
+                    <!-- Gemini Agent Node (Sparkle) -->
+                    <g id="svg-node-gemini" class="transition-all duration-500 text-gray-500">
+                      <!-- Background glow circle -->
+                      <circle cx="250" cy="60" r="32" class="svg-glow-circle opacity-0 transition-all duration-500" fill="currentColor"/>
+                      <!-- Sparkle shape -->
+                      <path d="M250 42 Q250 60 268 60 Q250 60 250 78 Q250 60 232 60 Q250 60 250 42" fill="none" stroke="currentColor" stroke-width="2"/>
+                      <circle cx="250" cy="60" r="4" fill="currentColor"/>
+                      <text x="250" y="85" text-anchor="middle" class="text-[9px] font-sans font-bold fill-current tracking-tighter" stroke="none">Gemini Agent</text>
+                    </g>
+
+                    <!-- Engine Node (Cloud Run Server) -->
+                    <g id="svg-node-cr" class="transition-all duration-500 text-gray-500">
+                      <!-- Background glow circle -->
+                      <circle cx="160" cy="160" r="32" class="svg-glow-circle opacity-0 transition-all duration-500" fill="currentColor"/>
+                      <!-- Chip/server shape -->
+                      <rect x="140" y="140" width="40" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
+                      <rect x="147" y="147" width="26" height="26" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                      <path d="M153 160 h14 M160 153 v14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                      <text x="160" y="195" text-anchor="middle" class="text-[9px] font-sans font-bold fill-current tracking-tighter" stroke="none">Cloud Run (ADK)</text>
+                    </g>
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
@@ -1689,7 +1941,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
-              <span>Estimated: 5-8 minutes depending on data complexity</span>
+              <span>Elapsed: <span id="generationElapsedTime" class="font-mono text-white font-semibold">00:00</span> / Est: ~02:00 minutes (typically under 3 minutes)</span>
             </div>
             <button onclick="cancelGeneration()"
               class="px-4 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-[9px] font-bold uppercase tracking-widest transition-all active:scale-95">
@@ -1699,7 +1951,7 @@
 
           <!-- Terminal-style Dynamic Logs -->
           <div class="mt-6 p-4 bg-black/40 rounded-xl border border-white/5 font-mono overflow-hidden">
-            <div id="generationLogs" class="space-y-1 h-[200px] overflow-y-auto custom-scrollbar">
+            <div id="generationLogs" class="space-y-1 h-[180px] overflow-y-auto custom-scrollbar">
               <div class="text-[9px] text-gray-500 italic opacity-50">Initializing system synthesis engines...</div>
             </div>
           </div>
@@ -1754,7 +2006,7 @@
                     </svg>
                   </div>
                   <div>
-                    <p class="text-xs font-bold text-gray-200">Know a  who could use this?</p>
+                    <p class="text-xs font-bold text-gray-200">Know a CE who could use this?</p>
                     <p class="text-[10px] text-gray-500">Share the tool link with your team</p>
                   </div>
                 </div>
@@ -1890,7 +2142,9 @@
                     Open Cloud Shell
                   </a>
                 </div>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-black/40 border border-white/10 rounded-3xl p-6 shadow-xl">
+
+                <!-- Internal User Tips Accordion -->
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-black/40 border border-white/10 rounded-3xl p-6 shadow-xl">
                   <!-- Project ID Setup -->
                   <div class="space-y-4">
                     <div class="flex items-center gap-3">
@@ -2079,6 +2333,8 @@
                 </div>
               </div>
             </div>
+
+
 
 
           </div>
@@ -2304,10 +2560,8 @@
     </main>
 
       </div>
-    </main>
-  </div>
 
-  <!-- Confirmation Modal -->
+    <!-- Confirmation Modal -->
   <div id="oppModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
     <div class="glass max-w-md w-full rounded-3xl p-8 border border-white/10 shadow-2xl animate-fade-in relative">
       <button onclick="closeOppModal()" class="absolute top-6 right-6 p-2 rounded-xl text-gray-500 hover:text-white hover:bg-white/5 transition-all">
@@ -2332,7 +2586,7 @@
     </div>
   </div>
 
-  <div id="toast">Copied to clipboard!</div>
+<div id="toast">Copied to clipboard!</div>
 
   <script>
     let currentData = null;
@@ -2462,7 +2716,6 @@
       if (inList) html += '</ul>';
       return html;
     }
-
 
     // ===========================================
     // Domain Research Functions
@@ -2675,6 +2928,24 @@
       const needsTransition = window.currentMethod !== 'manual';
       if (needsTransition) {
         selectMethod('manual');
+      } else {
+        // Even when already in 'manual' mode, ensure containers are visible.
+        // This handles the case where switchMethod() hid everything (step2Container,
+        // manualContainer) without resetting currentMethod, so selectMethod() is
+        // skipped but the UI is in the wrong state.
+        const selection = document.getElementById('methodSelection');
+        const manual = document.getElementById('manualContainer');
+        selection.classList.add('hidden', 'opacity-0', 'pointer-events-none');
+        manual.classList.remove('hidden');
+        manual.classList.remove('opacity-0', 'translate-y-4');
+        manual.classList.add('opacity-100', 'translate-y-0');
+
+        const step2 = document.getElementById('step2Container');
+        if (step2) {
+          step2.style.display = 'block';
+          step2.classList.remove('opacity-0', 'translate-y-4');
+          step2.classList.add('opacity-100', 'translate-y-0');
+        }
       }
 
       const applyFn = () => {
@@ -2743,8 +3014,6 @@
       }, 300);
     }
 
-
-    // Modal & Tracking Logic
     function openOppModal() {
       if (window.currentMethod === 'template') {
         if (!window.templateSelected) {
@@ -2782,6 +3051,9 @@
       closeOppModal();
       generateDemo();
     }
+
+    // Tab Logic
+
 
     // Back from template gallery → always goes to initial two-choice screen
     function switchMethod() {
@@ -2846,7 +3118,7 @@
           { tag: 'ai', msg: 'Optimizing agent reasoning chains...' },
           { tag: 'success', msg: 'Resource bundling complete.' },
           { tag: 'info', msg: 'Finalizing executable artifact...' },
-          { tag: 'wait', msg: 'Waiting for response... (this may take 5-8 minutes)' }
+          { tag: 'wait', msg: 'Waiting for response... (typically 1:30 - 2:30 minutes)' }
         ]
       },
       timer: null,
@@ -2881,16 +3153,282 @@
       },
       stop: function () {
         if (this.timer) clearInterval(this.timer);
+      },
+      logDirect: function (tag, msg) {
+        const container = document.getElementById('generationLogs');
+        if (!container) return;
+        const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const div = document.createElement('div');
+        div.className = 'log-line';
+        div.innerHTML = `
+          <span class="log-ts">[${time}]</span>
+          <span class="log-tag log-tag-${tag}">${tag}</span>
+          <span class="log-msg">${msg}</span>
+        `;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
       }
     };
     let currentDomainName = '';
     let isCancelled = false;
     let step2Timer = null;
+    let generationRetryCount = 0;
+    const MAX_RETRIES = 2;
+
+    // Premium Synthesis and Bundling Carousel and Timer Logic
+    const SYNTHESIS_TIPS = [
+      {
+        heading: "⚡ Powered by Gemini 3.5 Flash",
+        body: "Using Google's latest model to synthesize domain models, SQL queries, and reasoning paths in seconds."
+      },
+      {
+        heading: "🔌 Extend with MCP Servers",
+        body: "Include any custom MCP server by pasting its GitHub repo link directly in the Custom MCP Servers section."
+      },
+      {
+        heading: "📂 Workspace Context Integration",
+        body: "Enabling the Workspace MCP option allows the agent to inspect, read, and reason about your local workspace files automatically."
+      }
+    ];
+
+    const BUNDLING_TIPS = [
+      {
+        heading: "🧹 Easy Stack Cleanup",
+        body: "Run the setup script with the --cleanup flag to delete all temporary resources and GCP services created during your demo."
+      },
+      {
+        heading: "⚙️ Custom Run Configuration",
+        body: "You can override models at runtime! Run ./setup-demo.sh --model gemini-1.5-pro to test different engines in Cloud Shell."
+      },
+      {
+        heading: "📊 Instant Data Insights",
+        body: "The script automatically packages a lightweight Flask/Python Data Viewer that serves web insights via an authorized endpoint."
+      }
+    ];
+
+    let currentTipsList = SYNTHESIS_TIPS;
+    let tipIndex = 0;
+    let tipIntervalId = null;
+    let elapsedTimerId = null;
+    let elapsedSeconds = 0;
+
+    function rotateTip() {
+      const carouselText = document.getElementById('carouselTipText');
+      if (!carouselText) return;
+      
+      carouselText.classList.remove('opacity-100');
+      carouselText.classList.add('opacity-0');
+      
+      setTimeout(() => {
+        const nextTip = currentTipsList[tipIndex];
+        const headingEl = document.getElementById('tipHeading');
+        const bodyEl = document.getElementById('tipBody');
+        if (headingEl) headingEl.innerText = nextTip.heading;
+        if (bodyEl) bodyEl.innerText = nextTip.body;
+        
+        // Update dots
+        for (let i = 0; i < 3; i++) {
+          const dot = document.getElementById(`tipDot${i}`);
+          if (dot) {
+            if (i === tipIndex) {
+              dot.setAttribute('class', 'w-3 h-1.5 rounded-full bg-sky-500 transition-all duration-300');
+            } else {
+              dot.setAttribute('class', 'w-1.5 h-1.5 rounded-full bg-gray-700 transition-all duration-300');
+            }
+          }
+        }
+        
+        carouselText.classList.remove('opacity-0');
+        carouselText.classList.add('opacity-100');
+        
+        tipIndex = (tipIndex + 1) % currentTipsList.length;
+      }, 500);
+    }
+
+    function startTipsCarousel(phase) {
+      if (tipIntervalId) clearInterval(tipIntervalId);
+      currentTipsList = phase === 'bundling' ? BUNDLING_TIPS : SYNTHESIS_TIPS;
+      tipIndex = 0;
+      rotateTip(); // Show first tip immediately
+      tipIntervalId = setInterval(rotateTip, 12000); // cycle every 12 seconds
+    }
+
+    function stopTipsCarousel() {
+      if (tipIntervalId) {
+        clearInterval(tipIntervalId);
+        tipIntervalId = null;
+      }
+    }
+
+    function startElapsedTimer() {
+      if (elapsedTimerId) clearInterval(elapsedTimerId);
+      elapsedSeconds = 0;
+      updateElapsedTimeDisplay();
+      elapsedTimerId = setInterval(() => {
+        elapsedSeconds++;
+        updateElapsedTimeDisplay();
+      }, 1000);
+    }
+
+    function stopElapsedTimer() {
+      if (elapsedTimerId) {
+        clearInterval(elapsedTimerId);
+        elapsedTimerId = null;
+      }
+    }
+
+    function updateElapsedTimeDisplay() {
+      const minutes = Math.floor(elapsedSeconds / 60);
+      const seconds = elapsedSeconds % 60;
+      const formatted = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      const el = document.getElementById('generationElapsedTime');
+      if (el) el.innerText = formatted;
+    }
+
+    function updateSynthesisProgress(step, status) {
+      const s1 = document.getElementById('progress-step-1');
+      const s2 = document.getElementById('progress-step-2');
+      const progressBar = document.getElementById('synthesisProgressBar');
+      const glowDot = document.getElementById('synthesisGlowDot');
+      
+      const nodeBq = document.getElementById('svg-node-bq');
+      const nodeGemini = document.getElementById('svg-node-gemini');
+      const nodeCr = document.getElementById('svg-node-cr');
+      
+      const pathBqGemini = document.getElementById('svg-path-bq-gemini');
+      const pathGeminiCr = document.getElementById('svg-path-gemini-cr');
+      const pathCrBq = document.getElementById('svg-path-cr-bq');
+      
+      const checkmarkSvg = `<svg class="w-5 h-5 text-emerald-500" viewBox="0 0 52 52" fill="none">
+        <circle class="checkmark-circle" cx="26" cy="26" r="25"/>
+        <path class="checkmark-check" d="M14.1 27.2 l7.1 7.2 16.7-16.8"/>
+      </svg>`;
+
+      if (step === 1) {
+        if (status === 'running') {
+          // Reset all
+          if (progressBar) progressBar.style.width = '15%';
+          if (glowDot) glowDot.setAttribute('class', 'relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-500');
+          
+          // Steps UI
+          if (s1) {
+            s1.setAttribute('class', 'flex items-center gap-4 p-4 rounded-xl border border-sky-500/20 bg-sky-500/5 transition-all duration-300');
+            const icon = s1.querySelector('.step-icon');
+            if (icon) {
+              icon.setAttribute('class', 'step-icon w-8 h-8 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40 flex items-center justify-center text-xs font-bold synthesis-node-pulse shrink-0');
+              icon.innerText = '1';
+            }
+            const msg = s1.querySelector('.step-message');
+            if (msg) msg.innerText = 'Synthesizing domain logic and planning database schemas...';
+          }
+          
+          if (s2) {
+            s2.setAttribute('class', 'flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-white/5 transition-all duration-300 opacity-60');
+            const icon = s2.querySelector('.step-icon');
+            if (icon) {
+              icon.setAttribute('class', 'step-icon w-8 h-8 rounded-full bg-gray-800 text-gray-400 border border-white/10 flex items-center justify-center text-xs font-bold shrink-0');
+              icon.innerText = '2';
+            }
+            const msg = s2.querySelector('.step-message');
+            if (msg) msg.innerText = 'Waiting to pack deployment assets...';
+          }
+          
+          // SVG UI: BQ is pulsing active
+          if (nodeBq) nodeBq.setAttribute('class', 'transition-all duration-500 text-sky-400 svg-active');
+          if (nodeGemini) nodeGemini.setAttribute('class', 'transition-all duration-500 text-gray-600');
+          if (nodeCr) nodeCr.setAttribute('class', 'transition-all duration-500 text-gray-600');
+          
+          if (pathBqGemini) pathBqGemini.setAttribute('class', 'opacity-0 transition-all duration-500');
+          if (pathGeminiCr) pathGeminiCr.setAttribute('class', 'opacity-0 transition-all duration-500');
+          if (pathCrBq) pathCrBq.setAttribute('class', 'opacity-0 transition-all duration-500');
+          
+          startTipsCarousel('synthesis');
+          startElapsedTimer();
+        } 
+        else if (status === 'completed') {
+          if (progressBar) progressBar.style.width = '45%';
+          
+          // Steps UI
+          if (s1) {
+            s1.setAttribute('class', 'flex items-center gap-4 p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 transition-all duration-300');
+            const icon1 = s1.querySelector('.step-icon');
+            if (icon1) {
+              icon1.setAttribute('class', 'step-icon w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center text-xs font-bold shrink-0');
+              icon1.innerHTML = checkmarkSvg;
+            }
+            const msg = s1.querySelector('.step-message');
+            if (msg) msg.innerText = 'Domain logic synthesis complete!';
+          }
+          
+          // SVG UI: BQ is done, flow to Gemini starts
+          if (nodeBq) nodeBq.setAttribute('class', 'transition-all duration-500 text-emerald-500 svg-done');
+          if (pathBqGemini) {
+            pathBqGemini.setAttribute('class', 'synthesis-flow-line opacity-100 text-sky-400 transition-all duration-500');
+          }
+        }
+      } 
+      else if (step === 2) {
+        if (status === 'running') {
+          if (progressBar) progressBar.style.width = '55%';
+          
+          // Steps UI
+          if (s2) {
+            s2.setAttribute('class', 'flex items-center gap-4 p-4 rounded-xl border border-sky-500/20 bg-sky-500/5 transition-all duration-300');
+            const icon = s2.querySelector('.step-icon');
+            if (icon) {
+              icon.setAttribute('class', 'step-icon w-8 h-8 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40 flex items-center justify-center text-xs font-bold synthesis-node-pulse shrink-0');
+              icon.innerText = '2';
+            }
+            const msg = s2.querySelector('.step-message');
+            if (msg) msg.innerText = 'Bundling deployment assets... (typically 1:30 - 2:30 minutes)';
+          }
+          
+          // SVG UI: Gemini and Cloud Run light up active, Gemini -> CR flow starts
+          if (nodeGemini) nodeGemini.setAttribute('class', 'transition-all duration-500 text-sky-400 svg-active');
+          if (nodeCr) nodeCr.setAttribute('class', 'transition-all duration-500 text-sky-400 svg-active');
+          
+          if (pathGeminiCr) {
+            pathGeminiCr.setAttribute('class', 'synthesis-flow-line opacity-100 text-sky-400 transition-all duration-500');
+          }
+          
+          startTipsCarousel('bundling');
+        } 
+        else if (status === 'completed') {
+          if (progressBar) progressBar.style.width = '100%';
+          if (glowDot) glowDot.setAttribute('class', 'relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500');
+          
+          // Steps UI
+          if (s2) {
+            s2.setAttribute('class', 'flex items-center gap-4 p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 transition-all duration-300');
+            const icon2 = s2.querySelector('.step-icon');
+            if (icon2) {
+              icon2.setAttribute('class', 'step-icon w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center text-xs font-bold shrink-0');
+              icon2.innerHTML = checkmarkSvg;
+            }
+            const msg = s2.querySelector('.step-message');
+            if (msg) msg.innerText = 'Deployment assets successfully generated!';
+          }
+          
+          // SVG UI: All done
+          if (nodeGemini) nodeGemini.setAttribute('class', 'transition-all duration-500 text-emerald-500 svg-done');
+          if (nodeCr) nodeCr.setAttribute('class', 'transition-all duration-500 text-emerald-500 svg-done');
+          
+          if (pathBqGemini) pathBqGemini.setAttribute('class', 'opacity-100 text-emerald-500 transition-all duration-500');
+          if (pathGeminiCr) pathGeminiCr.setAttribute('class', 'opacity-100 text-emerald-500 transition-all duration-500');
+          if (pathCrBq) pathCrBq.setAttribute('class', 'opacity-100 text-emerald-500 transition-all duration-500');
+          
+          stopTipsCarousel();
+          stopElapsedTimer();
+        }
+      }
+    }
 
     function cancelGeneration() {
       isCancelled = true;
       GenerationLogger.stop();
       if (step2Timer) clearTimeout(step2Timer);
+      stopTipsCarousel();
+      stopElapsedTimer();
 
       const btn = document.getElementById('generateBtn');
       btn.disabled = false;
@@ -2945,6 +3483,22 @@
       document.getElementById('section-step4').classList.add('hidden');
       document.getElementById('errorSection').classList.add('hidden');
       document.getElementById('stepsSection').classList.add('hidden');
+
+      // Re-enable the generate button and reset its visual state
+      const genBtn = document.getElementById('generateBtn');
+      if (genBtn) {
+        genBtn.disabled = false;
+        document.getElementById('btnSpinner').classList.add('hidden');
+        document.getElementById('btnText').innerText = 'Generate Setup Script & Assets';
+      }
+
+      // Ensure step2Container (generate button area) is visible
+      const step2 = document.getElementById('step2Container');
+      if (step2) {
+        step2.style.display = 'block';
+        step2.classList.remove('opacity-0', 'translate-y-4');
+        step2.classList.add('opacity-100', 'translate-y-0');
+      }
 
       // Reset current data
       currentData = null;
@@ -3432,6 +3986,8 @@
         enableWorkspaceMcp: window.workspaceMcpIncluded || false
       };
 
+      generationRetryCount = 0; // Reset retry count for a fresh generation
+
       const stepsSection = document.getElementById('stepsSection');
       stepsSection.classList.remove('hidden');
 
@@ -3442,13 +3998,7 @@
       document.getElementById('section-step4').classList.add('hidden');
 
       // Reset progress UI
-      const s1 = document.getElementById('progress-step-1');
-      const s2 = document.getElementById('progress-step-2');
-      s1.className = 'flex items-center gap-4 transition-all duration-300';
-      s2.className = 'flex items-center gap-4 transition-all duration-300';
-      s1.querySelector('.step-icon').className = 'step-icon w-6 h-6 rounded bg-sky-500/20 text-sky-400 flex items-center justify-center text-[10px] font-bold animate-pulse';
-      s1.querySelector('.step-message').innerText = 'Synthesizing...';
-      s2.querySelector('.step-message').innerText = 'Waiting...';
+      updateSynthesisProgress(1, 'running');
 
       document.getElementById('generateBtn').disabled = true;
       document.getElementById('btnSpinner').classList.remove('hidden');
@@ -3459,59 +4009,73 @@
 
       // Simulate step 2 animation with more realistic timing
       isCancelled = false;
+      if (step2Timer) clearTimeout(step2Timer);
       step2Timer = setTimeout(() => {
         if (isCancelled) return;
-        s1.classList.add('step-completed');
-        s1.querySelector('.step-message').innerText = 'Logic synthesis successful';
-        s2.querySelector('.step-icon').className = 'step-icon w-6 h-6 rounded bg-sky-500/20 text-sky-400 flex items-center justify-center text-[10px] font-bold animate-pulse';
-        s2.querySelector('.step-message').innerText = 'Bundling assets... (this may take 5-8 minute)';
+        updateSynthesisProgress(1, 'completed');
+        updateSynthesisProgress(2, 'running');
       }, 25000); // More realistic ~25s timing
 
-      google.script.run
-        .withSuccessHandler(res => {
-          if (isCancelled) return;
-          GenerationLogger.stop();
-          document.getElementById('generateBtn').disabled = false;
-          document.getElementById('btnSpinner').classList.add('hidden');
-          document.getElementById('btnText').innerText = 'Generate Setup Script & Assets';
-
-          if (!res.success) return onFailure(res.error);
-
-          // Complete animation
-          s2.classList.add('step-completed');
-          s2.querySelector('.step-message').innerText = 'Bundle ready';
-
-          setTimeout(() => {
+      function executeGenerationCall() {
+        if (isCancelled) return;
+        google.script.run
+          .withSuccessHandler(res => {
             if (isCancelled) return;
-            stepsSection.classList.add('hidden');
-            currentData = res;
-            try {
-              showFinalResult(res);
-              
-              // Handle persistence feedback
-              if (res.saveStatus) {
-                if (res.saveStatus.driveBackup && !res.saveStatus.driveBackup.success) {
-                  showToast('⚠️ Demo ready, but Drive backup failed: ' + res.saveStatus.driveBackup.error, 8000);
-                } else {
-                  showToast('✅ Demo generated successfully!');
-                }
-              }
-            } catch (uiErr) {
-              console.error('UI Rendering Error:', uiErr);
-            }
-            
 
-          }, 800);
-        })
-        .withFailureHandler(err => {
-          if (isCancelled) return;
-          onFailure(err);
-        })
-        .generateDemo(userGoal, options);
+            if (!res.success) {
+              if (generationRetryCount < MAX_RETRIES) {
+                generationRetryCount++;
+                GenerationLogger.logDirect('warn', 'AI response parsing failed. Initiating automatic retry (Attempt ' + generationRetryCount + ' of ' + MAX_RETRIES + ')...');
+                setTimeout(executeGenerationCall, 1000);
+                return;
+              }
+              GenerationLogger.stop();
+              document.getElementById('generateBtn').disabled = false;
+              document.getElementById('btnSpinner').classList.add('hidden');
+              document.getElementById('btnText').innerText = 'Generate Setup Script & Assets';
+              return onFailure(res.error);
+            }
+
+            GenerationLogger.stop();
+            document.getElementById('generateBtn').disabled = false;
+            document.getElementById('btnSpinner').classList.add('hidden');
+            document.getElementById('btnText').innerText = 'Generate Setup Script & Assets';
+
+            // Complete animation
+            updateSynthesisProgress(2, 'completed');
+
+            setTimeout(() => {
+              if (isCancelled) return;
+              stepsSection.classList.add('hidden');
+              currentData = res;
+              try {
+                showFinalResult(res);
+                showToast('✅ Demo generated successfully!');
+              } catch (uiErr) {
+                console.error('UI Rendering Error:', uiErr);
+              }
+            }, 800);
+          })
+          .withFailureHandler(err => {
+            if (isCancelled) return;
+            if (generationRetryCount < MAX_RETRIES) {
+              generationRetryCount++;
+              GenerationLogger.logDirect('warn', 'Transient network or Apps Script failure. Initiating automatic retry (Attempt ' + generationRetryCount + ' of ' + MAX_RETRIES + ')...');
+              setTimeout(executeGenerationCall, 1000);
+              return;
+            }
+            onFailure(err);
+          })
+          .generateDemo(userGoal, options);
+      }
+
+      executeGenerationCall();
     }
 
     function onFailure(err) {
       GenerationLogger.stop();
+      stopTipsCarousel();
+      stopElapsedTimer();
       document.getElementById('generateBtn').disabled = false;
       document.getElementById('btnSpinner').classList.add('hidden');
       document.getElementById('stepsSection').classList.add('hidden');
@@ -3544,6 +4108,15 @@
         template.classList.add('hidden');
         manual.classList.remove('hidden');
         manual.classList.add('opacity-100', 'translate-y-0');
+
+        // Show step2Container (holds the generate button) and set method
+        window.currentMethod = 'manual';
+        const step2 = document.getElementById('step2Container');
+        if (step2) {
+          step2.style.display = 'block';
+          step2.classList.remove('opacity-0', 'translate-y-4');
+          step2.classList.add('opacity-100', 'translate-y-0');
+        }
       }
 
       const adkDirPlaceholder = document.getElementById('adkDirPlaceholder');
@@ -4375,6 +4948,9 @@
     }
 
 
+
+
+
     window.onload = () => {
       console.log('App initialization...');
       
@@ -4382,8 +4958,6 @@
       localStorage.removeItem('ge_generator_input');
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
-
-        
         // Run diagnostics
         google.script.run.withSuccessHandler(resRaw => {
           const res = typeof resRaw === 'string' ? JSON.parse(resRaw) : resRaw;
@@ -4583,65 +5157,91 @@
 
   <!-- Feature Notification Modal -->
   <div id="featureNotifyModal">
-    <div class="glass max-w-md w-full rounded-3xl p-7 border border-white/10 shadow-2xl fade-in relative">
+    <div class="glass max-w-lg w-full rounded-3xl p-7 border border-white/10 shadow-2xl fade-in relative">
       <!-- Close Button -->
-      <button onclick="closeFeatureNotify(false)" aria-label="Close" class="absolute top-5 right-5 text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 rounded-lg p-1 transition-colors">
+      <button onclick="closeFeatureNotify(false)" aria-label="Close" class="absolute top-5 right-5 text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 rounded-lg p-1 transition-colors z-10">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
       </button>
       <!-- Header -->
       <div class="text-center mb-6">
-        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-sky-500 flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-violet-500/20">
-          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path></svg>
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-sky-500 flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-violet-500/25" style="animation: featureShimmer 4s ease-in-out infinite; background-size: 200% auto;">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
         </div>
         <div class="flex items-center justify-center gap-2 mb-2">
-          <span class="feature-badge">🆕 New</span>
+          <span class="feature-badge">🚀 Major Update</span>
         </div>
-        <h2 class="text-xl font-bold text-white mb-1">Custom MCP Server Catalog</h2>
-        <p class="text-gray-400 text-xs">Supercharge your demos with external data sources</p>
+        <h2 class="text-xl font-bold text-white mb-1">What's New</h2>
+        <p class="text-gray-400 text-xs">4 powerful capabilities to elevate your demos</p>
       </div>
 
-      <!-- Feature Highlight -->
-      <div class="feature-card mb-5">
+      <!-- Feature 1: Gemini 3.5 Flash -->
+      <div class="feature-card mb-3">
         <div class="flex gap-3">
-          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-400 border border-sky-500/20">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/15 to-teal-500/15 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-bold text-white mb-0.5">Gemini 3.5 Flash Default</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">Announced at Google I/O 2026, Gemini 3.5 Flash is now the default model powering all agent operations. <span class="text-emerald-400/80">Experience blazing-fast reasoning speed and advanced multi-step execution.</span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 2: A2UI -->
+      <div class="feature-card mb-3">
+        <div class="flex gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-fuchsia-500/15 to-violet-500/15 flex items-center justify-center text-fuchsia-400 border border-fuchsia-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-bold text-white mb-0.5">A2UI Interactive Demos</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">Bring demos to life with rich UI components — cards, forms, approval flows & more. <span class="text-fuchsia-400/80">Accelerate customer decisions and spark immediate "I want this" moments.</span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 3: Custom MCP Server Import -->
+      <div class="feature-card mb-3">
+        <div class="flex gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/15 to-cyan-500/15 flex items-center justify-center text-sky-400 border border-sky-500/20">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
           </div>
-          <div>
-            <h4 class="text-sm font-bold text-white mb-1">Browse & Add MCP Servers</h4>
-            <p class="text-[11px] text-gray-400 leading-relaxed">Pick from our curated catalog of MCP servers — Slack, e-Gov, finance, legal & more. One click to integrate into your demo deployment script.</p>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-bold text-white mb-0.5">Custom MCP Server Import</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">Just paste a GitHub URL to auto-analyze & integrate any MCP server. <span class="text-sky-400/80">Instantly connect to customer-specific data sources for compelling, tailored demos.</span></p>
           </div>
         </div>
       </div>
 
-      <!-- How to access -->
-      <div class="bg-black/30 rounded-xl p-3 mb-5 border border-white/5">
-        <p class="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-2">How to access</p>
-        <div class="flex items-center gap-2 text-xs text-gray-300">
-          <span class="flex items-center gap-1">
-            <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            <strong>External Data Sources</strong>
-          </span>
-          <span class="text-gray-600">→</span>
-          <span class="text-sky-400 font-semibold">Browse Catalog</span>
+      <!-- Feature 4: Autonomous Workflow Operator -->
+      <div class="feature-card mb-5">
+        <div class="flex gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/15 flex items-center justify-center text-amber-400 border border-amber-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-bold text-white mb-0.5">Autonomous Workflow Operator</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">Multi-step dependent workflows with automatic pipeline execution — scan, classify, process & audit. <span class="text-amber-400/80">The agent proactively proposes and executes operational tasks on behalf of users.</span></p>
+          </div>
         </div>
       </div>
 
       <!-- CTA Button -->
-      <button onclick="closeFeatureNotifyAndOpenCatalog()"
-        class="w-full feature-shimmer-btn text-white font-bold py-3 rounded-2xl transition-all shadow-lg shadow-sky-500/20 active:scale-[0.98] mb-3">
-        ✨ GOT IT, LET ME TRY!
+      <button onclick="closeFeatureNotify(true)"
+        class="w-full feature-shimmer-btn text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-sky-500/20 active:scale-[0.98] mb-3 text-base tracking-wide">
+        🎉 LET'S GO!
       </button>
 
       <!-- Don't show again checkbox -->
       <label class="flex items-center justify-center gap-2 cursor-pointer group">
         <input type="checkbox" id="featureNotifyDontShow" class="w-3 h-3 rounded border-white/15 text-sky-500/60 focus:ring-sky-500/20 bg-white/5 cursor-pointer opacity-50 hover:opacity-80 transition-opacity">
-        <span class="text-[11px] text-gray-500 group-hover:text-gray-400 transition-colors select-none">Don't show this notification again</span>
+        <span class="text-[11px] text-gray-500 group-hover:text-gray-400 transition-colors select-none">Don't show this again</span>
       </label>
     </div>
   </div>
 
   <script>
-    const FEATURE_NOTIFY_KEY = 'feature_mcp_catalog_dismissed';
+    const FEATURE_NOTIFY_KEY = 'feature_v3_whats_new_dismissed';
 
     function maybeShowFeatureNotify() {
       if (localStorage.getItem(FEATURE_NOTIFY_KEY)) return;
@@ -4660,12 +5260,9 @@
       }
     }
 
-    function closeFeatureNotifyAndOpenCatalog() {
-      closeFeatureNotify(true);
-      // Small delay for smooth transition, then open the MCP catalog modal
-      setTimeout(() => {
-        if (typeof window.openMcpModal === 'function') window.openMcpModal();
-      }, 300);
+    function openWhatsNew() {
+      const modal = document.getElementById('featureNotifyModal');
+      if (modal) modal.classList.add('show');
     }
 
     // Close on ESC
@@ -5326,9 +5923,76 @@
       return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
 
+    // --- Activity Ticker (Header) ---
+    let tickerInterval = null;
+    let tickerIndex = 0;
+    let tickerPaused = false;
+
+    function renderActivityTicker() {
+      const stats = window._usageStats;
+      const wrapper = document.getElementById('activityTicker');
+      if (!wrapper) return;
+      if (!stats || !stats.recentActivity || stats.recentActivity.length === 0) {
+        wrapper.classList.add('hidden');
+        return;
+      }
+
+      wrapper.classList.remove('hidden');
+      // Show the parent activity module container
+      const module = document.getElementById('activityModule');
+      if (module) module.classList.remove('hidden');
+      const ticker = wrapper.querySelector('.activity-ticker');
+      if (!ticker) return;
+
+      const items = stats.recentActivity.slice(0, 10);
+      ticker.innerHTML = items.map((item, i) => {
+        const relTime = getRelativeTime(new Date(item.timestamp));
+        const goal = item.userGoal || 'Demo';
+        const locationLabel = item.location
+          ? `Someone in <span class="text-white font-medium">${item.location}</span>`
+          : 'A teammate';
+        return `<div class="activity-ticker-item${i === 0 ? ' active' : ''}" data-idx="${i}">
+          <span class="inline-flex items-center text-[9px] text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded-full border border-emerald-500/25 whitespace-nowrap font-medium shrink-0">${relTime}</span>
+          <span class="text-[11px] text-gray-400 ticker-text-clamp flex-1 min-w-0">${locationLabel} generated <span class="text-gray-200 font-medium">${goal}</span></span>
+        </div>`;
+      }).join('');
+
+      // Start rotation
+      tickerIndex = 0;
+      if (tickerInterval) clearInterval(tickerInterval);
+      if (items.length > 1) {
+        tickerInterval = setInterval(() => {
+          if (tickerPaused) return;
+          const allItems = ticker.querySelectorAll('.activity-ticker-item');
+          allItems.forEach(el => el.classList.remove('active'));
+          tickerIndex = (tickerIndex + 1) % allItems.length;
+          allItems[tickerIndex].classList.add('active');
+        }, 5000);
+      }
+
+      // Pause on hover
+      wrapper.addEventListener('mouseenter', () => { tickerPaused = true; });
+      wrapper.addEventListener('mouseleave', () => { tickerPaused = false; });
+
+      // Update Community tab badge — count only activities from last 24h
+      const now24h = Date.now() - 24 * 60 * 60 * 1000;
+      const recentCount = items.filter(a => new Date(a.timestamp).getTime() > now24h).length;
+      updateCommunityBadge(recentCount);
+    }
+
+    function updateCommunityBadge(count) {
+      const badge = document.getElementById('communityBadge');
+      if (!badge) return;
+      if (count > 0) {
+        badge.textContent = count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
 
     function copyShareLink() {
-      const url = 'https://goo.gle/ge-demo-gen';
+      const url = 'https://goto.google.com/ge-demo-gen';
       navigator.clipboard.writeText(url).then(() => {
         const btn = document.getElementById('shareLinkBtn');
         const originalHTML = btn.innerHTML;
@@ -5343,9 +6007,38 @@
           btn.classList.remove('border-emerald-500/40');
         }, 2000);
       }).catch(() => {
-        window.showToast('Failed to copy. URL: goo.gle/ge-demo-gen');
+        window.showToast('Failed to copy. URL: goto.google.com/ge-demo-gen');
       });
     }
+
+    // Fetch usage stats on page load (single call serves Stats + Ticker + Badge)
+    google.script.run
+      .withSuccessHandler(function(raw) {
+        try {
+          const stats = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          window._usageStats = stats;
+
+          // Pill badge (all-time cumulative)
+          if (stats.totalDemos > 0) {
+            animateCounter('statTotalDemosBanner', stats.totalDemos);
+            animateCounter('statTotalUsersBanner', stats.uniqueUsers);
+            if (stats.uniqueLocations > 0) {
+              animateCounter('statTotalLocationsBanner', stats.uniqueLocations);
+            }
+            document.getElementById('weeklyStatsBadge').classList.remove('hidden');
+            // Show the parent activity module container
+            const actModule = document.getElementById('activityModule');
+            if (actModule) actModule.classList.remove('hidden');
+          }
+
+          // Activity ticker (header) + Community tab badge
+          renderActivityTicker();
+        } catch(e) { console.error('Stats parse error:', e); }
+      })
+      .withFailureHandler(function(err) {
+        console.warn('Usage stats unavailable:', err);
+      })
+      .getUsageStats();
 
   </script>
 

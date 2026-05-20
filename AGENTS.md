@@ -22,6 +22,33 @@ Layer 3: Python source files (agent.py, fast_api_app.py, tools.py, etc.)
 Layer 4: LLM system instruction (consumed by Gemini models)
 ```
 
+### Viewer Escaping Chain (DIFFERENT from above!)
+
+The Data Viewer template (`viewer_app/main.py`) has a **distinct 4-layer chain**
+where Layer 3 is a Python triple-quoted string (`"""`) serving HTML, and Layer 4
+is browser JavaScript — NOT an LLM instruction.
+
+```
+Layer 1: Code.gs (JavaScript / GAS runtime)
+  ↓  JS template literal processes \\ → \
+  ↓  (note: \n → actual newline!)
+Layer 2: Bash quoted heredoc (<<'__VIEWER_MAIN__')
+  ↓  Passes through verbatim (no expansion)
+Layer 3: Python triple-quoted string (HTML_TEMPLATE = """...""")
+  ↓  Python interprets \n → newline, \\ → \
+  ↓  (This is the KEY difference from agent heredocs!)
+Layer 4: Browser JavaScript execution
+  ↓  JS interprets \n in string literals as newline
+```
+
+> [!CAUTION]
+> The Python `"""` layer is an EXTRA escaping step. In agent heredocs (e.g.,
+> `__AGENT_EOF__`), the Python file IS the final destination — Python runtime
+> interprets `\n` directly. In the Viewer, Python `"""` renders HTML, and
+> the **browser** must see `\n` (literal backslash + n) in the JS source.
+> This means you need **4 backslashes** in Code.gs for the Viewer, vs **2**
+> for agent heredocs.
+
 ### Key File Locations in Code.gs
 
 | Heredoc | Delimiter | Type | Line Range (approx) | Generates |
@@ -31,6 +58,7 @@ Layer 4: LLM system instruction (consumed by Gemini models)
 | `agent.py` | `__AGENT_EOF__` | Quoted (`'...'`) | ~L5236-5755 | Agent definitions |
 | `part_converters.py` | `__PART_CONVERTERS_EOF__` | Quoted | ~L5755-6095 | A2A↔GenAI converters |
 | `fast_api_app.py` | `__FAST_API_EOF__` | Quoted (`'...'`) | ~L6107-6993 | A2A server + event loop |
+| `viewer_app/main.py` | `__VIEWER_MAIN__` | Quoted (`'...'`) | ~L1841-2420 | Data Viewer Flask app (HTML + JS) |
 
 > [!IMPORTANT]
 > Line numbers shift frequently as the file evolves (~8300+ lines). Use `grep` to find
@@ -78,6 +106,35 @@ Layer 4: LLM system instruction (consumed by Gemini models)
    entire file as JavaScript. Backtick triplets are interpreted as JS template literal
    delimiters, causing `SyntaxError: Unexpected identifier` on whatever follows.
    **Use `chr(96) * 3` in Python code to construct the backtick fence dynamically.**
+
+9. **In the Data Viewer template (`__VIEWER_MAIN__`), use `\\\\n` (4 backslashes + n)
+   for JS newlines, NOT `\\n` (2 backslashes + n).** The Viewer has an extra Python
+   `"""` layer that agent heredocs don't have. 2 backslashes produce `\n` in the
+   Python file, which Python `"""` interprets as a real newline (0x0a), breaking the
+   browser's JS string literal. 4 backslashes produce `\\n` in the Python file,
+   which Python renders as `\n` (literal characters), letting the browser JS
+   correctly interpret it as a newline escape.
+   **Alternatively, avoid `\n` entirely — use HTML structure (`<div>`) instead of
+   string concatenation with newlines.**
+
+10. **ALWAYS verify which JS template conditional block you are inside before inserting
+    code.** Conditional blocks (`${ flag ? \`...\` : '' }`) can span hundreds of lines.
+    Feature-independent code (Firestore init, common imports, shared utilities) must
+    NEVER be placed inside a feature-flag conditional block. See **Section 10** for
+    detection commands and incident history.
+
+11. **NEVER use bare double quotes (`'"'`) in Python string literals inside heredoc
+    content that is wrapped in a JS template literal.** The GAS JavaScript parser
+    processes the entire file and can misinterpret quote nesting, causing
+    `SyntaxError: Unexpected string`. **Use `chr(34)` instead.**
+    Example: `_text.strip('"')` → `_text.strip(chr(34))`.
+
+12. **NEVER use `\n` in Python COMMENTS inside a JS template literal heredoc.** The
+    `\n` is processed by the JS template literal layer BEFORE it reaches the heredoc,
+    producing a real newline (0x0a). This splits the comment across lines. Content
+    after the newline has no `#` prefix and is parsed as executable Python — causing
+    `SyntaxError` if it contains emoji or other invalid syntax. **Use plain-text
+    descriptions instead of literal escape sequences in comments.**
 
 ### 2.2 Escaping by Heredoc Type
 
@@ -193,6 +250,93 @@ Python `r'...\s...'` → regex metacharacter for whitespace ✅
 > backslashes as-is. However, the JS template literal layer processes the content
 > BEFORE it reaches the Python file, so JS escaping rules apply first.
 
+#### Example H: Newline in JS string literal inside Data Viewer template
+
+The Viewer template has an extra Python `"""` layer (see Section 1: Viewer Escaping
+Chain). JS string literals containing `\n` must survive 4 layers.
+
+**WRONG** — 2 backslashes: `SyntaxError: Invalid or unexpected token` in browser:
+```javascript
+// In Code.gs (JS template literal containing <<'__VIEWER_MAIN__' heredoc):
+// Inside Python HTML_TEMPLATE = """...<script>...
+body += '--- Description ---\\n' + text;
+```
+
+Escaping chain:
+```
+Code.gs:  \\n  (0x5c 0x5c 0x6e)
+  ↓ JS template literal: \\ → \, n → n
+bash:     \n   (0x5c 0x6e)
+  ↓ Quoted heredoc: verbatim
+Python:   \n   (0x5c 0x6e) inside """..."""
+  ↓ Python runtime: \n → newline (0x0a)  ← BREAKS HERE
+HTML:     actual newline in JS code → SyntaxError!
+```
+
+**RIGHT** — 4 backslashes:
+```javascript
+body += '--- Description ---\\\\n' + text;
+```
+
+Escaping chain:
+```
+Code.gs:  \\\\n  (0x5c 0x5c 0x5c 0x5c 0x6e)
+  ↓ JS template literal: \\\\ → \\, n → n
+bash:     \\n    (0x5c 0x5c 0x6e)
+  ↓ Quoted heredoc: verbatim
+Python:   \\n    (0x5c 0x5c 0x6e) inside """..."""
+  ↓ Python runtime: \\ → \, n → n = literal \n (0x5c 0x6e)
+HTML:     \n in JS source → browser interprets as newline ✅
+```
+
+**BEST** — avoid the problem entirely by using HTML structure:
+```javascript
+// Instead of '--- Description ---\\\\n' + text
+html += '<div class="detail-field">' + key + ': ' + val + '</div>';
+```
+
+> [!CAUTION]
+> This is the most insidious escaping bug in this codebase because the 2-backslash
+> fix (`\\n`) works correctly for ALL other heredocs (agent.py, fast_api_app.py,
+> etc.) where the Python file is the final destination. Only the Viewer template,
+> which wraps JS inside Python `"""` inside a heredoc, requires 4 backslashes.
+
+#### Example I: `\n` in Python comments (inside JS template literal + quoted heredoc)
+
+Python comments (`#`) only cover text up to the end of the line. If a comment
+contains `\n` inside a JS template literal, JS converts it to a real newline,
+splitting the comment across two lines. The second line has NO `#` prefix and is
+parsed as executable Python.
+
+**WRONG** — JS interprets `\n` as newline, breaking the comment:
+```javascript
+// In Code.gs, inside a JS template literal containing <<'__FAST_API_EOF__':
+            #   "---\n### 💡 Next Actions"
+            #   "---\n\n💡 Next Actions"  (no # marks)
+```
+
+After JS processing, the Python file contains:
+```python
+            #   "---
+### 💡 Next Actions"
+            #   "---
+
+💡 Next Actions"  (no # marks)
+```
+
+The lines starting with `💡` have no `#` prefix → `SyntaxError: invalid character '💡'`.
+
+**RIGHT** — use plain-text descriptions instead of literal escape sequences:
+```javascript
+            #   "---" + newline + "### Next Actions"
+            #   "---" + newlines + "Next Actions"  (no hash marks)
+```
+
+> [!WARNING]
+> This is easy to overlook because comments feel "safe" — but the JS template literal
+> layer processes ALL content (including comments) before it reaches the heredoc.
+> Rule #1 (no `\n` in string literals) applies equally to comments.
+
 ### 2.4 ADK Instruction Template Engine Hazard
 
 ADK's `instructions_utils.inject_session_state()` (called automatically before every
@@ -236,6 +380,10 @@ Before submitting any change that touches Python code inside heredocs:
 - [ ] Search for `{word}` patterns in agent `instruction` text → replace with `<word>` or `[WORD]`
 - [ ] Search for backtick triplets (` ``` `) → replace with `chr(96) * 3` in Python code
 - [ ] Check regex patterns in raw strings (`r'...'`): `\s`, `\n`, `\t` need `\\s`, `\\n`, `\\t` for JS layer
+- [ ] **Viewer template (`__VIEWER_MAIN__`)**: Any JS `\n` in string literals needs `\\\\n` (4 backslashes) due to the extra Python `"""` layer
+- [ ] **Conditional block check**: Verify new code is not accidentally inside a `${ flag ? ... }` block (see Section 10)
+- [ ] Search for `'"'` or `strip('"')` in Python code inside heredocs → replace `'"'` with `chr(34)`
+- [ ] **Comments check**: Search for `\n`, `\t`, `\s` inside Python comments (`#`) — they are processed by JS just like code
 - [ ] Run hex verification: `sed -n 'Lp' Code.gs | xxd` to check actual bytes
 
 #### Automated Scan Command
@@ -461,3 +609,54 @@ awk 'NR<=N && /<<.*EOF/' Code.gs | tail -1
 | 2026-05-08 | Same KeyError persists after `{{document_id}}` fix | ADK regex `{+` matches **any** number of opening braces, so `{{var}}` is still caught | Confirmed: only non-brace notation (`<>`, `[]`) is safe |
 | 2026-05-10 | `SyntaxError: Unexpected identifier 'tool_code'` (L6751) | Backtick triplets (` ``` `) in Python regex patterns and comments inside heredoc interpreted as JS template literals by GAS parser | Replace ` ``` ` with `chr(96) * 3` in Python; remove backtick triplets from comments |
 | 2026-05-10 | `SyntaxError: unterminated string literal` (L301 in deployed fast_api_app.py) | `\s` and `\n` in Python regex raw string inside JS template literal: JS interpreted `\n` as newline character (0x0a), splitting the string literal | Double backslashes: `\\s*\\n` — JS processes `\\` → `\`, producing `\s*\n` in the Python file |
+| 2026-05-13 | `Firestore not available (client=False, ...)` — background task tools fail | Firestore client init code placed inside `${ enableWorkspaceMcp ? ... }` conditional block from first commit (`6e331c7`). When `enableWorkspaceMcp=false`, init code was never emitted, leaving `builtins._firestore_client` unset | Move Firestore init outside the conditional block; add AGENTS.md Section 10 and Golden Rule #10 |
+| 2026-05-18 | `SyntaxError: Unexpected string` (L7293) | `strip('"')` in Python code inside `__AGENT_EOF__` heredoc — GAS JS parser misinterpreted the bare double quote in the Python string literal | Replace `'"'` with `chr(34)` — avoids GAS parser quote-nesting confusion |
+| 2026-05-19 | `SyntaxError: invalid character '💡' (U+1F4A1)` (L917 in deployed fast_api_app.py) | `\n` in Python comments inside JS template literal: JS converted `\n` to real newline (0x0a), splitting the comment across lines. Second line had no `#` prefix, exposing `💡 Next Actions` as executable Python code | Replace literal `\n` sequences in comments with plain-text descriptions (e.g., `"---" + newline + "### Next Actions"`) |
+
+---
+
+## 10. JS Template Conditional Block Boundaries
+
+### The Problem
+
+Code.gs uses JS template literal conditional blocks (`${ flag ? \`...\` : '' }`) to
+conditionally include large sections of generated Python/Bash code. These blocks can
+span **hundreds of lines**, making it easy to accidentally insert feature-independent
+code inside a conditional block.
+
+### 10.1 Golden Rule (also listed as Rule #10 in Section 2.1)
+
+**ALWAYS verify which conditional block you are inside before inserting code.**
+Feature-independent code (e.g., Firestore init, common imports, shared utilities)
+must NEVER be placed inside a feature-flag conditional block.
+
+### 10.2 How to Check Your Location
+
+Before inserting code at line N, run:
+
+```bash
+# Find all conditional block starts BEFORE line N:
+awk 'NR<=N && /\$\{.*\?.*`/' Code.gs | tail -3
+
+# Find all conditional block ends AFTER line N:
+awk 'NR>=N && /` : .*\}/' Code.gs | head -3
+```
+
+If the nearest block start has no matching block end before your insertion point,
+**you are inside a conditional block**.
+
+### 10.3 Known Long Conditional Blocks
+
+| Flag | Block Start (approx) | Block End (approx) | Span |
+|------|---------------------|-------------------|------|
+| `enableWorkspaceMcp` (tools.py) | ~L4146 | ~L4460 | ~314 lines |
+| `enableWorkspaceMcp` (agent.py) | ~L6569 | ~L6772 | ~203 lines |
+
+> [!IMPORTANT]
+> Line numbers shift frequently. Always use `grep` to find actual boundaries.
+
+### 10.4 Incident History
+
+| Date | What Happened | Lines Affected |
+|------|---------------|----------------|
+| 2026-05-13 | Firestore client init placed inside `enableWorkspaceMcp` block. When flag=false, `builtins._firestore_client` was never set, breaking all background task tools. | L4148 (should have been before L4132) |

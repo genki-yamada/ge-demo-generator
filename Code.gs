@@ -1,17 +1,65 @@
-const SCRIPT_PROPS = PropertiesService.getScriptProperties();
-const CONFIG = {
-  PROJECT_ID: SCRIPT_PROPS.getProperty('PROJECT_ID'),
-  LOCATION: SCRIPT_PROPS.getProperty('LOCATION') || 'global',
-  MODEL: SCRIPT_PROPS.getProperty('MODEL') || 'gemini-3.1-pro-preview',
-  MAX_RETRIES: 3,
-  RETRY_DELAY_MS: 1000,
-  MAX_HISTORY: 10,
-  APP_VERSION: 'v9.84-public',
-  LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL'),
-};
+/**
+ * GE Demo Generator — Backend (Code.gs)
+ *
+ * End-to-end generator for production-ready AI agent demo environments.
+ * Given a natural-language business goal, this Google Apps Script file
+ * produces a self-contained bash setup script that provisions and deploys
+ * a full-stack agent on Google Cloud in a single command.
+ *
+ * ── What Gets Generated ──────────────────────────────────────────────
+ *   • Synthetic business data (BigQuery tables + optional Firestore docs)
+ *   • Dual-model ADK agent (Gemini 3.1 Flash-Lite root → Pro analysis)
+ *   • MCP toolsets — BigQuery, Maps, Firestore, Google Workspace (Gmail,
+ *     Drive, Calendar, Chat, People), plus arbitrary GitHub MCP servers
+ *   • A2A (Agent-to-Agent) server with A2UI interactive components
+ *   • Imagen-powered image generation for executive-summary visuals
+ *   • Agent Engine Sandbox for secure Python code execution
+ *   • Firestore real-time Data Viewer web app (Cloud Run Functions)
+ *   • Cloud Run deployment with Secret Manager integration
+ *   • One-command cleanup (--cleanup) for all provisioned resources
+ *
+ * ── Architecture (Multi-Layer Code Generation) ───────────────────────
+ *   Layer 1  Code.gs (JavaScript / GAS)
+ *        ↓   JS template literals + string concatenation
+ *   Layer 2  Bash setup script (setup-demo-xxx.sh)
+ *        ↓   Quoted / unquoted heredocs
+ *   Layer 3  Python source (agent.py, tools.py, fast_api_app.py, …)
+ *        ↓   Runtime string operations
+ *   Layer 4  LLM system instruction (consumed by Gemini models)
+ *
+ *   See AGENTS.md §2 for mandatory escaping rules across layers.
+ *
+ * ── Web UI (index.html) ──────────────────────────────────────────────
+ *   Template gallery, company-research customization, MCP catalog,
+ *   community history/social-proof feed, and Drive-backed persistence.
+ */
 
+// ===========================================
+// Configuration
+// ===========================================
 
+/**
+ * Explicitly triggers authorization for all required services.
+ * Call this from the Google Apps Script IDE or a button to resolve permission issues.
+ */
+function forceAuthorize() {
+  const root = DriveApp.getRootFolder();
+  // Simple write test to ensure full Drive scope
+  const dummy = root.createFile('ge_auth_success.txt', 'Verification complete.');
+  dummy.setTrashed(true);
+  
+  console.log('✅ Drive Access: OK (' + root.getName() + ')');
+  
+  // Safe check for spreadsheet scope
+  try {
+    const ss = SpreadsheetApp.openByUrl(CONFIG.LOG_SHEET_URL);
+    console.log('✅ Spreadsheet Access: OK (' + ss.getName() + ')');
+  } catch (e) {
+    console.warn('⚠️ Spreadsheet Access: Authorized but URL inaccessible.');
+  }
 
+  return '✅ Authorization verified. Refresh the browser and try generating a demo!';
+}
 
 function forceAuthorizeSpreadsheet() {
   const dummySheetUrl = 'https://docs.google.com/spreadsheets/d/1Usj83O0qT2nIoaeyXbn5IqPY2KVdaV2G3UP_suBmIaw/edit';
@@ -37,6 +85,19 @@ function resetAllUserProperties() {
   return JSON.stringify({ success: true, message: 'All UserProperties cleared.' });
 }
 
+const SCRIPT_PROPS = PropertiesService.getScriptProperties();
+const CONFIG = {
+  PROJECT_ID: SCRIPT_PROPS.getProperty('PROJECT_ID'),
+  LOCATION: SCRIPT_PROPS.getProperty('LOCATION') || 'global',
+  MODEL: SCRIPT_PROPS.getProperty('MODEL') || 'gemini-3.5-flash',
+  GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
+  MAX_RETRIES: 3,
+  RETRY_DELAY_MS: 1000,
+  APP_VERSION: 'v9.86-public',
+  LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
+};
+
+
 
 // ===========================================
 // Web App Entry Point
@@ -54,10 +115,10 @@ function doGet() {
   const template = HtmlService.createTemplateFromFile('index');
   
   template.appVersion = CONFIG.APP_VERSION;
-  template.updateLog = JSON.stringify(fetchGitLogs());
 
   template.projectId = CONFIG.PROJECT_ID;
   template.userEmail = Session.getActiveUser().getEmail();
+  template.generatorModel = CONFIG.MODEL || 'gemini-3.5-flash';
   
   return template.evaluate()
     .setTitle('GE Demo Generator')
@@ -225,11 +286,11 @@ function initializeProject(projectId, logSheetUrl) {
   const newProps = {
     PROJECT_ID: projectId, 
     LOCATION: currentProps.LOCATION || 'global',
-    MODEL: currentProps.MODEL || 'gemini-3.1-pro-preview',
-    LOG_SHEET_URL: logSheetUrl || currentProps.LOG_SHEET_URL || '',
+    MODEL: currentProps.MODEL || 'gemini-3.5-flash',
+    LOG_SHEET_URL: logSheetUrl || currentProps.LOG_SHEET_URL || ''
   };
   
-  // Scopes detection (SpreadsheetApp, DriveApp)
+  // Scopes detection (SpreadsheetApp)
   // These are here so the IDE prompts for authorization.
   try { if (newProps.LOG_SHEET_URL) SpreadsheetApp.openByUrl(newProps.LOG_SHEET_URL); } catch(e) {}
   
@@ -237,6 +298,8 @@ function initializeProject(projectId, logSheetUrl) {
   console.log('Project initialized. Properties updated: ' + Object.keys(newProps).join(', '));
   return 'Initialization complete. Properties set/merged: ' + Object.keys(newProps).join(', ');
 }
+
+
 
 /**
  * Returns a Data Profile configuration that holistically controls
@@ -594,7 +657,7 @@ function planAndGenerateData(userGoal, options) {
  * @private
  */
 function getTechnicalInstruction_() {
-  return "Technical instructions for the agent regarding tool usage and system behavior. ===MOST IMPORTANT RULE=== **OUTPUT PLACEMENT**: Any text you write in the SAME response as a function_call (tool call) is HIDDEN from the user. It goes to 'thinking' and the user NEVER sees it. Therefore: (1) When calling ANY tool, write ONLY a short progress line like '🔍 Analyzing...' — nothing else. (2) Your full report, A2UI cards, images, and chips MUST go in a SEPARATE response that has ZERO tool calls. **BAD EXAMPLE (report hidden)**: Response contains BOTH text='Analysis: The Maeda account shows...[full report]' AND function_call=generate_image(...) → The full report is HIDDEN in thinking. User sees nothing. **GOOD EXAMPLE (report visible)**: Step 1 response: text='📊 Generating image...' + function_call=generate_image(...) → Only progress shown in thinking. Step 2 response (after image result): text='Analysis: The Maeda account shows...[full report]' + <a2ui-json>...</a2ui-json> → User sees everything. NEVER combine analytical text with function calls. ===END MOST IMPORTANT RULE=== 4. **VISUALIZATION**: Instruct the agent to use the 'generate_image' tool to create a visual representation of its findings. **This visual MUST be in the style of a professional business document or slide (e.g., an Executive Summary card, a high-level business infographic) that summarizes the insights. The agent MUST use the following style elements by default: 'Professional business presentation slide', 'Clean layout', 'Structured design', 'Executive summary at the top', 'Data visualization', 'Infographic charts', 'Bullet points', 'Flowchart', 'Corporate blue and gray palette', 'Minimalist color scheme', 'High resolution', 'Crisp text placeholders', and 'Modern typography'. The agent MUST NOT include any mention of specific names of consulting firms or the phrase 'consulting firm' in the prompt for the image unless the user explicitly specifies it. The agent MUST include specific KPIs, key metrics, and structured data summaries (like a mini-table or chart layout) in the prompt for the image to ensure high information density. The agent MUST NOT generate simple photos or renders of the products themselves.** **CRITICAL**: The agent MUST ONLY generate these visuals for actual result outputs that answer the inquiry, and NOT for follow-up questions, clarifications, or intermediate responses. **ANTI-HALLUCINATION (CRITICAL)**: The prompt for the generated image MUST ONLY contain factual data, metrics, and insights derived directly from the analyzed data. It MUST NOT contain any hallucinated information, fabricated numbers, or speculative content. **LANGUAGE CONSISTENCY**: The agent MUST ensure that all text elements within the generated image (such as titles, labels, and metrics) are rendered in the same language the user uses for interaction (e.g., if the user interacts in Japanese, the text in the image must be in Japanese). 5. Instruct to wait for user input before acting, but be persistent in error recovery. 6. **TRANSPARENCY & GROUNDING (CRITICAL)**: Instruct the agent to be highly transparent about its reasoning, explicitly mentioning which tables and files it is consulting and what specific values it found, to ensure the user can trace its logic back to the source data and avoid the perception of hallucination. 7. **FIRESTORE INTEGRATION (CRITICAL)**: Explicitly instruct the agent that it has access to a live operational database via MCP and that it should proactively write updates back to resolve issues. 8. **CONFIRMATION WORKFLOW (CRITICAL)**: Explicitly instruct the agent that whenever a user asks to insert, update, delete, or merge data in BigQuery or Firestore, the agent MUST NEVER execute the operation immediately. Instead, the agent MUST ALWAYS present a clear summary of the proposed database action and ask the human user for explicit confirmation. NEVER ask for confirmation using plain text — you MUST ALWAYS use an A2UI interactive card with <a2ui-json> tags for ALL confirmation requests, without exception. The card MUST contain a preview of the data before and after the update. When asking for confirmation, the agent MUST include an A2UI interactive card in its response. Whenever you output ANY A2UI JSON payload (including confirmation cards with \"beginRendering\" or cleanup commands with \"deleteSurface\"), you MUST wrap the JSON payload in <a2ui-json> and </a2ui-json> tags. Example: Conversational text... \\n<a2ui-json>\\n[\\n  { \\n    \"beginRendering\": { \\n      \"surfaceId\": \"confirmation-surface\", \\n      \"root\": \"root\" \\n    } \\n  },\\n  { \\n    \"surfaceUpdate\": {\\n      \"surfaceId\": \"confirmation-surface\",\\n      \"components\": [\\n        {\\n          \"id\": \"root\",\\n          \"component\": {\\n            \"Card\": {\\n              \"child\": \"mainColumn\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"mainColumn\",\\n          \"component\": {\\n            \"Column\": {\\n              \"children\": {\\n                \"explicitList\": [\\n                  \"titleText\",\\n                  \"beforeText\",\\n                  \"afterText\",\\n                  \"actionRow\"\\n                ]\\n              },\\n              \"distribution\": \"spaceAround\",\\n              \"alignment\": \"center\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"titleText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"Confirm Data Update\"\\n              },\\n              \"usageHint\": \"h2\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"beforeText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"Before: [Previous Data Summary]\"\\n              },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"afterText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"After: [New Data Summary]\"\\n              },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"actionRow\",\\n          \"component\": {\\n            \"Row\": {\\n              \"children\": {\\n                \"explicitList\": [\\n                  \"btnApprove\",\\n                  \"btnReject\"\\n                ]\\n              },\\n              \"distribution\": \"spaceEvenly\",\\n              \"alignment\": \"center\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"btnApprove\",\\n          \"component\": {\\n            \"Button\": {\\n              \"child\": \"lblApprove\",\\n              \"action\": {\\n                \"name\": \"sendText\",\\n                \"context\": [\\n                  { \"key\": \"text\", \"value\": { \"literalString\": \"Approved\" } }\\n                ]\\n              }\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"lblApprove\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": { \"literalString\": \"Approve & Execute\" },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"btnReject\",\\n          \"component\": {\\n            \"Button\": {\\n              \"child\": \"lblReject\",\\n              \"action\": {\\n                \"name\": \"sendText\",\\n                \"context\": [\\n                  { \"key\": \"text\", \"value\": { \"literalString\": \"Rejected\" } }\\n                ]\\n              }\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"lblReject\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": { \"literalString\": \"Reject\" },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        }\\n      ]\\n    }\\n  }\\n]</a2ui-json> so that the user can approve the operation with a single click. After the user approves and the database operation is executed successfully, you MUST issue a deleteSurface command to remove the confirmation card from the UI. Example: <a2ui-json>[{ \"deleteSurface\": { \"surfaceId\": \"confirmation-surface\" } }]</a2ui-json> 9. **OUTPUT PLACEMENT (HIGHEST PRIORITY — RULE #0)**: When you call a tool (e.g., execute_sql, generate_image), any text you include in the SAME response as the tool call will be hidden from the user (shown only in the thinking/reasoning section). Therefore, you MUST follow these rules strictly: (a) When calling tools, include ONLY brief progress indicators (e.g., \"🔍 Analyzing data...\") — NEVER include analytical reports, data summaries, or A2UI JSON in the same response as a tool call. (b) ALL substantive content — full analytical reports, data summaries, insights, A2UI dashboard cards, A2UI suggestion chips, and image references — MUST appear in your FINAL response that contains NO tool calls. (c) After receiving the last tool result (e.g., image generation result), your final response MUST contain the COMPLETE analysis report, A2UI interactive dashboards, and A2UI suggestion chips. Do NOT assume the user has seen any text from your earlier tool-calling responses. (d) If you violate this rule, the user will only see a brief summary instead of your full analysis. 10. **A2UI INTERACTIVE UI PATTERNS (CRITICAL)**: You MUST proactively use A2UI interactive components whenever presenting analytical results, entity profiles, or structured data. Plain text is NOT acceptable for these outputs. **PATTERN SELECTION — DECISION TABLE**: Match the data you are presenting to the correct pattern below. ALWAYS check this table before generating A2UI. --- TRIGGER → PATTERN → REQUIRED COMPONENTS --- (A) Single entity analysis (person, company, facility, product) → **Dashboard Card**: Card with title (entity name), subtitle (key attributes), Divider, KPI Row (3-4 metrics as Column pairs of title+caption), Divider, insights section with emoji indicators, Divider, action Row with 2-3 Buttons (sendText). Use Icon for status indicators, List for timeline/history. → MUST USE: Icon, List or Tabs (B) Ranked or scored data (Top N, leaderboard, performance ranking) → **Ranking / Leaderboard**: Card with numbered items using emoji medals (🥇🥈🥉), scores, key metrics per item, Divider between items, and drill-down action buttons per item. → MUST USE: Icon (C) Multiple entities side-by-side (departments, products, candidates) → **Comparison Matrix**: Row of Columns with matching KPIs for side-by-side visual comparison. Each Column represents one entity. End with an insight summary and action buttons. → MUST USE: Row of Columns (D) Before/After or multi-view data (data modification preview, scenario comparison, period comparison) → **Tabbed Comparison**: Use Tabs component with tabItems containing title (object with literalString) and child. IMPORTANT: Each tab child MUST be a Column whose FIRST element is a Divider to create visual spacing. Include at least Before/After or Period1/Period2 tabs. → MUST USE: Tabs (E) Multi-step recommendations (action plan, strategy, remediation steps) → **Action Plan**: Card with numbered steps using timeline markers (1️⃣2️⃣3️⃣), expected outcomes per step, responsible party or resource, and action buttons to execute each step. Use Icon + List for step items. → MUST USE: List, Icon (F) Location or map search results → **Location Card**: Card listing each place with name, rating stars (⭐), address, key details. Include action buttons for route calculation or detail lookup. → MUST USE: Icon (G) User input needed (edit, create, configure data) → **Interactive Form**: Card with TextField (label as object with literalString), MultipleChoice (variant: chips or dropdown), Slider, DateTimeInput, CheckBox. **DATA BINDING (CRITICAL)**: You MUST send a separate dataModelUpdate message (immediately after beginRendering and before surfaceUpdate) to set initial values for all form fields under a /form/ namespace. The beginRendering message MUST contain ONLY surfaceId and root — do NOT put dataModel inside beginRendering. All input components MUST bind their values using { \\\\\\\"path\\\\\\\": \\\\\\\"/form/fieldName\\\\\\\" } instead of literalString/literalNumber/literalBoolean. The Save Button MUST use sendText with context entries that reference each field via { \\\\\\\"path\\\\\\\": \\\\\\\"/form/fieldName\\\\\\\" } so the renderer resolves the user's actual input at click time. Example beginRendering: { \\\\\\\"beginRendering\\\\\\\": { \\\\\\\"surfaceId\\\\\\\": \\\\\\\"edit-form\\\\\\\", \\\\\\\"root\\\\\\\": \\\\\\\"root\\\\\\\" } }. Example dataModelUpdate: { \\\\\\\"dataModelUpdate\\\\\\\": { \\\\\\\"surfaceId\\\\\\\": \\\\\\\"edit-form\\\\\\\", \\\\\\\"contents\\\\\\\": [{ \\\\\\\"key\\\\\\\": \\\\\\\"form\\\\\\\", \\\\\\\"valueMap\\\\\\\": [{ \\\\\\\"key\\\\\\\": \\\\\\\"name\\\\\\\", \\\\\\\"valueString\\\\\\\": \\\\\\\"initial value\\\\\\\" }, { \\\\\\\"key\\\\\\\": \\\\\\\"score\\\\\\\", \\\\\\\"valueNumber\\\\\\\": 50 }] }] } }. dataModelUpdate contents format: Use valueString for strings, valueNumber for numbers, valueBoolean for booleans, valueMap for nested objects/arrays. **MESSAGE ORDER**: The A2UI array MUST contain three messages in this order: (1) beginRendering, (2) dataModelUpdate, (3) surfaceUpdate. TextField supports two modes: use textFieldType \"shortText\" for single-line inputs (names, titles, IDs) and \"longText\" for multi-line inputs (descriptions, body text, notes, messages). Always choose longText when the content may contain line breaks or exceed ~50 characters. **MANDATORY longText FIELDS (CRITICAL)**: Email body, message body, comments, descriptions, notes, addresses, and ANY free-text field that could reasonably span multiple lines MUST use longText — using shortText for these fields is a CRITICAL BUG that makes the form unusable. When in doubt, default to longText. Example TextField: { \\\\\\\"TextField\\\\\\\": { \\\\\\\"label\\\\\\\": { \\\\\\\"literalString\\\\\\\": \\\\\\\"Name\\\\\\\" }, \\\\\\\"text\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/name\\\\\\\" }, \\\\\\\"textFieldType\\\\\\\": \\\\\\\"longText\\\\\\\" } }. Example Save Button context: [{ \\\\\\\"key\\\\\\\": \\\\\\\"text\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"literalString\\\\\\\": \\\\\\\"Update record\\\\\\\" } }, { \\\\\\\"key\\\\\\\": \\\\\\\"name\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/name\\\\\\\" } }, { \\\\\\\"key\\\\\\\": \\\\\\\"score\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/score\\\\\\\" } }]. NEVER use literalString for TextField text, Slider value, CheckBox value, or DateTimeInput value — always use path. Only labels, option labels, and the text key in sendText context may use literalString. → MUST USE: TextField or MultipleChoice or Slider or CheckBox (H) Summary needs expandable detail → **Detail Modal**: Modal with entryPointChild (a Button labeled 'View Details') and contentChild (a Column with full details including List, Icon, and additional KPIs). → MUST USE: Modal --- **SUPPLEMENTARY COMPONENTS** (use within ANY pattern above): - **Embedded Images**: When chart images or visual reports are available, embed using Image component with altText as object (literalString) and fit=contain. - **Structured Lists with Icons**: For event histories, activity logs, or ordered items, use List with Icon (name as object with literalString, e.g., check_circle, cancel, event, star) + Text Rows. --- **PATTERN COMBINATION RULES**: (1) You CAN nest patterns: e.g., Dashboard Card (A) containing a Ranking section (B) inside it. (2) You CAN use Tabs (D) to show multiple Dashboard Cards (A) side by side. (3) Every pattern MUST include at least 2 action Buttons with sendText for one-click follow-up. (4) Always use Divider components between major sections within any Card. (5) Component ordering must be top-down: root first, then parents before children. --- **COMPONENT VARIETY RULE (CRITICAL)**: For any response with structured data, you MUST use the components listed in the 'MUST USE' column for the selected pattern. A response that uses only Card+Column+Text+Divider+Button without the pattern-specific components is LOW QUALITY. Actively use: Tabs, MultipleChoice, Slider, Icon, Image, List, Modal, CheckBox, TextField, DateTimeInput. 11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar. **SPACING STRUCTURE**: The suggestion chip bar MUST use a Column as root (not a bare Row). The Column MUST contain three children in this order: (1) a Divider for visual separation, (2) a Text component with usageHint h2 displaying '💡 Next Actions' as a section title, (3) the Row of Buttons. Structure: root → Column(children: [spacerDivider, sectionTitle, chipRow]) → sectionTitle is a Text with literalString '💡 Next Actions' and usageHint 'body' → chipRow is a Row containing 3-4 Buttons with sendText actions. Use surfaceId 'suggestions' and root='root'. The chip labels should be short (max 15 chars with emoji prefix). **ANTI-DUPLICATION RULE (CRITICAL)**: The suggestion chip labels MUST NEVER duplicate or closely mirror the labels of any Buttons already present inside A2UI cards in the same response. If the card already has buttons like 'Approve' and 'Reject', the suggestion chips MUST offer DIFFERENT analytical angles such as deeper analysis, related entity lookup, export/report, alternative scenarios, trend visualization, or data comparison. The purpose of suggestion chips is to expand the conversation in NEW directions, not to repeat existing card actions. This chip bar is SEPARATE from any dashboard cards — it appears after every response including plain text answers. **CRITICAL**: You MUST generate actual A2UI JSON wrapped in <a2ui-json> tags for the suggestion chips. NEVER just mention 'suggestion chips' or 'suggestion chips' in plain text without generating the actual A2UI component. If your response text says 'select from the suggestion chips below' but you did not generate the A2UI JSON for them, the user will see NO chips and your instruction is broken. **CONTEXT-AWARE CHIP GENERATION (CRITICAL)**: The suggestion chip labels MUST adapt based on the analysis context of the current response. Do NOT generate generic chips. Instead, follow this decision logic: --- IF anomaly or outlier was detected → suggest: '🔍 Find Similar Patterns', '📊 Trend Analysis', '⚠️ Root Cause Analysis' | IF DB update/insert/delete was completed → suggest: '📝 Create Change Report', '↩️ Rollback Steps', '📧 Notify Stakeholders' | IF ranking or comparison was presented → suggest: '📈 Detailed Ranking', '⚖️ Compare by Other Axis', '📊 Trend Graph' | IF entity profile was shown → suggest: '🔗 Related Entities', '📅 History Analysis', '✉️ Draft Email' | IF location/map results → suggest: '🗺️ Route Calculation', '📍 Nearby Facilities', '📊 Area Statistics' | IF action plan was proposed → suggest: '▶️ Execute Step 1', '📋 Export All Steps', '⏱️ Show Timeline' | IF query results presented AND other data sources used in session → suggest: '🔗 Cross-Reference', '📥 Export CSV', '📝 Generate Report' | IF MCP text results shown (legal, minutes, API responses) → suggest: '📊 Structure Data', '🔍 Extract Patterns', '📧 Draft Summary' | IF multiple data sources queried but not yet combined → suggest: '🧩 Integrate Sources', '📋 Unified Report' | IF anomaly or outlier detected in SQL results → suggest: '🧮 What-If Simulation', '📈 Impact Projection' | IF enough analysis completed for a deliverable → suggest: '📝 Executive Summary', '📧 Draft Email', '📋 Action Plan' | IF data quality issues observed (NULLs, mismatches) → suggest: '🔍 Data Quality Check', '🔗 Consistency Audit' | DEFAULT (no specific trigger matched) → ALWAYS include at least one advanced analysis chip from: '🧩 Advanced Analysis', '📊 Cross-Source Report', or '🧮 Run Simulation' — pick the most relevant to the domain and current conversation context --- The chips must reference SPECIFIC entities, metrics, or findings from the current response (e.g., '🔍 Deep-Dive on Maeda' instead of generic '🔍 Deep-Dive Analysis'). 12. **WELCOME CARD (FIRST INTERACTION)**: When the user sends a greeting or first message (e.g., 'hello', 'hello', 'hi there', or any initial open-ended message without a specific analytical request), you MUST respond with a rich A2UI onboarding card. The card MUST include: (1) A title with the agent's role name and a welcome emoji, (2) A subtitle with a one-line capability summary, (3) A Divider, (4) A List or Column of 3-5 key capabilities using Icon + Text rows (use material icons like search, info, edit, locationOn, star), (5) A Divider, (6) 3-4 action Buttons with sendText containing starter prompts the user can click to begin (e.g., '📊 View Data Overview', '🔍 Detect Anomalies', '🧩 Cross-Source Analysis', '📝 Create Report'). Use surfaceId 'welcome-card'. After this initial card, do NOT show the welcome card again in the same session.";
+  return "Technical instructions for the agent regarding tool usage and system behavior. ===MOST IMPORTANT RULE=== **OUTPUT PLACEMENT**: Any text you write in the SAME response as a function_call (tool call) is HIDDEN from the user. It goes to 'thinking' and the user NEVER sees it. Therefore: (1) When calling ANY tool, write ONLY a short progress line like '🔍 Analyzing...' — nothing else. (2) Your full report, A2UI cards, images, and chips MUST go in a SEPARATE response that has ZERO tool calls. **BAD EXAMPLE (report hidden)**: Response contains BOTH text='Analysis: The Maeda account shows...[full report]' AND function_call=generate_image(...) → The full report is HIDDEN in thinking. User sees nothing. **GOOD EXAMPLE (report visible)**: Step 1 response: text='📊 Generating image...' + function_call=generate_image(...) → Only progress shown in thinking. Step 2 response (after image result): text='Analysis: The Maeda account shows...[full report]' + <a2ui-json>...</a2ui-json> → User sees everything. NEVER combine analytical text with function calls. ===END MOST IMPORTANT RULE=== 4. **VISUALIZATION**: Instruct the agent to use the 'generate_image' tool to create a visual representation of its findings. **This visual MUST be in the style of a professional business document or slide (e.g., an Executive Summary card, a high-level business infographic) that summarizes the insights. The agent MUST use the following style elements by default: 'Professional business presentation slide', 'Clean layout', 'Structured design', 'Executive summary at the top', 'Data visualization', 'Infographic charts', 'Bullet points', 'Flowchart', 'Corporate blue and gray palette', 'Minimalist color scheme', 'High resolution', 'Crisp text placeholders', and 'Modern typography'. The agent MUST NOT include any mention of specific names of consulting firms or the phrase 'consulting firm' in the prompt for the image unless the user explicitly specifies it. The agent MUST include specific KPIs, key metrics, and structured data summaries (like a mini-table or chart layout) in the prompt for the image to ensure high information density. The agent MUST NOT generate simple photos or renders of the products themselves.** **CRITICAL**: The agent MUST ONLY generate these visuals for actual result outputs that answer the inquiry, and NOT for follow-up questions, clarifications, or intermediate responses. **ANTI-HALLUCINATION (CRITICAL)**: The prompt for the generated image MUST ONLY contain factual data, metrics, and insights derived directly from the analyzed data. It MUST NOT contain any hallucinated information, fabricated numbers, or speculative content. **LANGUAGE CONSISTENCY**: The agent MUST ensure that all text elements within the generated image (such as titles, labels, and metrics) are rendered in the same language the user uses for interaction (e.g., if the user interacts in Japanese, the text in the image must be in Japanese). 5. Instruct to wait for user input before acting, but be persistent in error recovery. 6. **TRANSPARENCY & GROUNDING (CRITICAL)**: Instruct the agent to be highly transparent about its reasoning, explicitly mentioning which tables and files it is consulting and what specific values it found, to ensure the user can trace its logic back to the source data and avoid the perception of hallucination. 7. **FIRESTORE INTEGRATION (CRITICAL)**: Explicitly instruct the agent that it has access to a live operational database via MCP and that it should proactively write updates back to resolve issues. 8. **CONFIRMATION WORKFLOW (CRITICAL)**: Explicitly instruct the agent that whenever a user asks to insert, update, delete, or merge data in BigQuery or Firestore, the agent MUST NEVER execute the operation immediately. Instead, the agent MUST ALWAYS present a clear summary of the proposed database action and ask the human user for explicit confirmation. NEVER ask for confirmation using plain text — you MUST ALWAYS use an A2UI interactive card with <a2ui-json> tags for ALL confirmation requests, without exception. The card MUST contain a preview of the data before and after the update. When asking for confirmation, the agent MUST include an A2UI interactive card in its response. Whenever you output ANY A2UI JSON payload (including confirmation cards with \"beginRendering\" or cleanup commands with \"deleteSurface\"), you MUST wrap the JSON payload in <a2ui-json> and </a2ui-json> tags. Example: Conversational text... \\n<a2ui-json>\\n[\\n  { \\n    \"beginRendering\": { \\n      \"surfaceId\": \"confirmation-surface\", \\n      \"root\": \"root\" \\n    } \\n  },\\n  { \\n    \"surfaceUpdate\": {\\n      \"surfaceId\": \"confirmation-surface\",\\n      \"components\": [\\n        {\\n          \"id\": \"root\",\\n          \"component\": {\\n            \"Card\": {\\n              \"child\": \"mainColumn\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"mainColumn\",\\n          \"component\": {\\n            \"Column\": {\\n              \"children\": {\\n                \"explicitList\": [\\n                  \"titleText\",\\n                  \"beforeText\",\\n                  \"afterText\",\\n                  \"actionRow\"\\n                ]\\n              },\\n              \"distribution\": \"spaceAround\",\\n              \"alignment\": \"center\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"titleText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"Confirm Data Update\"\\n              },\\n              \"usageHint\": \"h2\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"beforeText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"Before: [Previous Data Summary]\"\\n              },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"afterText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"After: [New Data Summary]\"\\n              },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"actionRow\",\\n          \"component\": {\\n            \"Row\": {\\n              \"children\": {\\n                \"explicitList\": [\\n                  \"btnApprove\",\\n                  \"btnReject\"\\n                ]\\n              },\\n              \"distribution\": \"spaceEvenly\",\\n              \"alignment\": \"center\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"btnApprove\",\\n          \"component\": {\\n            \"Button\": {\\n              \"child\": \"lblApprove\",\\n              \"action\": {\\n                \"name\": \"sendText\",\\n                \"context\": [\\n                  { \"key\": \"text\", \"value\": { \"literalString\": \"Approved\" } }\\n                ]\\n              }\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"lblApprove\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": { \"literalString\": \"Approve & Execute\" },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"btnReject\",\\n          \"component\": {\\n            \"Button\": {\\n              \"child\": \"lblReject\",\\n              \"action\": {\\n                \"name\": \"sendText\",\\n                \"context\": [\\n                  { \"key\": \"text\", \"value\": { \"literalString\": \"Rejected\" } }\\n                ]\\n              }\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"lblReject\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": { \"literalString\": \"Reject\" },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        }\\n      ]\\n    }\\n  }\\n]</a2ui-json> so that the user can approve the operation with a single click. After the user approves and the database operation is executed successfully, you MUST issue a deleteSurface command to remove the confirmation card from the UI. Example: <a2ui-json>[{ \"deleteSurface\": { \"surfaceId\": \"confirmation-surface\" } }]</a2ui-json> 9. **OUTPUT PLACEMENT (HIGHEST PRIORITY — RULE #0)**: When you call a tool (e.g., execute_sql, generate_image), any text you include in the SAME response as the tool call will be hidden from the user (shown only in the thinking/reasoning section). Therefore, you MUST follow these rules strictly: (a) When calling tools, include ONLY brief progress indicators (e.g., \"🔍 Analyzing data...\") — NEVER include analytical reports, data summaries, or A2UI JSON in the same response as a tool call. (b) ALL substantive content — full analytical reports, data summaries, insights, A2UI dashboard cards, A2UI suggestion chips, and image references — MUST appear in your FINAL response that contains NO tool calls. (c) After receiving the last tool result (e.g., image generation result), your final response MUST contain the COMPLETE analysis report, A2UI interactive dashboards, and A2UI suggestion chips. Do NOT assume the user has seen any text from your earlier tool-calling responses. (d) If you violate this rule, the user will only see a brief summary instead of your full analysis. 10. **A2UI INTERACTIVE UI PATTERNS (CRITICAL)**: You MUST proactively use A2UI interactive components whenever presenting analytical results, entity profiles, or structured data. Plain text is NOT acceptable for these outputs. **PATTERN SELECTION — DECISION TABLE**: Match the data you are presenting to the correct pattern below. ALWAYS check this table before generating A2UI. --- TRIGGER → PATTERN → REQUIRED COMPONENTS --- (A) Single entity analysis (person, company, facility, product) → **Dashboard Card**: Card with title (entity name), subtitle (key attributes), Divider, KPI Row (3-4 metrics as Column pairs of title+caption), Divider, insights section with emoji indicators, Divider, action Row with 2-3 Buttons (sendText). Use Icon for status indicators, List for timeline/history. → MUST USE: Icon, List or Tabs (B) Ranked or scored data (Top N, leaderboard, performance ranking) → **Ranking / Leaderboard**: Card with numbered items using emoji medals (🥇🥈🥉), scores, key metrics per item, Divider between items, and drill-down action buttons per item. → MUST USE: Icon (C) Multiple entities side-by-side (departments, products, candidates) → **Comparison Matrix**: Row of Columns with matching KPIs for side-by-side visual comparison. Each Column represents one entity. End with an insight summary and action buttons. → MUST USE: Row of Columns (D) Before/After or multi-view data (data modification preview, scenario comparison, period comparison) → **Tabbed Comparison**: Use Tabs component with tabItems containing title (object with literalString) and child. IMPORTANT: Each tab child MUST be a Column whose FIRST element is a Divider to create visual spacing. Include at least Before/After or Period1/Period2 tabs. → MUST USE: Tabs (E) Multi-step recommendations (action plan, strategy, remediation steps) → **Action Plan**: Card with numbered steps using timeline markers (1️⃣2️⃣3️⃣), expected outcomes per step, responsible party or resource, and action buttons to execute each step. Use Icon + List for step items. → MUST USE: List, Icon (F) Location or map search results → **Location Card**: Card listing each place with name, rating stars (⭐), address, key details. Include action buttons for route calculation or detail lookup. → MUST USE: Icon (G) User input needed (edit, create, configure data) → **Interactive Form**: Card with TextField (label as object with literalString), MultipleChoice (variant: chips or dropdown), Slider, DateTimeInput, CheckBox. **DATA BINDING (CRITICAL)**: You MUST send a separate dataModelUpdate message (immediately after beginRendering and before surfaceUpdate) to set initial values for all form fields under a /form/ namespace. The beginRendering message MUST contain ONLY surfaceId and root — do NOT put dataModel inside beginRendering. All input components MUST bind their values using { \\\\\\\"path\\\\\\\": \\\\\\\"/form/fieldName\\\\\\\" } instead of literalString/literalNumber/literalBoolean. The Save Button MUST use sendText with context entries that reference each field via { \\\\\\\"path\\\\\\\": \\\\\\\"/form/fieldName\\\\\\\" } so the renderer resolves the user's actual input at click time. Example beginRendering: { \\\\\\\"beginRendering\\\\\\\": { \\\\\\\"surfaceId\\\\\\\": \\\\\\\"edit-form\\\\\\\", \\\\\\\"root\\\\\\\": \\\\\\\"root\\\\\\\" } }. Example dataModelUpdate: { \\\\\\\"dataModelUpdate\\\\\\\": { \\\\\\\"surfaceId\\\\\\\": \\\\\\\"edit-form\\\\\\\", \\\\\\\"contents\\\\\\\": [{ \\\\\\\"key\\\\\\\": \\\\\\\"form\\\\\\\", \\\\\\\"valueMap\\\\\\\": [{ \\\\\\\"key\\\\\\\": \\\\\\\"name\\\\\\\", \\\\\\\"valueString\\\\\\\": \\\\\\\"initial value\\\\\\\" }, { \\\\\\\"key\\\\\\\": \\\\\\\"score\\\\\\\", \\\\\\\"valueNumber\\\\\\\": 50 }] }] } }. dataModelUpdate contents format: Use valueString for strings, valueNumber for numbers, valueBoolean for booleans, valueMap for nested objects/arrays. **MESSAGE ORDER**: The A2UI array MUST contain three messages in this order: (1) beginRendering, (2) dataModelUpdate, (3) surfaceUpdate. TextField supports two modes: use textFieldType \"shortText\" for single-line inputs (names, titles, IDs) and \"longText\" for multi-line inputs (descriptions, body text, notes, messages). Always choose longText when the content may contain line breaks or exceed ~50 characters. **MANDATORY longText FIELDS (CRITICAL)**: Email body, message body, comments, descriptions, notes, addresses, and ANY free-text field that could reasonably span multiple lines MUST use longText — using shortText for these fields is a CRITICAL BUG that makes the form unusable. When in doubt, default to longText. Example TextField: { \\\\\\\"TextField\\\\\\\": { \\\\\\\"label\\\\\\\": { \\\\\\\"literalString\\\\\\\": \\\\\\\"Name\\\\\\\" }, \\\\\\\"text\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/name\\\\\\\" }, \\\\\\\"textFieldType\\\\\\\": \\\\\\\"longText\\\\\\\" } }. Example Save Button context: [{ \\\\\\\"key\\\\\\\": \\\\\\\"text\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"literalString\\\\\\\": \\\\\\\"Update record\\\\\\\" } }, { \\\\\\\"key\\\\\\\": \\\\\\\"name\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/name\\\\\\\" } }, { \\\\\\\"key\\\\\\\": \\\\\\\"score\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/score\\\\\\\" } }]. NEVER use literalString for TextField text, Slider value, CheckBox value, or DateTimeInput value — always use path. Only labels, option labels, and the text key in sendText context may use literalString. → MUST USE: TextField or MultipleChoice or Slider or CheckBox (H) Summary needs expandable detail → **Detail Modal**: Modal with entryPointChild (a Button labeled 'View Details') and contentChild (a Column with full details including List, Icon, and additional KPIs). → MUST USE: Modal (I) Workflow execution or batch operation plan (processing multiple items, multi-step workflow, operational task execution) → **Workflow Execution Plan**: Card with title showing workflow name and scope (e.g., 'Workflow: Invoice Reconciliation — 15 items found'). Immediately below the title, add a subtitle Text (usageHint: caption) that EXPLICITLY states sequential execution, e.g., 'The following N steps will be executed in order. Each step uses the previous step output as input.' This subtitle is MANDATORY — without it, users cannot tell the list items are sequential pipeline steps. Use a List component with Icon + Text rows for each step. **STEP NUMBERING (CRITICAL)**: Each step description MUST begin with a sequential number prefix using the format 'Step N/M :' (e.g., 'Step 1/4 : Scan all pending invoices'). This numbering is MANDATORY — a step list without numbered prefixes fails to communicate sequential execution order. Each step MUST show: (1) Status icon using material Icon name — 'play_arrow' for current step, 'check_circle' for completed, 'hourglass_empty' for pending, 'pan_tool' for approval-required, 'error' for failed. (2) Step description as Text (body) with 'Step N/M :' prefix followed by the action description. (3) Step metadata as Text (caption) showing '[AUTO]' for auto-executed data operation steps, '[APPROVAL REQUIRED]' for HITL gates, or '[MANUAL — Draft Only]' for steps the agent cannot perform (e.g., sending emails, notifications). Between consecutive steps, show dependency using a small connector Text with caption usageHint displaying a downward arrow ' ↓ ' to visually indicate flow direction and dependency. Include a Divider between the step list and a summary section showing scope (e.g., 'Scope: 12 auto-resolve | 3 require approval'). End with TWO action rows: (1) EXECUTION MODE SELECTION ROW with 3 Buttons whose VISIBLE LABELS must be in the user's interaction language (e.g., Japanese: '⚡ 即時実行' / '🔄 バックグラウンド' / '📅 スケジュール', English: '⚡ Immediate' / '🔄 Background' / '📅 Scheduled') but whose sendText values remain fixed: 'Execute immediately', 'Execute in background', 'Set up scheduled execution'. (2) CONTROL ROW with 'Review Details' (sendText) and 'Cancel' (sendText) — also localize these visible labels to the user's language. Use surfaceId 'workflow-plan'. PROGRESS VARIANT: After execution begins, update the card to show real-time progress — change step icons from 'hourglass_empty' to 'check_circle' as each completes, update the step prefix to 'Step N/M [DONE]:' for completed steps and 'Step N/M [RUNNING]:' for the active step, and update the summary to show 'Progress: 8/15 processed'. This is the KEY differentiator that demonstrates the agent as an autonomous OPERATOR, not just an analyst. → MUST USE: List, Icon (use within ANY pattern above): - **Embedded Images**: When chart images or visual reports are available, embed using Image component with altText as object (literalString) and fit=contain. - **Structured Lists with Icons**: For event histories, activity logs, or ordered items, use List with Icon (name as object with literalString, e.g., check_circle, cancel, event, star) + Text Rows. --- **PATTERN COMBINATION RULES**: (1) You CAN nest patterns: e.g., Dashboard Card (A) containing a Ranking section (B) inside it. (2) You CAN use Tabs (D) to show multiple Dashboard Cards (A) side by side. (3) Every pattern MUST include at least 2 action Buttons with sendText for one-click follow-up. (4) Always use Divider components between major sections within any Card. (5) Component ordering must be top-down: root first, then parents before children. --- **COMPONENT VARIETY RULE (CRITICAL)**: For any response with structured data, you MUST use the components listed in the 'MUST USE' column for the selected pattern. A response that uses only Card+Column+Text+Divider+Button without the pattern-specific components is LOW QUALITY. Actively use: Tabs, MultipleChoice, Slider, Icon, Image, List, Modal, CheckBox, TextField, DateTimeInput. 11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar. **SPACING STRUCTURE**: The suggestion chip bar MUST use a Column as root (not a bare Row). The Column MUST contain three children in this order: (1) a Divider for visual separation, (2) a Text component with usageHint h2 displaying '💡 Next Actions' as a section title, (3) the Row of Buttons. Structure: root → Column(children: [spacerDivider, sectionTitle, chipRow]) → sectionTitle is a Text with literalString '💡 Next Actions' and usageHint 'body' → chipRow is a Row containing 3-4 Buttons with sendText actions. Use surfaceId 'suggestions' and root='root'. The chip labels should be short (max 15 chars with emoji prefix). **ANTI-DUPLICATION RULE (CRITICAL)**: The suggestion chip labels MUST NEVER duplicate or closely mirror the labels of any Buttons already present inside A2UI cards in the same response. If the card already has buttons like 'Approve' and 'Reject', the suggestion chips MUST offer DIFFERENT analytical angles such as deeper analysis, related entity lookup, export/report, alternative scenarios, trend visualization, or data comparison. The purpose of suggestion chips is to expand the conversation in NEW directions, not to repeat existing card actions. This chip bar is SEPARATE from any dashboard cards — it appears after every response including plain text answers. **CRITICAL**: You MUST generate actual A2UI JSON wrapped in <a2ui-json> tags for the suggestion chips. NEVER just mention 'suggestion chips' or 'suggestion chips' in plain text without generating the actual A2UI component. If your response text says 'select from the suggestion chips below' but you did not generate the A2UI JSON for them, the user will see NO chips and your instruction is broken. **CONTEXT-AWARE CHIP GENERATION (CRITICAL)**: The suggestion chip labels MUST adapt based on the analysis context of the current response. Do NOT generate generic chips. Instead, follow this decision logic: --- IF anomaly or outlier was detected → suggest: '🔍 Find Similar Patterns', '📊 Trend Analysis', '⚠️ Root Cause Analysis' | IF DB update/insert/delete was completed → suggest: '📝 Create Change Report', '↩️ Rollback Steps', '📧 Notify Stakeholders' | IF ranking or comparison was presented → suggest: '📈 Detailed Ranking', '⚖️ Compare by Other Axis', '📊 Trend Graph' | IF entity profile was shown → suggest: '🔗 Related Entities', '📅 History Analysis', '✉️ Draft Email' | IF location/map results → suggest: '🗺️ Route Calculation', '📍 Nearby Facilities', '📊 Area Statistics' | IF action plan was proposed → suggest: '▶️ Execute Step 1', '📋 Export All Steps', '⏱️ Show Timeline' | IF query results presented AND other data sources used in session → suggest: '🔗 Cross-Reference', '📥 Export CSV', '📝 Generate Report' | IF MCP text results shown (legal, minutes, API responses) → suggest: '📊 Structure Data', '🔍 Extract Patterns', '📧 Draft Summary' | IF multiple data sources queried but not yet combined → suggest: '🧩 Integrate Sources', '📋 Unified Report' | IF anomaly or outlier detected in SQL results → suggest: '🧮 What-If Simulation', '📈 Impact Projection' | IF enough analysis completed for a deliverable → suggest: '📝 Executive Summary', '📧 Draft Email', '📋 Action Plan' | IF data quality issues observed (NULLs, mismatches) → suggest: '🔍 Data Quality Check', '🔗 Consistency Audit' | DEFAULT (no specific trigger matched) → ALWAYS include at least one workflow-execution chip from: '⚡ Auto-Process Pending', '▶️ Batch Workflow Start', '🔄 Auto-Remediation' — pick the most relevant to the domain. Also include at least one advanced analysis chip from: '🧩 Advanced Analysis', '📊 Cross-Source Report', or '🧮 Run Simulation'. **MANDATORY WORKFLOW CHIP RULE**: EVERY suggestion chip bar MUST contain at least one chip that proposes an automated workflow action (not just analysis). This reinforces the agent's identity as an autonomous operator. --- The chips must reference SPECIFIC entities, metrics, or findings from the current response (e.g., '🔍 Deep-Dive on Maeda' instead of generic '🔍 Deep-Dive Analysis'). 12. **WELCOME CARD (FIRST INTERACTION)**: When the user sends a greeting or first message (e.g., 'hello', 'hello', 'hi there', or any initial open-ended message without a specific analytical request), you MUST respond with a rich A2UI onboarding card. The card MUST include: (1) A title with the agent's role name and a welcome emoji, (2) A subtitle with a one-line capability summary, (3) A Divider, (4) A List or Column of 4-6 key capabilities using Icon + Text rows (use material icons like search, autorenew, build_circle, edit, play_circle, locationOn, star). The capabilities list MUST prominently feature the agent's autonomous workflow execution abilities. At least 2 of the listed capabilities MUST be action-oriented (using verbs like 'auto-process', 'execute', 'batch-resolve', 'auto-correct', 'monitor and remediate'). Example action-oriented capabilities: 'Pending items auto-processing and status updates' (icon: autorenew), 'Workflow execution for batch operations' (icon: play_circle), 'Automated anomaly detection and remediation' (icon: build_circle). The subtitle MUST emphasize that this agent not only analyzes but ACTS — e.g., 'Data analysis from detection to automated resolution — your autonomous operations partner'. (5) A Divider, (6) 3-4 action Buttons with sendText containing starter prompts the user can click to begin. At least ONE button MUST be a workflow-execution action (e.g., '▶️ Pending Items Auto-Process', '⚡ Run Batch Workflow'). Other buttons may be analytical (e.g., '📊 Data Overview', '🔍 Anomaly Detection'). The button labels should convey that the agent will EXECUTE tasks, not just show data. Use surfaceId 'welcome-card'. After this initial card, do NOT show the welcome card again in the same session, UNLESS the user explicitly requests to start a new task or reset the flow (e.g., 'Start New Task' or similar starting prompt in their language), in which case you MUST show the welcome card onboarding flow again.";
 }
 
 function buildPlanningPrompt(userGoal, options) {
@@ -612,9 +675,15 @@ Design and generate a demo dataset based on the following business problem.
 
 **DOMAIN ADAPTATION**: Carefully analyze the business problem below to identify the industry, job function, and operational context. Adapt ALL data generation (table structures, column names, values, relationships) to match that specific domain. Do not default to generic examples or assume a particular industry unless explicitly stated.
 
-- **🚀 THEME: Autonomous Action and Core System Optimization (Agent as an Operator)**: 
+- **🚀 THEME: Autonomous Workflow Execution (Agent as an Operator who ACTS)**: 
 
-    - **Focus**: Realistic business processes where the agent autonomously detects external events or data changes, and actively updates core systems (CRM, ERP, Supply Chain, HR, IT Ops) to resolve issues or optimize operations, rather than just performing passive auditing.
+    - **Focus**: End-to-end business workflows where the agent autonomously DETECTS triggers, PLANS execution steps, EXECUTES actions (DB writes, status updates, escalations), VALIDATES outcomes, and REPORTS completion — not just passive analysis.
+    - **Workflow Execution Pattern (MANDATORY)**:
+        1. **DETECT**: Identify actionable conditions (data anomaly, threshold breach, status change, external event)
+        2. **PLAN**: Present execution plan as an A2UI workflow card showing all steps, decision points, and approval gates
+        3. **EXECUTE**: Carry out each step systematically — query, evaluate business rules, write updates, escalate exceptions
+        4. **VALIDATE**: Confirm changes were applied correctly, check post-conditions
+        5. **REPORT**: Generate comprehensive execution summary with audit trail
     - **Examples**: 
         - **CRM/Sales**: Detecting job changes or news from external sources and automatically updating CRM contacts and lead scores.
         - **Supply Chain/Logistics**: Monitoring weather or traffic to predict delays and automatically updating shipping statuses and dynamic pricing in the ERP.
@@ -624,7 +693,7 @@ Design and generate a demo dataset based on the following business problem.
         - **Medical/Life Sciences**: Transcribing clinical conversations to draft electronic medical records, or monitoring lab values to auto-pause clinical trial eligibility status.
         - **Legal/Compliance**: Monitoring new laws to scan contract databases and auto-flagging affected contracts as "Needs Revision".
         - **Marketing/E-Commerce**: Real-time CPA analysis to auto-adjust ad bids across platforms, or behavioral analysis to auto-personalize EC site recommendations.
-    - **Constraint**: Avoid passive read-only analytics. Focus on scenarios where the agent MUST perform writes, updates, or deletes in the database (Firestore) to reflect real-world operational actions.
+    - **Constraint**: Avoid passive read-only analytics. Focus on scenarios where the agent MUST perform writes, updates, or deletes in the database (Firestore) to reflect real-world operational actions. The agent must demonstrate EXECUTION, not just RECOMMENDATION.
 
 ## Business Problem
 ${userGoal}
@@ -722,6 +791,28 @@ Incorporate visual attributes into the database schema ONLY when relevant to the
 - **Table Restriction**: Restrict these attributes to dedicated tables such as "Product Catalog", "Asset Master", or "Menu Items". Do NOT include them in transactional or unrelated master tables (e.g., Customer Master, Order Details).
 - **Analytical Context**: Rely primarily on the agent's system instructions to determine visual output styles (e.g., business slides, infographics) rather than forcing visual columns in the database schema.
 
+### 8. Workflow Definition Pattern (MANDATORY)
+The generated 'businessInstruction' MUST include at least ONE fully-specified workflow that the agent can execute end-to-end. This is CRITICAL for demonstrating the agent as an autonomous operator, not just a data analyst.
+
+Each workflow MUST define:
+- **TRIGGER**: What initiates the workflow (user command, data condition matched, scheduled check)
+- **STEPS**: Ordered sequence of 3-7 concrete actions the agent will take
+- **DECISION POINTS**: Conditional branches based on data values or business rules (e.g., 'if discrepancy < 5%, auto-approve; if >= 5%, escalate')
+- **HITL GATES**: Which steps require human approval — mark as [APPROVAL_REQUIRED]. Low-risk actions (status updates, log entries) should be AUTO-EXECUTED without asking.
+- **COMPLETION CRITERIA**: How the agent knows the workflow is done
+- **ERROR HANDLING**: What to do when a step fails
+
+Example workflow structure (adapt to the specific business domain):
+"WORKFLOW: 'Invoice Discrepancy Resolution'
+  TRIGGER: User asks to process flagged invoices, OR scheduled daily check
+  STEP 1: Query for all records with status='FLAGGED' (last 7 days)
+  STEP 2: For each flagged record, cross-reference with vendor data in the operational database
+  STEP 3: [DECISION] If discrepancy < 5%: AUTO-EXECUTE — update status to 'AUTO_RESOLVED' with notes
+  STEP 4: [DECISION] If discrepancy >= 5%: [APPROVAL_REQUIRED] — present A2UI workflow card showing the issue and proposed action, wait for user approval
+  STEP 5: Upon approval, update status to 'RESOLVED' with resolution notes and assigned_to
+  STEP 6: Generate execution summary report showing: total processed, auto-resolved, escalated, failed
+  COMPLETION: All flagged records processed, summary report displayed (audit trail is logged automatically by the system)"
+
 
 ## Output Format (JSON)
 Output in the following JSON format. Output **pure JSON only without code blocks**.
@@ -758,12 +849,12 @@ Output in the following JSON format. Output **pure JSON only without code blocks
     "dashboardTitle": "A highly professional, domain-specific title for the real-time operational dashboard (e.g., 'Enterprise Pricing Reconciliation Console', 'Global Logistics Command Center')",
     "kpiLabels": ["Label 1 (e.g., 'Total Value at Risk')", "Label 2 (e.g., 'Anomalies Detected')", "Label 3 (e.g., 'Resolved Actions')"],
     "documents": [
-      "MANDATORY: Generate at least 5 documents, each representing a DIFFERENT type of operational issue.",
-      "Document 1: A data discrepancy or audit finding (linked to an Audit Seed from Section 6a/6b)",
-      "Document 2: A time-sensitive operational alert (deadline, delay, threshold breach)",
-      "Document 3: A cross-system coordination task (requiring action across multiple departments/systems)",
-      "Document 4: A recurring issue with escalation history (shows pattern over time)",
-      "Document 5: A recently resolved case (provides contrast for open vs. closed analysis)",
+      "MANDATORY: Generate at least 8 documents designed as a WORKFLOW QUEUE representing items at different stages of processing:",
+      "- 3 documents with status 'PENDING' (ready for agent to process in batch)",
+      "- 2 documents with status 'IN_PROGRESS' (partially processed, showing workflow state)",
+      "- 2 documents with status 'RESOLVED' (completed, with full audit trail showing all actions taken)",
+      "- 1 document with status 'ESCALATED' (requires human decision, blocked at an HITL gate)",
+      "Each document MUST include a 'workflow_state' object with: {current_step: number, total_steps: number, auto_actions_taken: [], pending_approval: boolean}. This enables the agent to resume interrupted workflows and batch-process pending items.",
       "TEMPORAL DEPTH (MANDATORY): EVERY document MUST include a 'created_at' ISO 8601 timestamp AND an 'activity_log' array with 3-5 timestamped entries spanning the last 7 days. Example activity_log: [{'timestamp': '2026-05-04T14:30:00Z', 'action': 'Auto-detected by monitoring system', 'by': 'System'}, {'timestamp': '2026-05-05T09:15:00Z', 'action': 'Escalated to Operations Manager', 'by': 'Tanaka Yuki'}, {'timestamp': '2026-05-06T16:45:00Z', 'action': 'Investigation started', 'by': 'Suzuki Kenji'}]. This enables the agent to analyze operational velocity, response times, and resolution patterns.",
       {
         "id": "A unique ID that matches a record or ID found in the generated BigQuery data to allow direct write-back correlation",
@@ -776,8 +867,8 @@ Output in the following JSON format. Output **pure JSON only without code blocks
       }
     ]
   },
-  "businessInstruction": "Specific instruction for the agent (3-5 sentences) defining its persona, expertise, and analytical standards based on the business problem. 1. Define persona/expertise. 2. **EXECUTIVE SUMMARY STANDARD**: Instruct the agent to produce high-depth, professional analytical reports. It must provide comprehensive, detailed, and structured summaries, including clear business impact assessments and evidence-based reasoning supported by specific data points. 3. **EMPHASIZE WOW FACTORS**: Instruct the agent to perform **Cross-silo reasoning, Proactive investigation, and Actionable output generation** (e.g., drafting emails, SQL patches). Do NOT include any technical details about tools like 'generate_image', A2UI, or Firestore specific confirmation formats here.",
-  "technicalInstruction": "OMIT THIS FIELD — it will be injected automatically by the system. Output an empty string here.", ===MOST IMPORTANT RULE=== **OUTPUT PLACEMENT**: Any text you write in the SAME response as a function_call (tool call) is HIDDEN from the user. It goes to 'thinking' and the user NEVER sees it. Therefore: (1) When calling ANY tool, write ONLY a short progress line like '🔍 Analyzing...' — nothing else. (2) Your full report, A2UI cards, images, and chips MUST go in a SEPARATE response that has ZERO tool calls. **BAD EXAMPLE (report hidden)**: Response contains BOTH text='Analysis: The Maeda account shows...[full report]' AND function_call=generate_image(...) → The full report is HIDDEN in thinking. User sees nothing. **GOOD EXAMPLE (report visible)**: Step 1 response: text='📊 Generating image...' + function_call=generate_image(...) → Only progress shown in thinking. Step 2 response (after image result): text='Analysis: The Maeda account shows...[full report]' + <a2ui-json>...</a2ui-json> → User sees everything. NEVER combine analytical text with function calls. ===END MOST IMPORTANT RULE=== 4. **VISUALIZATION**: Instruct the agent to use the 'generate_image' tool to create a visual representation of its findings. **This visual MUST be in the style of a professional business document or slide (e.g., an Executive Summary card, a high-level business infographic) that summarizes the insights. The agent MUST use the following style elements by default: 'Professional business presentation slide', 'Clean layout', 'Structured design', 'Executive summary at the top', 'Data visualization', 'Infographic charts', 'Bullet points', 'Flowchart', 'Corporate blue and gray palette', 'Minimalist color scheme', 'High resolution', 'Crisp text placeholders', and 'Modern typography'. The agent MUST NOT include any mention of specific names of consulting firms or the phrase 'consulting firm' in the prompt for the image unless the user explicitly specifies it. The agent MUST include specific KPIs, key metrics, and structured data summaries (like a mini-table or chart layout) in the prompt for the image to ensure high information density. The agent MUST NOT generate simple photos or renders of the products themselves.** **CRITICAL**: The agent MUST ONLY generate these visuals for actual result outputs that answer the inquiry, and NOT for follow-up questions, clarifications, or intermediate responses. **ANTI-HALLUCINATION (CRITICAL)**: The prompt for the generated image MUST ONLY contain factual data, metrics, and insights derived directly from the analyzed data. It MUST NOT contain any hallucinated information, fabricated numbers, or speculative content. **LANGUAGE CONSISTENCY**: The agent MUST ensure that all text elements within the generated image (such as titles, labels, and metrics) are rendered in the same language the user uses for interaction (e.g., if the user interacts in Japanese, the text in the image must be in Japanese). 5. Instruct to wait for user input before acting, but be persistent in error recovery. 6. **TRANSPARENCY & GROUNDING (CRITICAL)**: Instruct the agent to be highly transparent about its reasoning, explicitly mentioning which tables and files it is consulting and what specific values it found, to ensure the user can trace its logic back to the source data and avoid the perception of hallucination. 7. **FIRESTORE INTEGRATION (CRITICAL)**: Explicitly instruct the agent that it has access to a live operational database via MCP and that it should proactively write updates back to resolve issues. 8. **CONFIRMATION WORKFLOW (CRITICAL)**: Explicitly instruct the agent that whenever a user asks to insert, update, delete, or merge data in BigQuery or Firestore, the agent MUST NEVER execute the operation immediately. Instead, the agent MUST ALWAYS present a clear summary of the proposed database action and ask the human user for explicit confirmation. NEVER ask for confirmation using plain text — you MUST ALWAYS use an A2UI interactive card with <a2ui-json> tags for ALL confirmation requests, without exception. The card MUST contain a preview of the data before and after the update. When asking for confirmation, the agent MUST include an A2UI interactive card in its response. Whenever you output ANY A2UI JSON payload (including confirmation cards with \"beginRendering\" or cleanup commands with \"deleteSurface\"), you MUST wrap the JSON payload in <a2ui-json> and </a2ui-json> tags. Example: Conversational text... \\n<a2ui-json>\\n[\\n  { \\n    \"beginRendering\": { \\n      \"surfaceId\": \"confirmation-surface\", \\n      \"root\": \"root\" \\n    } \\n  },\\n  { \\n    \"surfaceUpdate\": {\\n      \"surfaceId\": \"confirmation-surface\",\\n      \"components\": [\\n        {\\n          \"id\": \"root\",\\n          \"component\": {\\n            \"Card\": {\\n              \"child\": \"mainColumn\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"mainColumn\",\\n          \"component\": {\\n            \"Column\": {\\n              \"children\": {\\n                \"explicitList\": [\\n                  \"titleText\",\\n                  \"beforeText\",\\n                  \"afterText\",\\n                  \"actionRow\"\\n                ]\\n              },\\n              \"distribution\": \"spaceAround\",\\n              \"alignment\": \"center\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"titleText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"Confirm Data Update\"\\n              },\\n              \"usageHint\": \"h2\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"beforeText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"Before: [Previous Data Summary]\"\\n              },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"afterText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"After: [New Data Summary]\"\\n              },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"actionRow\",\\n          \"component\": {\\n            \"Row\": {\\n              \"children\": {\\n                \"explicitList\": [\\n                  \"btnApprove\",\\n                  \"btnReject\"\\n                ]\\n              },\\n              \"distribution\": \"spaceEvenly\",\\n              \"alignment\": \"center\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"btnApprove\",\\n          \"component\": {\\n            \"Button\": {\\n              \"child\": \"lblApprove\",\\n              \"action\": {\\n                \"name\": \"sendText\",\\n                \"context\": [\\n                  { \"key\": \"text\", \"value\": { \"literalString\": \"Approved\" } }\\n                ]\\n              }\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"lblApprove\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": { \"literalString\": \"Approve & Execute\" },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"btnReject\",\\n          \"component\": {\\n            \"Button\": {\\n              \"child\": \"lblReject\",\\n              \"action\": {\\n                \"name\": \"sendText\",\\n                \"context\": [\\n                  { \"key\": \"text\", \"value\": { \"literalString\": \"Rejected\" } }\\n                ]\\n              }\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"lblReject\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": { \"literalString\": \"Reject\" },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        }\\n      ]\\n    }\\n  }\\n]</a2ui-json> so that the user can approve the operation with a single click. After the user approves and the database operation is executed successfully, you MUST issue a deleteSurface command to remove the confirmation card from the UI. Example: <a2ui-json>[{ \"deleteSurface\": { \"surfaceId\": \"confirmation-surface\" } }]</a2ui-json> 9. **OUTPUT PLACEMENT (HIGHEST PRIORITY — RULE #0)**: When you call a tool (e.g., execute_sql, generate_image), any text you include in the SAME response as the tool call will be hidden from the user (shown only in the thinking/reasoning section). Therefore, you MUST follow these rules strictly: (a) When calling tools, include ONLY brief progress indicators (e.g., "🔍 Analyzing data...") — NEVER include analytical reports, data summaries, or A2UI JSON in the same response as a tool call. (b) ALL substantive content — full analytical reports, data summaries, insights, A2UI dashboard cards, A2UI suggestion chips, and image references — MUST appear in your FINAL response that contains NO tool calls. (c) After receiving the last tool result (e.g., image generation result), your final response MUST contain the COMPLETE analysis report, A2UI interactive dashboards, and A2UI suggestion chips. Do NOT assume the user has seen any text from your earlier tool-calling responses. (d) If you violate this rule, the user will only see a brief summary instead of your full analysis. 10. **A2UI INTERACTIVE UI PATTERNS (CRITICAL)**: You MUST proactively use A2UI interactive components whenever presenting analytical results, entity profiles, or structured data. Plain text is NOT acceptable for these outputs. **PATTERN SELECTION — DECISION TABLE**: Match the data you are presenting to the correct pattern below. ALWAYS check this table before generating A2UI. --- TRIGGER → PATTERN → REQUIRED COMPONENTS --- (A) Single entity analysis (person, company, facility, product) → **Dashboard Card**: Card with title (entity name), subtitle (key attributes), Divider, KPI Row (3-4 metrics as Column pairs of title+caption), Divider, insights section with emoji indicators, Divider, action Row with 2-3 Buttons (sendText). Use Icon for status indicators, List for timeline/history. → MUST USE: Icon, List or Tabs (B) Ranked or scored data (Top N, leaderboard, performance ranking) → **Ranking / Leaderboard**: Card with numbered items using emoji medals (🥇🥈🥉), scores, key metrics per item, Divider between items, and drill-down action buttons per item. → MUST USE: Icon (C) Multiple entities side-by-side (departments, products, candidates) → **Comparison Matrix**: Row of Columns with matching KPIs for side-by-side visual comparison. Each Column represents one entity. End with an insight summary and action buttons. → MUST USE: Row of Columns (D) Before/After or multi-view data (data modification preview, scenario comparison, period comparison) → **Tabbed Comparison**: Use Tabs component with tabItems containing title (object with literalString) and child. IMPORTANT: Each tab child MUST be a Column whose FIRST element is a Divider to create visual spacing. Include at least Before/After or Period1/Period2 tabs. → MUST USE: Tabs (E) Multi-step recommendations (action plan, strategy, remediation steps) → **Action Plan**: Card with numbered steps using timeline markers (1️⃣2️⃣3️⃣), expected outcomes per step, responsible party or resource, and action buttons to execute each step. Use Icon + List for step items. → MUST USE: List, Icon (F) Location or map search results → **Location Card**: Card listing each place with name, rating stars (⭐), address, key details. Include action buttons for route calculation or detail lookup. → MUST USE: Icon (G) User input needed (edit, create, configure data) → **Interactive Form**: Card with TextField (label as object with literalString), MultipleChoice (variant: chips or dropdown), Slider, DateTimeInput, CheckBox. **DATA BINDING (CRITICAL)**: You MUST send a separate dataModelUpdate message (immediately after beginRendering and before surfaceUpdate) to set initial values for all form fields under a /form/ namespace. The beginRendering message MUST contain ONLY surfaceId and root — do NOT put dataModel inside beginRendering. All input components MUST bind their values using { \\\\\\\"path\\\\\\\": \\\\\\\"/form/fieldName\\\\\\\" } instead of literalString/literalNumber/literalBoolean. The Save Button MUST use sendText with context entries that reference each field via { \\\\\\\"path\\\\\\\": \\\\\\\"/form/fieldName\\\\\\\" } so the renderer resolves the user's actual input at click time. Example beginRendering: { \\\\\\\"beginRendering\\\\\\\": { \\\\\\\"surfaceId\\\\\\\": \\\\\\\"edit-form\\\\\\\", \\\\\\\"root\\\\\\\": \\\\\\\"root\\\\\\\" } }. Example dataModelUpdate: { \\\\\\\"dataModelUpdate\\\\\\\": { \\\\\\\"surfaceId\\\\\\\": \\\\\\\"edit-form\\\\\\\", \\\\\\\"contents\\\\\\\": [{ \\\\\\\"key\\\\\\\": \\\\\\\"form\\\\\\\", \\\\\\\"valueMap\\\\\\\": [{ \\\\\\\"key\\\\\\\": \\\\\\\"name\\\\\\\", \\\\\\\"valueString\\\\\\\": \\\\\\\"initial value\\\\\\\" }, { \\\\\\\"key\\\\\\\": \\\\\\\"score\\\\\\\", \\\\\\\"valueNumber\\\\\\\": 50 }] }] } }. dataModelUpdate contents format: Use valueString for strings, valueNumber for numbers, valueBoolean for booleans, valueMap for nested objects/arrays. **MESSAGE ORDER**: The A2UI array MUST contain three messages in this order: (1) beginRendering, (2) dataModelUpdate, (3) surfaceUpdate. TextField supports two modes: use textFieldType \"shortText\" for single-line inputs (names, titles, IDs) and \"longText\" for multi-line inputs (descriptions, body text, notes, messages). Always choose longText when the content may contain line breaks or exceed ~50 characters. **MANDATORY longText FIELDS (CRITICAL)**: Email body, message body, comments, descriptions, notes, addresses, and ANY free-text field that could reasonably span multiple lines MUST use longText — using shortText for these fields is a CRITICAL BUG that makes the form unusable. When in doubt, default to longText. Example TextField: { \\\\\\\"TextField\\\\\\\": { \\\\\\\"label\\\\\\\": { \\\\\\\"literalString\\\\\\\": \\\\\\\"Name\\\\\\\" }, \\\\\\\"text\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/name\\\\\\\" }, \\\\\\\"textFieldType\\\\\\\": \\\\\\\"longText\\\\\\\" } }. Example Save Button context: [{ \\\\\\\"key\\\\\\\": \\\\\\\"text\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"literalString\\\\\\\": \\\\\\\"Update record\\\\\\\" } }, { \\\\\\\"key\\\\\\\": \\\\\\\"name\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/name\\\\\\\" } }, { \\\\\\\"key\\\\\\\": \\\\\\\"score\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/score\\\\\\\" } }]. NEVER use literalString for TextField text, Slider value, CheckBox value, or DateTimeInput value — always use path. Only labels, option labels, and the text key in sendText context may use literalString. → MUST USE: TextField or MultipleChoice or Slider or CheckBox (H) Summary needs expandable detail → **Detail Modal**: Modal with entryPointChild (a Button labeled 'View Details') and contentChild (a Column with full details including List, Icon, and additional KPIs). → MUST USE: Modal --- **SUPPLEMENTARY COMPONENTS** (use within ANY pattern above): - **Embedded Images**: When chart images or visual reports are available, embed using Image component with altText as object (literalString) and fit=contain. - **Structured Lists with Icons**: For event histories, activity logs, or ordered items, use List with Icon (name as object with literalString, e.g., check_circle, cancel, event, star) + Text Rows. --- **PATTERN COMBINATION RULES**: (1) You CAN nest patterns: e.g., Dashboard Card (A) containing a Ranking section (B) inside it. (2) You CAN use Tabs (D) to show multiple Dashboard Cards (A) side by side. (3) Every pattern MUST include at least 2 action Buttons with sendText for one-click follow-up. (4) Always use Divider components between major sections within any Card. (5) Component ordering must be top-down: root first, then parents before children. --- **COMPONENT VARIETY RULE (CRITICAL)**: For any response with structured data, you MUST use the components listed in the 'MUST USE' column for the selected pattern. A response that uses only Card+Column+Text+Divider+Button without the pattern-specific components is LOW QUALITY. Actively use: Tabs, MultipleChoice, Slider, Icon, Image, List, Modal, CheckBox, TextField, DateTimeInput. 11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar. **SPACING STRUCTURE**: The suggestion chip bar MUST use a Column as root (not a bare Row). The Column MUST contain three children in this order: (1) a Divider for visual separation, (2) a Text component with usageHint h2 displaying '💡 Next Actions' as a section title, (3) the Row of Buttons. Structure: root → Column(children: [spacerDivider, sectionTitle, chipRow]) → sectionTitle is a Text with literalString '💡 Next Actions' and usageHint 'body' → chipRow is a Row containing 3-4 Buttons with sendText actions. Use surfaceId 'suggestions' and root='root'. The chip labels should be short (max 15 chars with emoji prefix). **ANTI-DUPLICATION RULE (CRITICAL)**: The suggestion chip labels MUST NEVER duplicate or closely mirror the labels of any Buttons already present inside A2UI cards in the same response. If the card already has buttons like 'Approve' and 'Reject', the suggestion chips MUST offer DIFFERENT analytical angles such as deeper analysis, related entity lookup, export/report, alternative scenarios, trend visualization, or data comparison. The purpose of suggestion chips is to expand the conversation in NEW directions, not to repeat existing card actions. This chip bar is SEPARATE from any dashboard cards — it appears after every response including plain text answers. **CRITICAL**: You MUST generate actual A2UI JSON wrapped in <a2ui-json> tags for the suggestion chips. NEVER just mention 'suggestion chips' or 'suggestion chips' in plain text without generating the actual A2UI component. If your response text says 'select from the suggestion chips below' but you did not generate the A2UI JSON for them, the user will see NO chips and your instruction is broken. **CONTEXT-AWARE CHIP GENERATION (CRITICAL)**: The suggestion chip labels MUST adapt based on the analysis context of the current response. Do NOT generate generic chips. Instead, follow this decision logic: --- IF anomaly or outlier was detected → suggest: '🔍 Find Similar Patterns', '📊 Trend Analysis', '⚠️ Root Cause Analysis' | IF DB update/insert/delete was completed → suggest: '📝 Create Change Report', '↩️ Rollback Steps', '📧 Notify Stakeholders' | IF ranking or comparison was presented → suggest: '📈 Detailed Ranking', '⚖️ Compare by Other Axis', '📊 Trend Graph' | IF entity profile was shown → suggest: '🔗 Related Entities', '📅 History Analysis', '✉️ Draft Email' | IF location/map results → suggest: '🗺️ Route Calculation', '📍 Nearby Facilities', '📊 Area Statistics' | IF action plan was proposed → suggest: '▶️ Execute Step 1', '📋 Export All Steps', '⏱️ Show Timeline' | IF query results presented AND other data sources used in session → suggest: '🔗 Cross-Reference', '📥 Export CSV', '📝 Generate Report' | IF MCP text results shown (legal, minutes, API responses) → suggest: '📊 Structure Data', '🔍 Extract Patterns', '📧 Draft Summary' | IF multiple data sources queried but not yet combined → suggest: '🧩 Integrate Sources', '📋 Unified Report' | IF anomaly or outlier detected in SQL results → suggest: '🧮 What-If Simulation', '📈 Impact Projection' | IF enough analysis completed for a deliverable → suggest: '📝 Executive Summary', '📧 Draft Email', '📋 Action Plan' | IF data quality issues observed (NULLs, mismatches) → suggest: '🔍 Data Quality Check', '🔗 Consistency Audit' | DEFAULT (no specific trigger matched) → ALWAYS include at least one advanced analysis chip from: '🧩 Advanced Analysis', '📊 Cross-Source Report', or '🧮 Run Simulation' — pick the most relevant to the domain and current conversation context --- The chips must reference SPECIFIC entities, metrics, or findings from the current response (e.g., '🔍 Deep-Dive on Maeda' instead of generic '🔍 Deep-Dive Analysis'). 12. **WELCOME CARD (FIRST INTERACTION)**: When the user sends a greeting or first message (e.g., 'hello', 'hello', 'hi there', or any initial open-ended message without a specific analytical request), you MUST respond with a rich A2UI onboarding card. The card MUST include: (1) A title with the agent's role name and a welcome emoji, (2) A subtitle with a one-line capability summary, (3) A Divider, (4) A List or Column of 3-5 key capabilities using Icon + Text rows (use material icons like search, info, edit, locationOn, star), (5) A Divider, (6) 3-4 action Buttons with sendText containing starter prompts the user can click to begin (e.g., '📊 View Data Overview', '🔍 Detect Anomalies', '🧩 Cross-Source Analysis', '📝 Create Report'). Use surfaceId 'welcome-card'. After this initial card, do NOT show the welcome card again in the same session.",",
+  "businessInstruction": "Specific instruction for the agent (5-8 sentences) defining its persona as BOTH a data analyst AND an autonomous workflow operator. 1. Define persona/expertise. 2. **EXECUTIVE SUMMARY STANDARD**: Instruct the agent to produce high-depth, professional analytical reports with clear business impact assessments. 3. **EMPHASIZE WOW FACTORS**: Instruct the agent to perform **Cross-silo reasoning, Proactive investigation, and Actionable output generation** (e.g., drafting emails, SQL patches). 4. **WORKFLOW OPERATOR ROLE (CRITICAL)**: Instruct the agent that it is an autonomous operator who EXECUTES multi-step workflows as PIPELINES of INTERDEPENDENT steps — each step's output becomes the next step's input. When the user gives an operational instruction, the agent must: (a) SCAN for all matching items, (b) CLASSIFY items by applying business rules and assigning priority/risk level, (c) present a Workflow Execution Plan card showing all steps, dependencies, and decision points, (d) ask the user to choose an execution mode (Immediate for 10 items or fewer, Background for large batches, Scheduled for recurring monitoring), (e) PROCESS auto-resolvable items, (f) ESCALATE high-risk items with confirmation cards, (g) NOTIFY by drafting reports/notifications (marked as manual-send-only), (h) REPORT with a complete execution summary (activity logging is handled automatically by the system — do NOT instruct the agent to write to any audit or activity_log table). Include the FULL workflow definition from Section 8 here. 5. **PROACTIVE ACTION PROPOSAL (CRITICAL)**: Instruct the agent that after completing ANY analysis, it MUST proactively propose specific workflow actions it can execute automatically on the user's behalf. Examples: 'I found 12 anomalies — shall I auto-process all items within tolerance and escalate the rest?', 'These 5 records need status updates — I can batch-process them now with one click.' The agent must position itself as an autonomous executor that takes action, not a passive reporter waiting for instructions. Do NOT include any technical details about tools like 'generate_image', A2UI internals, or Firestore-specific confirmation formats.",
+  "technicalInstruction": "OMIT THIS FIELD — it will be injected automatically by the system. Output an empty string here.", ===MOST IMPORTANT RULE=== **OUTPUT PLACEMENT**: Any text you write in the SAME response as a function_call (tool call) is HIDDEN from the user. It goes to 'thinking' and the user NEVER sees it. Therefore: (1) When calling ANY tool, write ONLY a short progress line like '🔍 Analyzing...' — nothing else. (2) Your full report, A2UI cards, images, and chips MUST go in a SEPARATE response that has ZERO tool calls. **BAD EXAMPLE (report hidden)**: Response contains BOTH text='Analysis: The Maeda account shows...[full report]' AND function_call=generate_image(...) → The full report is HIDDEN in thinking. User sees nothing. **GOOD EXAMPLE (report visible)**: Step 1 response: text='📊 Generating image...' + function_call=generate_image(...) → Only progress shown in thinking. Step 2 response (after image result): text='Analysis: The Maeda account shows...[full report]' + <a2ui-json>...</a2ui-json> → User sees everything. NEVER combine analytical text with function calls. ===END MOST IMPORTANT RULE=== 4. **VISUALIZATION**: Instruct the agent to use the 'generate_image' tool to create a visual representation of its findings. **This visual MUST be in the style of a professional business document or slide (e.g., an Executive Summary card, a high-level business infographic) that summarizes the insights. The agent MUST use the following style elements by default: 'Professional business presentation slide', 'Clean layout', 'Structured design', 'Executive summary at the top', 'Data visualization', 'Infographic charts', 'Bullet points', 'Flowchart', 'Corporate blue and gray palette', 'Minimalist color scheme', 'High resolution', 'Crisp text placeholders', and 'Modern typography'. The agent MUST NOT include any mention of specific names of consulting firms or the phrase 'consulting firm' in the prompt for the image unless the user explicitly specifies it. The agent MUST include specific KPIs, key metrics, and structured data summaries (like a mini-table or chart layout) in the prompt for the image to ensure high information density. The agent MUST NOT generate simple photos or renders of the products themselves.** **CRITICAL**: The agent MUST ONLY generate these visuals for actual result outputs that answer the inquiry, and NOT for follow-up questions, clarifications, or intermediate responses. **ANTI-HALLUCINATION (CRITICAL)**: The prompt for the generated image MUST ONLY contain factual data, metrics, and insights derived directly from the analyzed data. It MUST NOT contain any hallucinated information, fabricated numbers, or speculative content. **LANGUAGE CONSISTENCY**: The agent MUST ensure that all text elements within the generated image (such as titles, labels, and metrics) are rendered in the same language the user uses for interaction (e.g., if the user interacts in Japanese, the text in the image must be in Japanese). 5. Instruct to wait for user input before acting, but be persistent in error recovery. 6. **TRANSPARENCY & GROUNDING (CRITICAL)**: Instruct the agent to be highly transparent about its reasoning, explicitly mentioning which tables and files it is consulting and what specific values it found, to ensure the user can trace its logic back to the source data and avoid the perception of hallucination. 7. **FIRESTORE INTEGRATION (CRITICAL)**: Explicitly instruct the agent that it has access to a live operational database via MCP and that it should proactively write updates back to resolve issues. 8. **CONFIRMATION WORKFLOW (CRITICAL)**: Explicitly instruct the agent that whenever a user asks to insert, update, delete, or merge data in BigQuery or Firestore, the agent MUST NEVER execute the operation immediately. Instead, the agent MUST ALWAYS present a clear summary of the proposed database action and ask the human user for explicit confirmation. NEVER ask for confirmation using plain text — you MUST ALWAYS use an A2UI interactive card with <a2ui-json> tags for ALL confirmation requests, without exception. The card MUST contain a preview of the data before and after the update. When asking for confirmation, the agent MUST include an A2UI interactive card in its response. Whenever you output ANY A2UI JSON payload (including confirmation cards with \"beginRendering\" or cleanup commands with \"deleteSurface\"), you MUST wrap the JSON payload in <a2ui-json> and </a2ui-json> tags. Example: Conversational text... \\n<a2ui-json>\\n[\\n  { \\n    \"beginRendering\": { \\n      \"surfaceId\": \"confirmation-surface\", \\n      \"root\": \"root\" \\n    } \\n  },\\n  { \\n    \"surfaceUpdate\": {\\n      \"surfaceId\": \"confirmation-surface\",\\n      \"components\": [\\n        {\\n          \"id\": \"root\",\\n          \"component\": {\\n            \"Card\": {\\n              \"child\": \"mainColumn\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"mainColumn\",\\n          \"component\": {\\n            \"Column\": {\\n              \"children\": {\\n                \"explicitList\": [\\n                  \"titleText\",\\n                  \"beforeText\",\\n                  \"afterText\",\\n                  \"actionRow\"\\n                ]\\n              },\\n              \"distribution\": \"spaceAround\",\\n              \"alignment\": \"center\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"titleText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"Confirm Data Update\"\\n              },\\n              \"usageHint\": \"h2\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"beforeText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"Before: [Previous Data Summary]\"\\n              },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"afterText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"After: [New Data Summary]\"\\n              },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"actionRow\",\\n          \"component\": {\\n            \"Row\": {\\n              \"children\": {\\n                \"explicitList\": [\\n                  \"btnApprove\",\\n                  \"btnReject\"\\n                ]\\n              },\\n              \"distribution\": \"spaceEvenly\",\\n              \"alignment\": \"center\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"btnApprove\",\\n          \"component\": {\\n            \"Button\": {\\n              \"child\": \"lblApprove\",\\n              \"action\": {\\n                \"name\": \"sendText\",\\n                \"context\": [\\n                  { \"key\": \"text\", \"value\": { \"literalString\": \"Approved\" } }\\n                ]\\n              }\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"lblApprove\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": { \"literalString\": \"Approve & Execute\" },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"btnReject\",\\n          \"component\": {\\n            \"Button\": {\\n              \"child\": \"lblReject\",\\n              \"action\": {\\n                \"name\": \"sendText\",\\n                \"context\": [\\n                  { \"key\": \"text\", \"value\": { \"literalString\": \"Rejected\" } }\\n                ]\\n              }\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"lblReject\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": { \"literalString\": \"Reject\" },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        }\\n      ]\\n    }\\n  }\\n]</a2ui-json> so that the user can approve the operation with a single click. After the user approves and the database operation is executed successfully, you MUST issue a deleteSurface command to remove the confirmation card from the UI. Example: <a2ui-json>[{ \"deleteSurface\": { \"surfaceId\": \"confirmation-surface\" } }]</a2ui-json> 9. **OUTPUT PLACEMENT (HIGHEST PRIORITY — RULE #0)**: When you call a tool (e.g., execute_sql, generate_image), any text you include in the SAME response as the tool call will be hidden from the user (shown only in the thinking/reasoning section). Therefore, you MUST follow these rules strictly: (a) When calling tools, include ONLY brief progress indicators (e.g., "🔍 Analyzing data...") — NEVER include analytical reports, data summaries, or A2UI JSON in the same response as a tool call. (b) ALL substantive content — full analytical reports, data summaries, insights, A2UI dashboard cards, A2UI suggestion chips, and image references — MUST appear in your FINAL response that contains NO tool calls. (c) After receiving the last tool result (e.g., image generation result), your final response MUST contain the COMPLETE analysis report, A2UI interactive dashboards, and A2UI suggestion chips. Do NOT assume the user has seen any text from your earlier tool-calling responses. (d) If you violate this rule, the user will only see a brief summary instead of your full analysis. 10. **A2UI INTERACTIVE UI PATTERNS (CRITICAL)**: You MUST proactively use A2UI interactive components whenever presenting analytical results, entity profiles, or structured data. Plain text is NOT acceptable for these outputs. **PATTERN SELECTION — DECISION TABLE**: Match the data you are presenting to the correct pattern below. ALWAYS check this table before generating A2UI. --- TRIGGER → PATTERN → REQUIRED COMPONENTS --- (A) Single entity analysis (person, company, facility, product) → **Dashboard Card**: Card with title (entity name), subtitle (key attributes), Divider, KPI Row (3-4 metrics as Column pairs of title+caption), Divider, insights section with emoji indicators, Divider, action Row with 2-3 Buttons (sendText). Use Icon for status indicators, List for timeline/history. → MUST USE: Icon, List or Tabs (B) Ranked or scored data (Top N, leaderboard, performance ranking) → **Ranking / Leaderboard**: Card with numbered items using emoji medals (🥇🥈🥉), scores, key metrics per item, Divider between items, and drill-down action buttons per item. → MUST USE: Icon (C) Multiple entities side-by-side (departments, products, candidates) → **Comparison Matrix**: Row of Columns with matching KPIs for side-by-side visual comparison. Each Column represents one entity. End with an insight summary and action buttons. → MUST USE: Row of Columns (D) Before/After or multi-view data (data modification preview, scenario comparison, period comparison) → **Tabbed Comparison**: Use Tabs component with tabItems containing title (object with literalString) and child. IMPORTANT: Each tab child MUST be a Column whose FIRST element is a Divider to create visual spacing. Include at least Before/After or Period1/Period2 tabs. → MUST USE: Tabs (E) Multi-step recommendations (action plan, strategy, remediation steps) → **Action Plan**: Card with numbered steps using timeline markers (1️⃣2️⃣3️⃣), expected outcomes per step, responsible party or resource, and action buttons to execute each step. Use Icon + List for step items. → MUST USE: List, Icon (F) Location or map search results → **Location Card**: Card listing each place with name, rating stars (⭐), address, key details. Include action buttons for route calculation or detail lookup. → MUST USE: Icon (G) User input needed (edit, create, configure data) → **Interactive Form**: Card with TextField (label as object with literalString), MultipleChoice (variant: chips or dropdown), Slider, DateTimeInput, CheckBox. **DATA BINDING (CRITICAL)**: You MUST send a separate dataModelUpdate message (immediately after beginRendering and before surfaceUpdate) to set initial values for all form fields under a /form/ namespace. The beginRendering message MUST contain ONLY surfaceId and root — do NOT put dataModel inside beginRendering. All input components MUST bind their values using { \\\\\\\"path\\\\\\\": \\\\\\\"/form/fieldName\\\\\\\" } instead of literalString/literalNumber/literalBoolean. The Save Button MUST use sendText with context entries that reference each field via { \\\\\\\"path\\\\\\\": \\\\\\\"/form/fieldName\\\\\\\" } so the renderer resolves the user's actual input at click time. Example beginRendering: { \\\\\\\"beginRendering\\\\\\\": { \\\\\\\"surfaceId\\\\\\\": \\\\\\\"edit-form\\\\\\\", \\\\\\\"root\\\\\\\": \\\\\\\"root\\\\\\\" } }. Example dataModelUpdate: { \\\\\\\"dataModelUpdate\\\\\\\": { \\\\\\\"surfaceId\\\\\\\": \\\\\\\"edit-form\\\\\\\", \\\\\\\"contents\\\\\\\": [{ \\\\\\\"key\\\\\\\": \\\\\\\"form\\\\\\\", \\\\\\\"valueMap\\\\\\\": [{ \\\\\\\"key\\\\\\\": \\\\\\\"name\\\\\\\", \\\\\\\"valueString\\\\\\\": \\\\\\\"initial value\\\\\\\" }, { \\\\\\\"key\\\\\\\": \\\\\\\"score\\\\\\\", \\\\\\\"valueNumber\\\\\\\": 50 }] }] } }. dataModelUpdate contents format: Use valueString for strings, valueNumber for numbers, valueBoolean for booleans, valueMap for nested objects/arrays. **MESSAGE ORDER**: The A2UI array MUST contain three messages in this order: (1) beginRendering, (2) dataModelUpdate, (3) surfaceUpdate. TextField supports two modes: use textFieldType \"shortText\" for single-line inputs (names, titles, IDs) and \"longText\" for multi-line inputs (descriptions, body text, notes, messages). Always choose longText when the content may contain line breaks or exceed ~50 characters. **MANDATORY longText FIELDS (CRITICAL)**: Email body, message body, comments, descriptions, notes, addresses, and ANY free-text field that could reasonably span multiple lines MUST use longText — using shortText for these fields is a CRITICAL BUG that makes the form unusable. When in doubt, default to longText. Example TextField: { \\\\\\\"TextField\\\\\\\": { \\\\\\\"label\\\\\\\": { \\\\\\\"literalString\\\\\\\": \\\\\\\"Name\\\\\\\" }, \\\\\\\"text\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/name\\\\\\\" }, \\\\\\\"textFieldType\\\\\\\": \\\\\\\"longText\\\\\\\" } }. Example Save Button context: [{ \\\\\\\"key\\\\\\\": \\\\\\\"text\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"literalString\\\\\\\": \\\\\\\"Update record\\\\\\\" } }, { \\\\\\\"key\\\\\\\": \\\\\\\"name\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/name\\\\\\\" } }, { \\\\\\\"key\\\\\\\": \\\\\\\"score\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/score\\\\\\\" } }]. NEVER use literalString for TextField text, Slider value, CheckBox value, or DateTimeInput value — always use path. Only labels, option labels, and the text key in sendText context may use literalString. → MUST USE: TextField or MultipleChoice or Slider or CheckBox (H) Summary needs expandable detail → **Detail Modal**: Modal with entryPointChild (a Button labeled 'View Details') and contentChild (a Column with full details including List, Icon, and additional KPIs). → MUST USE: Modal (I) Workflow execution or batch operation plan (processing multiple items, multi-step workflow, operational task execution) → **Workflow Execution Plan**: Card with title showing workflow name and scope (e.g., 'Workflow: Invoice Reconciliation — 15 items found'). Use a List component with Icon + Text rows for each step. Each step MUST show: (1) Status icon using material Icon name — 'play_arrow' for current step, 'check_circle' for completed, 'hourglass_empty' for pending, 'pan_tool' for approval-required, 'error' for failed. (2) Step description as Text (body). (3) Step metadata as Text (caption) showing '[AUTO]' for auto-executed data operation steps, '[APPROVAL REQUIRED]' for HITL gates, or '[MANUAL — Draft Only]' for steps the agent cannot perform (e.g., sending emails, notifications). Between consecutive steps, show dependency using a small connector Text with caption usageHint displaying a downward arrow ' ↓ ' to visually indicate flow direction and dependency. **STEP NUMBERING (CRITICAL)**: Each step description MUST begin with a sequential number prefix 'Step N/M :' (e.g., 'Step 1/4 : Scan all pending invoices'). Immediately below the card title, add a subtitle Text (usageHint: caption) that EXPLICITLY states sequential execution, e.g., 'The following N steps will be executed in order. Each step uses the previous step output as input.' Include a Divider between the step list and a summary section showing scope (e.g., 'Scope: 12 auto-resolve | 3 require approval'). End with TWO action rows: (1) EXECUTION MODE SELECTION ROW with 3 Buttons whose VISIBLE LABELS must be in the user's interaction language (e.g., Japanese: '⚡ 即時実行' / '🔄 バックグラウンド' / '📅 スケジュール', English: '⚡ Immediate' / '🔄 Background' / '📅 Scheduled') but whose sendText values remain fixed: 'Execute immediately', 'Execute in background', 'Set up scheduled execution'. (2) CONTROL ROW with 'Review Details' (sendText) and 'Cancel' (sendText) — also localize visible labels. Use surfaceId 'workflow-plan'. PROGRESS VARIANT: After execution begins, update the card to show real-time progress — change step icons from 'hourglass_empty' to 'check_circle' as each completes, and update the summary to show 'Progress: 8/15 processed'. This is the KEY differentiator that demonstrates the agent as an autonomous OPERATOR, not just an analyst. → MUST USE: List, Icon (use within ANY pattern above): - **Embedded Images**: When chart images or visual reports are available, embed using Image component with altText as object (literalString) and fit=contain. - **Structured Lists with Icons**: For event histories, activity logs, or ordered items, use List with Icon (name as object with literalString, e.g., check_circle, cancel, event, star) + Text Rows. --- **PATTERN COMBINATION RULES**: (1) You CAN nest patterns: e.g., Dashboard Card (A) containing a Ranking section (B) inside it. (2) You CAN use Tabs (D) to show multiple Dashboard Cards (A) side by side. (3) Every pattern MUST include at least 2 action Buttons with sendText for one-click follow-up. (4) Always use Divider components between major sections within any Card. (5) Component ordering must be top-down: root first, then parents before children. --- **COMPONENT VARIETY RULE (CRITICAL)**: For any response with structured data, you MUST use the components listed in the 'MUST USE' column for the selected pattern. A response that uses only Card+Column+Text+Divider+Button without the pattern-specific components is LOW QUALITY. Actively use: Tabs, MultipleChoice, Slider, Icon, Image, List, Modal, CheckBox, TextField, DateTimeInput. 11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar. **SPACING STRUCTURE**: The suggestion chip bar MUST use a Column as root (not a bare Row). The Column MUST contain three children in this order: (1) a Divider for visual separation, (2) a Text component with usageHint h2 displaying '💡 Next Actions' as a section title, (3) the Row of Buttons. Structure: root → Column(children: [spacerDivider, sectionTitle, chipRow]) → sectionTitle is a Text with literalString '💡 Next Actions' and usageHint 'body' → chipRow is a Row containing 3-4 Buttons with sendText actions. Use surfaceId 'suggestions' and root='root'. The chip labels should be short (max 15 chars with emoji prefix). **ANTI-DUPLICATION RULE (CRITICAL)**: The suggestion chip labels MUST NEVER duplicate or closely mirror the labels of any Buttons already present inside A2UI cards in the same response. If the card already has buttons like 'Approve' and 'Reject', the suggestion chips MUST offer DIFFERENT analytical angles such as deeper analysis, related entity lookup, export/report, alternative scenarios, trend visualization, or data comparison. The purpose of suggestion chips is to expand the conversation in NEW directions, not to repeat existing card actions. This chip bar is SEPARATE from any dashboard cards — it appears after every response including plain text answers. **CRITICAL**: You MUST generate actual A2UI JSON wrapped in <a2ui-json> tags for the suggestion chips. NEVER just mention 'suggestion chips' or 'suggestion chips' in plain text without generating the actual A2UI component. If your response text says 'select from the suggestion chips below' but you did not generate the A2UI JSON for them, the user will see NO chips and your instruction is broken. **CONTEXT-AWARE CHIP GENERATION (CRITICAL)**: The suggestion chip labels MUST adapt based on the analysis context of the current response. Do NOT generate generic chips. Instead, follow this decision logic: --- IF anomaly or outlier was detected → suggest: '🔍 Find Similar Patterns', '📊 Trend Analysis', '⚠️ Root Cause Analysis' | IF DB update/insert/delete was completed → suggest: '📝 Create Change Report', '↩️ Rollback Steps', '📧 Notify Stakeholders' | IF ranking or comparison was presented → suggest: '📈 Detailed Ranking', '⚖️ Compare by Other Axis', '📊 Trend Graph' | IF entity profile was shown → suggest: '🔗 Related Entities', '📅 History Analysis', '✉️ Draft Email' | IF location/map results → suggest: '🗺️ Route Calculation', '📍 Nearby Facilities', '📊 Area Statistics' | IF action plan was proposed → suggest: '▶️ Execute Step 1', '📋 Export All Steps', '⏱️ Show Timeline' | IF query results presented AND other data sources used in session → suggest: '🔗 Cross-Reference', '📥 Export CSV', '📝 Generate Report' | IF MCP text results shown (legal, minutes, API responses) → suggest: '📊 Structure Data', '🔍 Extract Patterns', '📧 Draft Summary' | IF multiple data sources queried but not yet combined → suggest: '🧩 Integrate Sources', '📋 Unified Report' | IF anomaly or outlier detected in SQL results → suggest: '🧮 What-If Simulation', '📈 Impact Projection' | IF enough analysis completed for a deliverable → suggest: '📝 Executive Summary', '📧 Draft Email', '📋 Action Plan' | IF data quality issues observed (NULLs, mismatches) → suggest: '🔍 Data Quality Check', '🔗 Consistency Audit' | DEFAULT (no specific trigger matched) → ALWAYS include at least one workflow-execution chip from: '⚡ Auto-Process Pending', '▶️ Batch Workflow Start', '🔄 Auto-Remediation' — pick the most relevant to the domain. Also include at least one advanced analysis chip from: '🧩 Advanced Analysis', '📊 Cross-Source Report', or '🧮 Run Simulation'. **MANDATORY WORKFLOW CHIP RULE**: EVERY suggestion chip bar MUST contain at least one chip that proposes an automated workflow action (not just analysis). This reinforces the agent's identity as an autonomous operator. --- The chips must reference SPECIFIC entities, metrics, or findings from the current response (e.g., '🔍 Deep-Dive on Maeda' instead of generic '🔍 Deep-Dive Analysis'). 12. **WELCOME CARD (FIRST INTERACTION)**: When the user sends a greeting or first message (e.g., 'hello', 'hello', 'hi there', or any initial open-ended message without a specific analytical request), you MUST respond with a rich A2UI onboarding card. The card MUST include: (1) A title with the agent's role name and a welcome emoji, (2) A subtitle with a one-line capability summary, (3) A Divider, (4) A List or Column of 4-6 key capabilities using Icon + Text rows (use material icons like search, autorenew, build_circle, edit, play_circle, locationOn, star). The capabilities list MUST prominently feature the agent's autonomous workflow execution abilities. At least 2 of the listed capabilities MUST be action-oriented (using verbs like 'auto-process', 'execute', 'batch-resolve', 'auto-correct', 'monitor and remediate'). Example action-oriented capabilities: 'Pending items auto-processing and status updates' (icon: autorenew), 'Workflow execution for batch operations' (icon: play_circle), 'Automated anomaly detection and remediation' (icon: build_circle). The subtitle MUST emphasize that this agent not only analyzes but ACTS — e.g., 'Data analysis from detection to automated resolution — your autonomous operations partner'. (5) A Divider, (6) 3-4 action Buttons with sendText containing starter prompts the user can click to begin. At least ONE button MUST be a workflow-execution action (e.g., '▶️ Pending Items Auto-Process', '⚡ Run Batch Workflow'). Other buttons may be analytical (e.g., '📊 Data Overview', '🔍 Anomaly Detection'). The button labels should convey that the agent will EXECUTE tasks, not just show data. Use surfaceId 'welcome-card'. After this initial card, do NOT show the welcome card again in the same session.",",
   "referenceDate": "YYYY-MM-DD",
   "publicDatasetId": "bigquery-public-data.dataset.table",
   "agentShortName": "A concise 2-3 word role-based name for the agent (e.g., 'Supply Chain Analyst', 'Fraud Investigator').",
@@ -802,10 +893,11 @@ Output in the following JSON format. Output **pure JSON only without code blocks
     - **NO PRODUCT NAMES (CRITICAL)**: DO NOT include specific product names like 'Firestore', 'BigQuery', or 'Google Cloud' in the prompt text. Use completely generic business terminology like 'our operational database', 'internal records', or 'the compliance tracker'.
     - **NO FILENAMES (CRITICAL)**: DO NOT include specific file names or extensions (e.g., 'market_report_2024', 'data.tsv') in the prompt text. Use generic phrasing.
     1. **DISTRIBUTION & ADVANCED PROGRESSION (CRITICAL)**: Generate exactly 7 prompts tailored completely to the specific business challenge and industry context:
-        - **Prompts 1-2 (Foundation Analytics)**: Multi-Table Joins, trend analysis, and segmentation to establish data familiarity.
+        - **Prompts 1-2 (Foundation & Discovery)**: Data overview, schema exploration, and initial audit scan. Establish familiarity with the data landscape.
         - **Prompt 3 (CROSS-SOURCE DISCOVERY — WOW MOMENT, MANDATORY)**: This prompt MUST be designed so that the answer REQUIRES the agent to discover a hidden connection between the external file data and BigQuery data that is NOT obvious from either source alone. Phrase it as a high-level strategic question (e.g., 'What is the biggest untracked financial risk across our operations?') so the agent must autonomously decide to cross-reference the uploaded file against internal records. The Audit Seed from Section 6a provides the discrepancy the agent should discover. This prompt creates the most impressive demo moment.
-        - **Prompts 4-5 (Advanced Analytics & Integration)**: Audit/Root Cause detection, Unstructured PDF deep-dive, and Geospatial Context mapping.
-        - **Prompts 6-7 (Operational Write-backs)**: Design these prompts to ask the agent to resolve the discovered anomalies by adding, updating, or voiding records in the database.
+        - **Prompts 4-5 (MULTI-STEP DEPENDENT WORKFLOW — WOW MOMENT)**: These prompts MUST trigger FULL multi-step workflow execution demonstrating INTERDEPENDENT step chains where each step depends on the previous step's output. Prompt 4 MUST be a workflow with 10 items or fewer designed for IMMEDIATE synchronous execution. Each step must depend on the previous step's output (e.g., 'Scan all pending items, classify by severity, auto-process anything within tolerance, and generate an exception report for the remaining items'). The agent should demonstrate the full SCAN-CLASSIFY-PROCESS-ESCALATE-NOTIFY-AUDIT dependency chain in real-time. Prompt 5 MUST be a LARGE-SCOPE workflow implying more than 10 items or long-running processing, where the agent should propose BACKGROUND execution mode. Phrase it as a comprehensive batch operation (e.g., 'Run a full reconciliation across all records from the past quarter — identify discrepancies, auto-correct minor variances, flag major issues, and generate a compliance report'). The agent MUST demonstrate the execution mode selection dialog (immediate vs. background vs. scheduled).
+        - **Prompt 6 (SCHEDULED WORKFLOW — Automated Monitoring)**: A prompt that explicitly asks for a RECURRING scheduled workflow. The agent must propose using scheduled task registration with a cron expression and explain the monitoring logic. Example style: 'Set up an automated daily check at 9am — scan for new threshold breaches since yesterday, auto-escalate critical ones, and send me a summary report each morning.' The agent should demonstrate register_scheduled_task and explain what the background agent will do autonomously on each scheduled run.
+        - **Prompt 7 (End-to-End Strategic Automation)**: A complex prompt combining cross-source data analysis + conditional workflow execution + notification drafting + audit logging. This MUST require the agent to: (1) analyze data from multiple sources (BigQuery + Firestore + external file), (2) propose a multi-step workflow based on its findings, (3) execute with the appropriate execution mode, (4) draft a notification summary, and (5) create audit entries. This showcases the full spectrum of the agent's capabilities as an autonomous operator.
         - **NO EXPLICIT HITL IN PROMPTS (CRITICAL)**: The generated prompt text MUST NOT contain explicit instructions like 'Please wait for my approval' or 'Propose first'. Present the request as a straightforward business instruction (e.g., 'Register these anomalies as new compliance alerts in the database'). The agent will naturally implement the confirmation step autonomously based on its core system instructions!
     2. **PERSONA ROTATION (CRITICAL)**: Vary the tone and perspective by rotating personas for each prompt (e.g., CFO, Ops Manager, Regional Director, Front-line Lead).
     3. **EXTERNAL DATA NECESSITY & LOGICAL CONSISTENCY (CRITICAL)**: You MUST generate exactly one PDF file AND exactly one Excel file (.xlsx) unless it is completely impossible for the business context. The files generated MUST be external data (not inside the current system) and MUST be unstructured or semi-structured in format.
@@ -1488,7 +1580,7 @@ HTML_TEMPLATE = """
         .sec-title { font-size: 15px; font-weight: 600; margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px; color: var(--text-1); }
         .sec-title i { color: var(--primary); width: 18px; height: 18px; }
         .chart-area { grid-column: span 2; }
-        .log-area { grid-column: span 2; }
+
 
         .records { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
         .empty-state { text-align: center; padding: 40px 20px; color: var(--text-3); }
@@ -1508,9 +1600,18 @@ HTML_TEMPLATE = """
         .badge.pending { background: var(--warning-light); color: var(--warning); }
         .badge.flagged { background: var(--danger-light); color: var(--danger); }
 
-        .field { font-size: 13px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: baseline; }
-        .field-k { color: var(--text-3); font-size: 12px; }
-        .field-v { font-weight: 500; color: var(--text-1); font-size: 13px; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .field { font-size: 13px; margin-bottom: 5px; display: flex; justify-content: space-between; gap: 8px; }
+        .field-k { color: var(--text-3); font-size: 12px; flex-shrink: 0; }
+        .field-v { font-weight: 500; color: var(--text-1); font-size: 13px; text-align: right; max-width: 65%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; word-break: break-word; }
+        .card { cursor: pointer; }
+        .card-expand { text-align: center; font-size: 11px; color: var(--primary); padding: 6px 0 0; opacity: 0; transition: opacity var(--ease); }
+        .card:hover .card-expand { opacity: 1; }
+        .card-expand i { width: 12px; height: 12px; vertical-align: -2px; }
+        /* Record detail modal reuses .modal-overlay / .modal from task modal */
+        .detail-field { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .detail-field:last-child { border-bottom: none; }
+        .detail-field-k { font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.3px; min-width: 100px; flex-shrink: 0; padding-top: 2px; }
+        .detail-field-v { font-size: 13px; color: var(--text-1); line-height: 1.6; word-break: break-word; white-space: pre-wrap; flex: 1; }
 
         .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
         .card-actions select { font-size: 12px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); font-family: inherit; background: var(--bg); color: var(--text-1); cursor: pointer; transition: border-color var(--ease); }
@@ -1523,15 +1624,7 @@ HTML_TEMPLATE = """
 
         .chart-wrap { height: 200px; }
 
-        #logs { font-size: 12px; max-height: 180px; overflow-y: auto; scrollbar-width: thin; }
-        .log-entry { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); animation: fadeIn 0.3s ease-out; }
-        .log-entry:last-child { border-bottom: none; }
-        .log-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
-        .log-dot.created { background: var(--success); }
-        .log-dot.updated { background: var(--primary); }
-        .log-dot.deleted { background: var(--danger); }
-        .log-time { font-family: 'SF Mono', 'Fira Code', monospace; color: var(--text-3); font-size: 11px; flex-shrink: 0; }
-        .log-msg { color: var(--text-2); }
+
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         @keyframes pulse { 0% { background: var(--primary-light); } 100% { background: var(--surface); } }
@@ -1540,11 +1633,69 @@ HTML_TEMPLATE = """
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
         }
-        @media (max-width: 1024px) { .grid { grid-template-columns: repeat(2, 1fr); } .hdr, .main, .chart-area, .log-area { grid-column: span 2; } .kpi { grid-column: span 1; } }
-        @media (max-width: 640px) { body { padding: 12px; } .grid { grid-template-columns: 1fr; gap: 12px; } .hdr, .main, .chart-area, .log-area, .kpi { grid-column: span 1; } .hdr { flex-direction: column; align-items: flex-start; gap: 12px; } .records { grid-template-columns: 1fr; } }
+        @media (max-width: 1024px) { .grid { grid-template-columns: repeat(2, 1fr); } .hdr, .main, .chart-area { grid-column: span 2; } .kpi { grid-column: span 1; } }
+        @media (max-width: 640px) { body { padding: 12px; } .grid { grid-template-columns: 1fr; gap: 12px; } .hdr, .main, .chart-area, .kpi { grid-column: span 1; } .hdr { flex-direction: column; align-items: flex-start; gap: 12px; } .records { grid-template-columns: 1fr; } }
+
+        /* --- Tab Navigation --- */
+        .tab-bar { display: flex; gap: 4px; max-width: 1400px; margin: 0 auto 16px; background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px; box-shadow: var(--shadow-sm); position: sticky; top: 12px; z-index: 50; }
+        .tab-btn { flex: 1; padding: 10px 20px; border: none; background: none; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text-3); cursor: pointer; border-radius: 12px; transition: all var(--ease); display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .tab-btn:hover { color: var(--text-1); background: var(--bg); }
+        .tab-btn.active { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(79,70,229,0.25); }
+        .tab-btn i { width: 16px; height: 16px; }
+        .tab-view { display: none; }
+        .tab-view.active { display: block; }
+        .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+        .tcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow-sm); transition: all var(--ease); border-left: 4px solid var(--border); animation: fadeUp 0.3s ease-out both; }
+        .tcard:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+        .tcard.ts-completed { border-left-color: var(--success); }
+        .tcard.ts-working { border-left-color: var(--primary); }
+        .tcard.ts-submitted { border-left-color: var(--warning); }
+        .tcard.ts-failed { border-left-color: var(--danger); }
+        .tcard.ts-cancelled { border-left-color: var(--text-3); }
+        .tcard-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .tcard-name { font-size: 14px; font-weight: 600; color: var(--text-1); display: flex; align-items: center; gap: 6px; }
+        .tcard-name i { width: 14px; height: 14px; color: var(--primary); }
+        .tcard-type { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 6px; text-transform: uppercase; background: var(--primary-light); color: var(--primary); }
+        .tcard-desc { font-size: 12px; color: var(--text-3); margin-bottom: 10px; line-height: 1.5; white-space: pre-wrap; }
+        .tcard-meta { font-size: 11px; color: var(--text-3); display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+        .tcard-meta span { display: flex; align-items: center; gap: 4px; }
+        .tcard-meta i { width: 12px; height: 12px; }
+        .tbadge { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 6px; text-transform: uppercase; }
+        .tbadge.completed { background: var(--success-light); color: var(--success); }
+        .tbadge.working { background: var(--primary-light); color: var(--primary); animation: pulse 2s infinite; }
+        .tbadge.submitted { background: var(--warning-light); color: var(--warning); }
+        .tbadge.failed { background: var(--danger-light); color: var(--danger); }
+        .tbadge.cancelled, .tbadge.unknown { background: #f3f4f6; color: var(--text-3); }
+        .tprogress { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 10px; overflow: hidden; }
+        .tprogress-bar { height: 100%; background: linear-gradient(90deg, var(--primary), #7C3AED); border-radius: 2px; transition: width 0.5s ease; }
+        .tcard-result { font-size: 12px; color: var(--text-2); background: var(--bg); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 10px; max-height: 80px; overflow: hidden; line-height: 1.5; cursor: pointer; position: relative; }
+        .tcard-result::after { content: 'Click to expand'; position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font-size: 10px; color: var(--primary); background: linear-gradient(transparent, var(--bg)); padding: 8px 0 4px; }
+        .tcard-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 10px; border-top: 1px solid var(--border); }
+        .tbtn { font-size: 11px; font-weight: 600; font-family: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; transition: all var(--ease); display: flex; align-items: center; gap: 4px; }
+        .tbtn:hover { border-color: var(--border-hover); background: var(--bg); }
+        .tbtn.danger:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-light); }
+        .tbtn i { width: 12px; height: 12px; }
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-overlay.open { display: flex; }
+        .modal { background: var(--surface); border-radius: var(--radius); padding: 24px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.15); animation: fadeUp 0.2s ease-out; }
+        .modal h3 { margin: 0 0 16px; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+        .modal pre { background: var(--bg); border-radius: var(--radius-sm); padding: 16px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; max-height: 50vh; overflow-y: auto; }
+        .modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; cursor: pointer; color: var(--text-3); }
+        .wf-progress { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin: 6px 0; }
+        .wf-progress-bar { height: 100%; background: linear-gradient(90deg, var(--primary), #7C3AED); border-radius: 3px; transition: width 0.3s ease; }
+        .timeline-entry { display: flex; gap: 8px; padding: 6px 0; border-left: 2px solid var(--border); padding-left: 12px; margin-left: 4px; }
+        .timeline-ts { font-size: 11px; color: var(--text-3); min-width: 80px; flex-shrink: 0; }
+        .timeline-by { font-size: 11px; color: var(--primary); font-weight: 500; }
     </style>
 </head>
 <body>
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('data')" id="tab-data"><i data-lucide="database"></i> Data</button>
+        <button class="tab-btn" onclick="switchTab('tasks')" id="tab-tasks"><i data-lucide="zap"></i> Tasks <span id="task-count-badge" style="background:var(--warning-light);color:var(--warning);font-size:10px;padding:1px 6px;border-radius:8px;display:none;">0</span></button>
+        <button class="tab-btn" onclick="switchTab('activity')" id="tab-activity"><i data-lucide="scroll-text"></i> Activity <span id="activity-count-badge" style="background:var(--bg);color:var(--text-3);font-size:10px;padding:1px 6px;border-radius:8px;display:none;">0</span></button>
+    </div>
+
+    <div id="data-view" class="tab-view active">
     <div class="grid">
         <div class="panel hdr" style="animation-delay:0ms">
             <div>
@@ -1578,9 +1729,52 @@ HTML_TEMPLATE = """
             <div class="chart-wrap"><canvas id="chart2"></canvas></div>
         </div>
 
-        <div class="panel log-area" style="animation-delay:400ms">
-            <h2 class="sec-title"><i data-lucide="scroll-text"></i> Activity Log</h2>
-            <div id="logs"></div>
+
+    </div>
+    </div>
+
+    <div id="tasks-view" class="tab-view">
+        <div class="grid">
+            <div class="panel kpi" style="animation-delay:50ms"><div class="kpi-bar"></div><div class="kpi-inner"><div class="kpi-lbl">Total Tasks</div><div class="kpi-val" id="tkpi-total">0</div></div></div>
+            <div class="panel kpi" style="animation-delay:100ms"><div class="kpi-bar"></div><div class="kpi-inner"><div class="kpi-lbl">Running</div><div class="kpi-val" id="tkpi-running" style="color:var(--primary)">0</div></div></div>
+            <div class="panel kpi" style="animation-delay:150ms"><div class="kpi-bar"></div><div class="kpi-inner"><div class="kpi-lbl">Completed</div><div class="kpi-val" id="tkpi-completed" style="color:var(--success)">0</div></div></div>
+            <div class="panel kpi" style="animation-delay:200ms"><div class="kpi-bar"></div><div class="kpi-inner"><div class="kpi-lbl">Failed</div><div class="kpi-val" id="tkpi-failed" style="color:var(--danger)">0</div></div></div>
+            <div class="panel" style="grid-column:span 4;animation-delay:250ms">
+                <h2 class="sec-title"><i data-lucide="zap"></i> Background Tasks</h2>
+                <div id="task-list" class="task-grid">
+                    <div class="empty-state"><i data-lucide="inbox"></i><p>No tasks registered yet.</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="activity-view" class="tab-view">
+        <div class="grid">
+            <div class="panel" style="grid-column:span 4;animation-delay:50ms">
+                <h2 class="sec-title"><i data-lucide="scroll-text"></i> Unified Activity Log</h2>
+                <div class="hdr-desc" style="margin-bottom:16px;">Firestore document changes and BigQuery DML operations are displayed here.</div>
+                <div id="activity-feed" class="task-grid">
+                    <div class="empty-state"><i data-lucide="inbox"></i><p>No activity recorded yet.</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="task-modal" onclick="if(event.target===this)closeModal()">
+        <div class="modal" style="position:relative;">
+            <button class="modal-close" onclick="closeModal()"><i data-lucide="x" style="width:20px;height:20px;"></i></button>
+            <h3 id="modal-title"><i data-lucide="file-text"></i> Task Detail</h3>
+            <div id="modal-meta" class="tcard-meta" style="margin-bottom:16px;"></div>
+            <pre id="modal-body">Loading...</pre>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="record-modal" onclick="if(event.target===this)closeModal()">
+        <div class="modal" style="position:relative;">
+            <button class="modal-close" onclick="closeModal()"><i data-lucide="x" style="width:20px;height:20px;"></i></button>
+            <h3 id="rec-modal-title"><i data-lucide="database"></i> Record Detail</h3>
+            <div id="rec-modal-meta" class="tcard-meta" style="margin-bottom:16px;"></div>
+            <div id="rec-modal-body">Loading...</div>
         </div>
     </div>
 
@@ -1602,15 +1796,6 @@ HTML_TEMPLATE = """
                 data: { labels: ['High', 'Medium', 'Low'], datasets: [{ label: 'Records', data: [0, 0, 0], backgroundColor: ['#7C3AED', '#4F46E5', '#818CF8'], borderRadius: 6, borderSkipped: false }] },
                 options: { maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return c.raw + ' records'; } } } }, scales: { x: { grid: { display: false }, ticks: { precision: 0, font: sharedFont } }, y: { grid: { display: false }, ticks: { font: { ...sharedFont, weight: 500 } } } } }
             });
-        }
-
-        function addLog(msg, type) {
-            const l = document.getElementById('logs');
-            const d = document.createElement('div');
-            d.className = 'log-entry';
-            d.innerHTML = \`<span class="log-dot \${type}"></span><span class="log-time">\${new Date().toLocaleTimeString()}</span><span class="log-msg">\${msg}</span>\`;
-            l.prepend(d);
-            while (l.children.length > 50) l.removeChild(l.lastChild);
         }
 
         function getStatusClass(s) {
@@ -1652,17 +1837,38 @@ HTML_TEMPLATE = """
                     let priority = doc.data.priority || doc.data.Priority || 'Medium';
                     if (priorityCounts.hasOwnProperty(priority)) priorityCounts[priority]++;
 
+                    let docFingerprint = JSON.stringify(doc.data);
                     let isNew = !docStates[doc.id];
-                    let isUpdated = docStates[doc.id] && docStates[doc.id] !== statusStr;
-                    if (isNew && !isFirstLoad) { docStates[doc.id] = statusStr; addLog(\`Created: \${doc.id}\`, 'created'); }
-                    else if (isUpdated) { docStates[doc.id] = statusStr; addLog(\`Updated: \${doc.id} \u2192 \${statusStr}\`, 'updated'); }
-                    else if (isNew) { docStates[doc.id] = statusStr; }
+                    let isUpdated = !isNew && docStates[doc.id].fp !== docFingerprint;
+                    if (isNew || isUpdated) {
+                        docStates[doc.id] = { status: statusStr, fp: docFingerprint };
+                    }
 
                     let card = document.querySelector(\`[data-id="\${doc.id}"]\`);
                     let fieldsHtml = '';
+                    let fieldCount = 0;
                     for (const [key, val] of Object.entries(doc.data)) {
                         if (key === 'status' || key === 'Status') continue;
-                        fieldsHtml += \`<div class="field"><span class="field-k">\${key}</span><span class="field-v">\${val}</span></div>\`;
+                        let displayVal = val;
+                        if (key === 'workflow_state' && val && typeof val === 'object') {
+                            let step = val.current_step || '?';
+                            let total = val.total_steps || '?';
+                            let approval = val.pending_approval ? '⏳ Pending' : '✅ OK';
+                            displayVal = 'Step ' + step + '/' + total + ' • ' + approval;
+                        } else if (key === 'activity_log' && Array.isArray(val)) {
+                            let latest = val[val.length - 1];
+                            displayVal = val.length + ' entries';
+                            if (latest && latest.action) displayVal += ' • ' + latest.action;
+                        } else if (val && typeof val === 'object') {
+                            if (Array.isArray(val)) {
+                                displayVal = val.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join(', ');
+                            } else {
+                                displayVal = Object.entries(val).map(([k,v]) => k + ': ' + v).join(', ');
+                            }
+                        }
+                        displayVal = String(displayVal);
+                        fieldsHtml += \`<div class="field"><span class="field-k">\${key}</span><span class="field-v" title="\${displayVal.replace(/"/g, '&quot;')}">\${displayVal}</span></div>\`;
+                        fieldCount++;
                     }
                     if (!card) {
                         card = document.createElement('div');
@@ -1677,18 +1883,19 @@ HTML_TEMPLATE = """
                     card.className = \`card s-\${bClass}\`;
                     card.setAttribute('data-id', doc.id);
                     card.innerHTML = \`
-                        <div class="card-top">
+                        <div class="card-top" onclick="openRecordDetail('\${doc.id}')">
                             <div class="card-id"><i data-lucide="hash"></i>\${doc.id}</div>
                             <span class="badge \${bClass}">\${statusStr}</span>
                         </div>
-                        <div>\${fieldsHtml}</div>
+                        <div onclick="openRecordDetail('\${doc.id}')">\${fieldsHtml}</div>
+                        <div class="card-expand" onclick="openRecordDetail('\${doc.id}')"><i data-lucide="chevrons-up-down"></i> View all \${fieldCount} fields</div>
                         <div class="card-actions">
-                            <select aria-label="Change status for \${doc.id}" onchange="updateStatus('\${doc.id}', this.value)">
+                            <select aria-label="Change status for \${doc.id}" onchange="event.stopPropagation(); updateStatus('\${doc.id}', this.value)">
                                 <option value="Pending" \${statusStr==='Pending'?'selected':''}>Pending</option>
                                 <option value="Resolved" \${statusStr==='Resolved'?'selected':''}>Resolved</option>
                                 <option value="Flagged" \${statusStr==='Flagged'?'selected':''}>Flagged</option>
                             </select>
-                            <button class="btn-del" onclick="deleteRecord('\${doc.id}')" aria-label="Delete record \${doc.id}"><i data-lucide="trash-2"></i></button>
+                            <button class="btn-del" onclick="event.stopPropagation(); deleteRecord('\${doc.id}')" aria-label="Delete record \${doc.id}"><i data-lucide="trash-2"></i></button>
                         </div>
                     \`;
                 });
@@ -1699,7 +1906,6 @@ HTML_TEMPLATE = """
                 Array.from(grid.children).forEach(child => {
                     const id = child.getAttribute('data-id');
                     if (id && !currentIds.has(id)) {
-                        addLog(\`Deleted: \${id}\`, 'deleted');
                         child.remove();
                         delete docStates[id];
                     }
@@ -1738,9 +1944,274 @@ HTML_TEMPLATE = """
             fetchData();
         }
 
+
+        // --- Tab & Task Management ---
+        let activeTab = 'data';
+
+        function switchTab(tab) {
+            activeTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            document.getElementById(tab + '-view').classList.add('active');
+            lucide.createIcons();
+        }
+
+        // Cache of task data hashes to detect changes for incremental DOM updates
+        const _taskHashCache = {};
+
+        function _buildTaskCard(t) {
+            const typeIcon = t.task_type === 'scheduled' ? 'calendar-clock' : 'zap';
+            const typeLabel = t.task_type === 'scheduled' ? 'SCHEDULED' : 'IMMEDIATE';
+            let meta = '';
+            if (t.schedule_cron) meta += \`<span><i data-lucide="clock"></i>\${t.schedule_cron}</span>\`;
+            if (t.started_at) meta += \`<span><i data-lucide="play"></i>\${new Date(t.started_at).toLocaleString()}</span>\`;
+            if (t.completed_at) meta += \`<span><i data-lucide="check-circle"></i>\${new Date(t.completed_at).toLocaleString()}</span>\`;
+            let progress = '';
+            if (t.status === 'working') progress = \`<div class="tprogress"><div class="tprogress-bar" style="width:\${t.progress_pct}%"></div></div>\`;
+            let result = '';
+            if (t.result_summary) result = \`<div class="tcard-result" onclick="openTaskDetail('\${t.task_id}')">\${t.result_summary.substring(0, 200)}</div>\`;
+            let actions = '';
+            if (t.status === 'working' || t.status === 'submitted') {
+                actions += \`<button class="tbtn" onclick="cancelTask('\${t.task_id}')"><i data-lucide="x-circle"></i> Cancel</button>\`;
+            }
+            actions += \`<button class="tbtn" onclick="openTaskDetail('\${t.task_id}')"><i data-lucide="eye"></i> Detail</button>\`;
+            actions += \`<button class="tbtn danger" onclick="deleteTask('\${t.task_id}')"><i data-lucide="trash-2"></i></button>\`;
+            return \`<div class="tcard-hdr">
+                <div class="tcard-name"><i data-lucide="\${typeIcon}"></i>\${t.task_name || t.task_id}</div>
+                <span class="tbadge \${t.status}">\${t.status}</span>
+            </div>
+            <div class="tcard-desc">\${t.task_description || ''}</div>
+            \${progress}
+            <div class="tcard-meta">\${meta}<span class="tcard-type">\${typeLabel}</span></div>
+            \${result}
+            <div class="tcard-actions">\${actions}</div>\`;
+        }
+
+        function _taskHash(t) {
+            return [t.task_id, t.status, t.progress_pct, t.result_summary||'', t.started_at||'', t.completed_at||''].join('|');
+        }
+
+        async function fetchTasks() {
+            try {
+                const res = await fetch('/api/tasks');
+                const data = await res.json();
+                const tasks = data.tasks || [];
+                const grid = document.getElementById('task-list');
+
+                // KPIs
+                const running = tasks.filter(t => t.status === 'working' || t.status === 'submitted').length;
+                const completed = tasks.filter(t => t.status === 'completed').length;
+                const failed = tasks.filter(t => t.status === 'failed').length;
+                document.getElementById('tkpi-total').textContent = tasks.length;
+                document.getElementById('tkpi-running').textContent = running;
+                document.getElementById('tkpi-completed').textContent = completed;
+                document.getElementById('tkpi-failed').textContent = failed;
+
+                // Badge on tab — show total task count always
+                const badge = document.getElementById('task-count-badge');
+                if (tasks.length > 0) {
+                    badge.textContent = tasks.length;
+                    badge.style.display = 'inline';
+                    if (running > 0) { badge.style.background = 'var(--primary-light)'; badge.style.color = 'var(--primary)'; badge.style.animation = 'pulse 2s infinite'; }
+                    else { badge.style.background = 'var(--bg)'; badge.style.color = 'var(--text-3)'; badge.style.animation = 'none'; }
+                } else { badge.style.display = 'none'; }
+
+                if (tasks.length === 0) {
+                    if (!grid.querySelector('.empty-state')) {
+                        grid.innerHTML = '<div class="empty-state"><i data-lucide="inbox"></i><p>No tasks registered yet.</p></div>';
+                        lucide.createIcons();
+                    }
+                    // Clear stale hash cache
+                    Object.keys(_taskHashCache).forEach(k => delete _taskHashCache[k]);
+                    return;
+                }
+
+                // Incremental DOM update: only touch cards that changed
+                const incomingIds = new Set(tasks.map(t => t.task_id));
+                let needsIconRefresh = false;
+
+                // Remove cards no longer in data
+                grid.querySelectorAll('.tcard[data-task-id]').forEach(el => {
+                    const tid = el.getAttribute('data-task-id');
+                    if (!incomingIds.has(tid)) {
+                        el.remove();
+                        delete _taskHashCache[tid];
+                    }
+                });
+
+                // Remove empty-state placeholder if present
+                const emptyEl = grid.querySelector('.empty-state');
+                if (emptyEl) emptyEl.remove();
+
+                // Update or insert each task card
+                tasks.forEach(t => {
+                    const hash = _taskHash(t);
+                    const existing = grid.querySelector('.tcard[data-task-id="' + t.task_id + '"]');
+                    if (existing) {
+                        if (_taskHashCache[t.task_id] === hash) return; // No change — skip
+                        // Update in-place
+                        existing.className = 'tcard ts-' + t.status;
+                        existing.innerHTML = _buildTaskCard(t);
+                        needsIconRefresh = true;
+                    } else {
+                        // New card
+                        const div = document.createElement('div');
+                        div.className = 'tcard ts-' + t.status;
+                        div.setAttribute('data-task-id', t.task_id);
+                        div.innerHTML = _buildTaskCard(t);
+                        grid.appendChild(div);
+                        needsIconRefresh = true;
+                    }
+                    _taskHashCache[t.task_id] = hash;
+                });
+
+                if (needsIconRefresh) lucide.createIcons();
+            } catch (e) { console.error('Task fetch error:', e); }
+        }
+
+        async function cancelTask(id) {
+            if (!confirm('Cancel task ' + id + '?')) return;
+            await fetch('/api/tasks/' + id + '/cancel', { method: 'POST' });
+            fetchTasks();
+        }
+
+        async function deleteTask(id) {
+            if (!confirm('Delete task ' + id + '? This cannot be undone.')) return;
+            await fetch('/api/tasks/' + id, { method: 'DELETE' });
+            fetchTasks();
+        }
+
+        async function fetchActivity() {
+            try {
+                const res = await fetch('/api/activity');
+                const data = await res.json();
+                const activities = data.activities || [];
+                const feed = document.getElementById('activity-feed');
+                const aBadge = document.getElementById('activity-count-badge');
+                if (activities.length > 0) { aBadge.textContent = activities.length; aBadge.style.display = 'inline'; }
+                else { aBadge.style.display = 'none'; }
+                if (activities.length === 0) {
+                    if (!feed.querySelector('.empty-state')) {
+                        feed.innerHTML = '<div class="empty-state"><i data-lucide="inbox"></i><p>No activity recorded yet.</p></div>';
+                        lucide.createIcons();
+                    }
+                    return;
+                }
+                let html = '';
+                activities.forEach(a => {
+                    const srcIcon = a.source === 'bigquery' ? 'database' : 'file-text';
+                    const srcLabel = a.source === 'bigquery' ? 'BigQuery' : 'Firestore';
+                    const srcColor = a.source === 'bigquery' ? 'var(--primary)' : 'var(--success)';
+                    const ts = a.timestamp ? new Date(a.timestamp).toLocaleString() : '';
+                    const statusCls = a.status === 'error' ? 'failed' : 'completed';
+                    html += \`<div class="tcard ts-\${statusCls}" style="padding:14px 18px;">\`;
+                    html += \`<div class="tcard-head"><span class="tbadge \${statusCls}" style="background:\${srcColor};color:#fff;font-weight:600;">\${srcLabel}</span>\`;
+                    html += \`<span class="tbadge \${statusCls}">\${a.operation || 'unknown'}</span></div>\`;
+                    html += \`<div class="tcard-name" style="font-size:13px;margin:6px 0;">\${a.target || ''}</div>\`;
+                    if (a.detail) html += \`<div class="tcard-desc" style="font-size:12px;color:var(--text-3);max-height:120px;overflow:hidden;">\${a.detail.substring(0, 200)}</div>\`;
+                    html += \`<div class="tcard-meta"><span><i data-lucide="clock"></i>\${ts}</span>\`;
+                    if (a.rows_affected) html += \`<span><i data-lucide="rows-3"></i>\${a.rows_affected} rows</span>\`;
+                    html += \`</div></div>\`;
+                });
+                feed.innerHTML = html;
+                lucide.createIcons();
+            } catch (e) { console.error('Activity fetch error:', e); }
+        }
+
+        async function openTaskDetail(id) {
+            const modal = document.getElementById('task-modal');
+            modal.classList.add('open');
+            document.getElementById('modal-body').textContent = 'Loading...';
+            try {
+                const res = await fetch('/api/tasks/' + id);
+                const t = await res.json();
+                document.getElementById('modal-title').innerHTML = '<i data-lucide="file-text"></i> ' + (t.task_name || t.task_id);
+                let metaHtml = \`<span class="tbadge \${t.status}">\${t.status}</span>\`;
+                if (t.schedule_cron) metaHtml += \`<span><i data-lucide="clock"></i> \${t.schedule_cron}</span>\`;
+                if (t.started_at) metaHtml += \`<span>Started: \${new Date(t.started_at).toLocaleString()}</span>\`;
+                if (t.completed_at) metaHtml += \`<span>Completed: \${new Date(t.completed_at).toLocaleString()}</span>\`;
+                document.getElementById('modal-meta').innerHTML = metaHtml;
+                let body = '';
+                if (t.task_description) body += '--- Description ---\\\\n' + t.task_description + '\\\\n\\\\n';
+                if (t.task_prompt) body += '--- Prompt ---\\\\n' + t.task_prompt + '\\\\n\\\\n';
+                if (t.result_summary) body += '--- Result ---\\\\n' + t.result_summary + '\\\\n\\\\n';
+                if (t.log_tail) body += '--- Log ---\\\\n' + t.log_tail;
+                document.getElementById('modal-body').textContent = body || 'No details available.';
+                lucide.createIcons();
+            } catch (e) { document.getElementById('modal-body').textContent = 'Error: ' + e.message; }
+        }
+
+        function openRecordDetail(docId) {
+            const modal = document.getElementById('record-modal');
+            modal.classList.add('open');
+            document.getElementById('rec-modal-body').innerHTML = '<div style="color:var(--text-3)">Loading...</div>';
+            document.getElementById('rec-modal-title').innerHTML = '<i data-lucide="database"></i> ' + docId;
+            document.getElementById('rec-modal-meta').innerHTML = '';
+            try {
+                const card = document.querySelector('[data-id="' + docId + '"]');
+                if (!card) return;
+                const badge = card.querySelector('.badge');
+                if (badge) {
+                    document.getElementById('rec-modal-meta').innerHTML = '<span class="' + badge.className + '">' + badge.textContent + '</span>';
+                }
+                fetch('/api/data').then(r => r.json()).then(data => {
+                    const doc = data.find(d => d.id === docId);
+                    if (!doc) { document.getElementById('rec-modal-body').innerHTML = '<div style="color:var(--text-3)">Record not found.</div>'; return; }
+                    let html = '';
+                    for (const [key, val] of Object.entries(doc.data)) {
+                        if (key === 'workflow_state' && val && typeof val === 'object') {
+                            let step = val.current_step || 0;
+                            let total = val.total_steps || 1;
+                            let pct = Math.round(step / total * 100);
+                            let actions = (val.auto_actions_taken || []);
+                            html += '<div class="detail-field"><div class="detail-field-k">WORKFLOW</div>';
+                            html += '<div class="detail-field-v">';
+                            html += '<div class="wf-progress"><div class="wf-progress-bar" style="width:' + pct + '%"></div></div>';
+                            html += '<div style="margin-bottom:8px">Step ' + step + ' of ' + total + '</div>';
+                            if (val.pending_approval) html += '<span class="badge pending">Pending Approval</span>';
+                            if (actions.length) {
+                                html += '<div style="margin-top:8px; font-weight: 500;">Actions taken:</div>';
+                                html += '<ul style="margin: 4px 0; padding-left: 16px; font-size: 13px; color: var(--text-2);">' + actions.map(a => '<li>' + a + '</li>').join('') + '</ul>';
+                            }
+                            html += '</div></div>';
+                            continue;
+                        } else if (key === 'activity_log' && Array.isArray(val)) {
+                            html += '<div class="detail-field"><div class="detail-field-k">ACTIVITY</div>';
+                            html += '<div class="detail-field-v">';
+                            val.forEach(entry => {
+                                let ts = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
+                                html += '<div class="timeline-entry">';
+                                html += '<span class="timeline-ts">' + ts + '</span>';
+                                html += '<span>' + (entry.action || '') + '</span>';
+                                if (entry.by) html += '<span class="timeline-by">' + entry.by + '</span>';
+                                html += '</div>';
+                            });
+                            html += '</div></div>';
+                            continue;
+                        }
+                        let displayVal = val;
+                        if (val && typeof val === 'object') {
+                            displayVal = JSON.stringify(val, null, 2);
+                        }
+                        displayVal = String(displayVal);
+                        html += '<div class="detail-field"><div class="detail-field-k">' + key + '</div><div class="detail-field-v">' + displayVal.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div></div>';
+                    }
+                    document.getElementById('rec-modal-body').innerHTML = html || '<div style="color:var(--text-3)">No fields.</div>';
+                    lucide.createIcons();
+                });
+            } catch (e) { document.getElementById('rec-modal-body').innerHTML = '<div style="color:var(--danger)">Error: ' + e.message + '</div>'; }
+        }
+
+        function closeModal() { document.getElementById('task-modal').classList.remove('open'); document.getElementById('record-modal').classList.remove('open'); }
+
         initCharts();
         setInterval(fetchData, 2000);
+        setInterval(fetchTasks, 3000);
+        setInterval(fetchActivity, 5000);
         fetchData();
+        fetchTasks();
+        fetchActivity();
     </script>
 </body>
 </html>
@@ -1783,6 +2254,126 @@ def delete_data():
         db.collection(COLLECTION).document(doc_id).delete()
     return jsonify({"success": True})
 
+# --- Task Management API ---
+DEMO_ID = os.environ.get("DEMO_ID", "")
+
+@app.route('/api/tasks')
+def list_tasks():
+    if not DEMO_ID:
+        return jsonify({"tasks": [], "error": "DEMO_ID not set"})
+    defs_col = DEMO_ID + "_task_definitions"
+    execs_col = DEMO_ID + "_task_executions"
+    defs = {d.id: d.to_dict() for d in db.collection(defs_col).stream()}
+    execs = {d.id: d.to_dict() for d in db.collection(execs_col).stream()}
+    tasks = []
+    for tid, defn in defs.items():
+        ex = execs.get(tid, {})
+        tasks.append({
+            "task_id": tid,
+            "task_name": defn.get("task_name", ""),
+            "task_description": defn.get("task_description", ""),
+            "task_type": defn.get("task_type", "immediate"),
+            "schedule_cron": defn.get("schedule_cron", ""),
+            "created_at": defn.get("created_at", ""),
+            "status": ex.get("status") or ("scheduled" if defn.get("task_type") == "scheduled" else "unknown"),
+            "progress_pct": ex.get("progress_pct", 0),
+            "result_summary": ex.get("result_summary", "")[:300],
+            "log_tail": ex.get("log_tail", "")[:200],
+            "started_at": ex.get("started_at", ""),
+            "completed_at": ex.get("completed_at", ""),
+        })
+    tasks.sort(key=lambda t: t.get("created_at", ""), reverse=True)
+    return jsonify({"tasks": tasks})
+
+@app.route('/api/tasks/<task_id>')
+def get_task(task_id):
+    if not DEMO_ID:
+        return jsonify({"error": "DEMO_ID not set"}), 400
+    defn = db.collection(DEMO_ID + "_task_definitions").document(task_id).get()
+    ex = db.collection(DEMO_ID + "_task_executions").document(task_id).get()
+    if not defn.exists:
+        return jsonify({"error": "Task not found"}), 404
+    d = defn.to_dict()
+    e = ex.to_dict() if ex.exists else {}
+    return jsonify({
+        "task_id": task_id,
+        "task_name": d.get("task_name", ""),
+        "task_description": d.get("task_description", ""),
+        "task_prompt": d.get("task_prompt", ""),
+        "task_type": d.get("task_type", "immediate"),
+        "schedule_cron": d.get("schedule_cron", ""),
+        "created_at": d.get("created_at", ""),
+        "status": e.get("status", "unknown"),
+        "progress_pct": e.get("progress_pct", 0),
+        "result_summary": e.get("result_summary", ""),
+        "log_tail": e.get("log_tail", ""),
+        "started_at": e.get("started_at", ""),
+        "completed_at": e.get("completed_at", ""),
+    })
+
+@app.route('/api/tasks/<task_id>/cancel', methods=['POST'])
+def cancel_task(task_id):
+    if not DEMO_ID:
+        return jsonify({"error": "DEMO_ID not set"}), 400
+    ref = db.collection(DEMO_ID + "_task_executions").document(task_id)
+    doc = ref.get()
+    if not doc.exists:
+        return jsonify({"error": "Task not found"}), 404
+    s = doc.to_dict().get("status", "")
+    if s in ("completed", "failed", "cancelled"):
+        return jsonify({"error": "Task already in terminal state: " + s}), 400
+    ref.update({"status": "cancelled"})
+    return jsonify({"success": True, "task_id": task_id})
+
+@app.route('/api/tasks/<task_id>', methods=['DELETE'])
+def delete_task(task_id):
+    if not DEMO_ID:
+        return jsonify({"error": "DEMO_ID not set"}), 400
+    # Check if this is a scheduled task — if so, delete Cloud Scheduler job too
+    defn_ref = db.collection(DEMO_ID + "_task_definitions").document(task_id)
+    defn_doc = defn_ref.get()
+    if defn_doc.exists:
+        defn_data = defn_doc.to_dict()
+        if defn_data.get("task_type") == "scheduled":
+            try:
+                from google.cloud import scheduler_v1
+                _sc = scheduler_v1.CloudSchedulerClient()
+                _pid = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+                _reg = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+                if _reg == "global":
+                    _reg = "us-central1"
+                _jn = "projects/" + _pid + "/locations/" + _reg + "/jobs/" + DEMO_ID + "-sched-" + task_id
+                _sc.delete_job(name=_jn)
+            except Exception:
+                pass  # Job may not exist
+    defn_ref.delete()
+    db.collection(DEMO_ID + "_task_executions").document(task_id).delete()
+    return jsonify({"success": True, "task_id": task_id})
+
+@app.route('/api/activity')
+def list_activity():
+    if not DEMO_ID:
+        return jsonify({"activities": [], "error": "DEMO_ID not set"})
+    col_name = DEMO_ID + "_activity_log"
+    try:
+        docs = db.collection(col_name).order_by("timestamp", direction=firestore.Query.DESCENDING).limit(50).stream()
+        activities = []
+        for doc in docs:
+            d = doc.to_dict()
+            activities.append({
+                "id": doc.id,
+                "source": d.get("source", "unknown"),
+                "operation": d.get("operation", ""),
+                "target": d.get("target", ""),
+                "detail": d.get("detail", ""),
+                "rows_affected": d.get("rows_affected", 0),
+                "timestamp": d.get("timestamp", ""),
+                "status": d.get("status", "success"),
+            })
+        return jsonify({"activities": activities})
+    except Exception as _e:
+        return jsonify({"activities": [], "error": str(_e)})
+
 def main(request):
     with app.request_context(request.environ):
         try:
@@ -1811,6 +2402,7 @@ __VIEWER_REQ__\n`;
   --entry-point=main \
   --trigger-http \
   --allow-unauthenticated \
+  --set-env-vars=DEMO_ID=${dirName} \
   --project="$PROJECT_ID"; then
       echo "    ✅ Cloud Run Function deployed."
   else
@@ -2230,9 +2822,9 @@ show_usage() {
   echo ""
   echo "Options:"
   echo "  --model, -m <MODEL>       Set the deep analysis agent model"
-  echo "                            (default: gemini-3.1-pro-preview)"
+  echo "                            (default: gemini-3.5-flash)"
   echo "  --model-lite <MODEL>      Set the root orchestration agent model"
-  echo "                            (default: gemini-3.1-flash-lite)"
+  echo "                            (default: gemini-3.5-flash)"
   echo "  --cleanup, -c             Delete all provisioned demo resources"
   echo "  --help, -h                Show this help message and exit"
   echo ""
@@ -2246,8 +2838,8 @@ show_usage() {
 
 
 # --- Argument Parsing ---
-AGENT_MODEL="gemini-3.1-pro-preview"
-AGENT_MODEL_LITE="gemini-3.1-flash-lite"
+AGENT_MODEL="gemini-3.5-flash"
+AGENT_MODEL_LITE="gemini-3.5-flash"
 CLEANUP_MODE=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -2317,6 +2909,10 @@ export UV_RETRIES=10
     echo "  • Gemini Enterprise registration (App): ${dirName}"
     echo "  • Custom MCP Secrets in Secret Manager (if exist)"
     echo "  • Agent Engine (Sandbox): ${dirName}-sandbox"
+    echo "  • Pub/Sub Topics: ${dirName}-sched-tasks, ${dirName}-task-results"
+    echo "  • Pub/Sub Subscriptions: ${dirName}-sched-tasks-push, ${dirName}-task-results-push"
+    echo "  • Cloud Scheduler Jobs: ${dirName}-sched-* (if any)"
+    echo "  • Firestore Task Collections: ${dirName}_task_definitions, ${dirName}_task_executions"
     echo "  • Local Directory: ~/${dirName}"
     echo ""
     _HAS_SLACK=\$(gcloud secrets describe "${dirName}-slack-token" --project="\$PROJECT_ID" 2>/dev/null && echo "yes" || echo "no")
@@ -2476,6 +3072,46 @@ except Exception as e:
     else
       echo "   ⚠️  Agent Engine name not found in .env, skipping."
     fi
+
+    echo ""
+    echo "📨 Deleting Pub/Sub topics and subscriptions..."
+    for SUB in "${dirName}-sched-tasks-push" "${dirName}-task-results-push"; do
+      gcloud pubsub subscriptions delete "$SUB" --project="$PROJECT_ID" --quiet 2>/dev/null \\
+        && echo "   ✅ Subscription deleted: $SUB" \\
+        || echo "   ⚠️  Subscription not found: $SUB"
+    done
+    for TOP in "${dirName}-sched-tasks" "${dirName}-task-results"; do
+      gcloud pubsub topics delete "$TOP" --project="$PROJECT_ID" --quiet 2>/dev/null \\
+        && echo "   ✅ Topic deleted: $TOP" \\
+        || echo "   ⚠️  Topic not found: $TOP"
+    done
+
+    echo ""
+    echo "⏰ Deleting Cloud Scheduler jobs..."
+    SCHED_JOBS=$(gcloud scheduler jobs list --location=us-central1 --project="$PROJECT_ID" \\
+      --format="value(name)" 2>/dev/null | grep "${dirName}-sched-" || true)
+    if [ -n "$SCHED_JOBS" ]; then
+      for JOB in $SCHED_JOBS; do
+        gcloud scheduler jobs delete "$JOB" --location=us-central1 \\
+          --project="$PROJECT_ID" --quiet 2>/dev/null \\
+          && echo "   ✅ Scheduler job deleted: $JOB" \\
+          || echo "   ⚠️  Failed to delete: $JOB"
+      done
+    else
+      echo "   ✅ No Cloud Scheduler jobs found."
+    fi
+
+    echo ""
+    echo "📁 Deleting Firestore task collections..."
+    uv run --no-project --with google-cloud-firestore python3 -c "
+from google.cloud import firestore
+db = firestore.Client()
+for coll_name in ['${dirName}_task_definitions', '${dirName}_task_executions', '${dirName}_task_push_configs']:
+    docs = list(db.collection(coll_name).stream())
+    for doc in docs:
+        doc.reference.delete()
+    print('   ✅ Deleted ' + str(len(docs)) + ' docs from ' + coll_name)
+" 2>/dev/null || echo "   ⚠️  Could not clear Firestore task collections."
 
     echo ""
     echo "📂 Deleting local directories and caches..."
@@ -2680,8 +3316,13 @@ if [ "$DEPLOY_CHOICE" = "2" ] || [ "$DEPLOY_CHOICE" = "3" ]; then
   grant_roles_fast "$PROJECT_ID" "serviceAccount" "\$COMPUTE_SA" \
     "roles/mcp.toolUser" "roles/bigquery.jobUser" "roles/bigquery.dataEditor" \
     "roles/serviceusage.serviceUsageConsumer" "roles/aiplatform.user" "roles/logging.logWriter" \
-    "roles/datastore.user" "roles/storage.objectViewer" "roles/artifactregistry.admin" "roles/run.invoker"
+    "roles/datastore.user" "roles/storage.objectViewer" "roles/artifactregistry.admin" "roles/run.invoker" \
+    "roles/pubsub.publisher" "roles/cloudscheduler.admin"
 
+  # Background task infra: Cloud Scheduler SA needs pubsub.publisher
+  echo "🔐 Configuring IAM for Cloud Scheduler Service Agent..."
+  SCHED_SA="service-\${PROJECT_NUMBER}@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
+  grant_roles_fast "$PROJECT_ID" "serviceAccount" "\$SCHED_SA" "roles/pubsub.publisher"
 
   if [ "$DEPLOY_CHOICE" = "3" ]; then
     echo "🔐 Configuring IAM permissions for Discovery Engine Service Agent..."
@@ -2696,6 +3337,8 @@ gcloud beta services mcp enable bigquery.googleapis.com --project="$PROJECT_ID" 
 gcloud beta services mcp enable mapstools.googleapis.com --project="$PROJECT_ID" 2>/dev/null &
 gcloud beta services mcp enable firestore.googleapis.com --project="$PROJECT_ID" 2>/dev/null &
 gcloud services enable aiplatform.googleapis.com --project="$PROJECT_ID" 2>/dev/null &
+gcloud services enable cloudscheduler.googleapis.com --project="$PROJECT_ID" 2>/dev/null &
+gcloud services enable pubsub.googleapis.com --project="$PROJECT_ID" 2>/dev/null &
 wait
 echo "  ✅ MCP services enabled"
 ${mcpServicesToEnable}
@@ -2737,11 +3380,16 @@ google-adk[a2a]>=1.31.1
 mcp>=1.24.0
 google-genai>=1.9.0
 python-dotenv>=1.0.0
-vertexai>=1.0.0
+google-cloud-aiplatform[agent_engines]>=1.112.0
 db-dtypes>=1.0.0
 google-cloud-storage>=2.14.0
 a2ui-agent-sdk @ git+https://github.com/google/A2UI.git#subdirectory=agent_sdks/python
 a2a-sdk<1.0.0
+google-cloud-scheduler>=2.0.0
+google-cloud-pubsub>=2.0.0
+google-cloud-firestore>=2.16.0
+google-cloud-logging>=3.0.0
+opentelemetry-api>=1.20.0
 __REQ_EOF__
 
 # Generate pyproject.toml required for adk project type
@@ -2961,6 +3609,11 @@ fi
 # --- Sandbox Provisioning for Code Execution ---
 echo "🧪 Provisioning Agent Sandbox for Code Execution..."
 export SANDBOX_OUT="/tmp/sandbox_result_$$.txt"
+# CRITICAL: Run from a clean temp directory, NOT the project directory.
+# agent_engines.create(config=...) packages the CWD for container build.
+# If Dockerfile/MCP files exist in CWD, the SDK tries to build them → hang.
+SANDBOX_TMPDIR=$(mktemp -d)
+pushd "$SANDBOX_TMPDIR" > /dev/null
 uv run --no-project --with "google-cloud-aiplatform[agent_engines]>=1.112.0" python3 << '__SANDBOX_PROVISION_EOF__'
 import sys, os, warnings, vertexai
 from vertexai import types
@@ -2994,6 +3647,8 @@ print('  ✅ Sandbox: ' + sandbox_resource_name)
 with open(os.environ.get('SANDBOX_OUT', '/tmp/sandbox_result.txt'), 'w') as f:
     f.write(agent_engine_name + '|' + sandbox_resource_name)
 __SANDBOX_PROVISION_EOF__
+popd > /dev/null
+rm -rf "$SANDBOX_TMPDIR"
 
 if [ -f "$SANDBOX_OUT" ]; then
     SANDBOX_RESULT=$(cat "$SANDBOX_OUT")
@@ -3313,6 +3968,20 @@ def get_maps_mcp_toolset():
         timeout=300
     ))
 
+# Initialize Firestore client for background task management
+# Stored on builtins so tools.py functions can access it without circular imports
+# NOTE: This MUST be outside the enableWorkspaceMcp conditional block
+# so background task tools work regardless of Workspace MCP configuration.
+import builtins
+if not hasattr(builtins, '_firestore_client'):
+    try:
+        from google.cloud import firestore as _firestore_mod
+        builtins._firestore_client = _firestore_mod.Client()
+        print("[tools.py] Firestore client initialized successfully for background tasks", flush=True)
+    except Exception as _fs_init_err:
+        builtins._firestore_client = None
+        print("[tools.py] FAILED to initialize Firestore client: " + type(_fs_init_err).__name__ + ": " + str(_fs_init_err), flush=True)
+
 ${ enableWorkspaceMcp ? `
 import re
 import httpx
@@ -3323,7 +3992,6 @@ from pydantic import AnyUrl
 # Updated by TokenExtractionMiddleware (primary) and _handle_request (fallback)
 # with the OAuth token from each A2A request.
 # The header_provider callback reads from this on each MCP HTTP call.
-import builtins
 if not hasattr(builtins, '_workspace_oauth_token'):
     builtins._workspace_oauth_token = ""
 
@@ -3782,6 +4450,504 @@ def get_slack_mcp_toolset():
         logging.error(f"\\u274c [SLACK_MCP] Failed to initialize: {e}", exc_info=True)
         return None
 ` : '' }
+
+# =============================================================================
+# Background Task Management (Long-Running Agent Orchestration)
+# =============================================================================
+import uuid as _task_uuid
+import datetime as _task_dt
+from google.adk.tools import LongRunningFunctionTool
+
+def register_background_task(
+    task_name: str,
+    task_description: str,
+    task_prompt: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Register a background task for async execution. CRITICAL RULES:
+    1. Call this tool EXACTLY ONCE per user request — never split a workflow into multiple tasks.
+    2. task_prompt MUST contain ALL workflow steps (SCAN, CLASSIFY, PROCESS, AUDIT, etc.)
+       as a complete, self-contained instruction. The background agent uses ONLY task_prompt
+       to execute the entire workflow autonomously.
+    3. A second call while a task is still ACTIVE (pending/working/submitted) will be BLOCKED.
+       Completed, failed, or cancelled tasks CAN be re-registered with a new call.
+
+    Args:
+        task_name: Short identifier for the ENTIRE workflow (e.g. 'store_optimization_workflow').
+        task_description: Summary of the complete workflow scope.
+        task_prompt: COMPLETE, SELF-CONTAINED instruction covering ALL steps from scan to audit.
+                     This is the ONLY input the background agent receives. Include data queries,
+                     business rules, success criteria, and reporting requirements for every step.
+
+    Returns:
+        dict with ticket-id and status.
+    """
+    import builtins
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+
+    # --- Structural guard: block recursive delegation ---
+    # Background workers (user_id="background-worker") must execute tasks
+    # directly using data tools, not re-register them as new background tasks.
+    if tool_context.user_id == "background-worker":
+        return {
+            "status": "blocked",
+            "message": "Cannot register background tasks from within a background worker. "
+                       "Execute operations directly using data tools (get_document, update_document, list_documents, execute_sql, etc.).",
+        }
+
+    _task_id = str(_task_uuid.uuid4())[:8]
+    _now = _task_dt.datetime.now(_task_dt.timezone.utc)
+    _now_iso = _now.isoformat()
+
+
+    _def_doc = {
+        "task_id": _task_id,
+        "task_name": task_name,
+        "task_description": task_description,
+        "task_prompt": task_prompt,
+        "task_type": "immediate",
+        "created_at": _now_iso,
+    }
+    _exec_doc = {
+        "task_id": _task_id,
+        "definition_id": _task_id,
+        "status": "submitted",
+        "progress_pct": 0,
+        "log_tail": "",
+        "result_summary": "",
+        "started_at": "",
+        "completed_at": "",
+        "reported_to_user": False,
+    }
+
+    import logging as _flog
+    _bg_logger = _flog.getLogger("bg_task")
+
+    if not _fs or not _demo_id:
+        _bg_logger.error("register_background_task: PRECONDITION FAILED fs=%s demo_id=%s", bool(_fs), repr(_demo_id))
+        return {
+            "status": "error",
+            "message": "Cannot register background task: Firestore client unavailable (client="
+                       + str(bool(_fs)) + ", demo_id=" + repr(_demo_id) + "). "
+                       + "The task management backend is not configured for this demo.",
+        }
+
+    try:
+        _fs.collection(_demo_id + "_task_definitions").document(_task_id).set(_def_doc)
+        _fs.collection(_demo_id + "_task_executions").document(_task_id).set(_exec_doc)
+        _bg_logger.warning("register_background_task: Firestore docs written task_id=%s", _task_id)
+    except Exception as _fs_err:
+        _bg_logger.error("register_background_task: Firestore write FAILED: %s", str(_fs_err)[:300])
+        return {
+            "status": "error",
+            "message": "Failed to register task: Firestore write error. " + str(_fs_err)[:200],
+        }
+
+    # Fire-and-forget: trigger worker endpoint via localhost
+    # IMPORTANT: Do NOT use SELF_URL (public *.run.app URL) for self-calls.
+    # Cloud Run --ingress internal blocks requests from the container's own
+    # public URL because they exit via the internet and re-enter as "external".
+    # Using localhost:PORT keeps the request inside the container.
+    import threading as _threading
+    import requests as _requests
+    _port = os.environ.get("PORT", "8080")
+    _worker_url = "http://localhost:" + _port + "/execute_task"
+
+    def _fire():
+        import logging as _log
+        _logger = _log.getLogger("bg_task")
+        _logger.warning("_fire: SENDING request worker_url=%s task_id=%s demo_id=%s", _worker_url, _task_id, _demo_id)
+        try:
+            _headers = {"Content-Type": "application/json"}
+            # Use short read timeout (0.5s): this is fire-and-forget.
+            # The execute_task endpoint runs the agent asynchronously;
+            # we only need to confirm the request was accepted, not wait for completion.
+            _resp = _requests.post(_worker_url, json={"task_id": _task_id, "demo_id": _demo_id}, headers=_headers, timeout=(5, 0.5))
+            _logger.warning("_fire: response status=%s body=%s", _resp.status_code, _resp.text[:300])
+        except _requests.exceptions.ReadTimeout:
+            # Expected: the worker is processing asynchronously.
+            _logger.warning("_fire: request accepted (ReadTimeout expected for async), task_id=%s", _task_id)
+        except _requests.exceptions.ConnectionError as _ce:
+            _logger.error("_fire CONNECTION_ERROR: server may not be ready. task_id=%s err=%s", _task_id, str(_ce)[:300])
+        except Exception as _e:
+            _logger.error("_fire FAILED: %s: %s", type(_e).__name__, str(_e)[:500])
+    _threading.Thread(target=_fire, daemon=True).start()
+
+
+
+    return {
+        "status": "submitted",
+        "ticket-id": _task_id,
+        "task_name": task_name,
+        "message": "Task registered. Processing started in background.",
+    }
+
+background_task_tool = LongRunningFunctionTool(func=register_background_task)
+
+
+def list_background_tasks(tool_context: ToolContext) -> dict:
+    """Lists all background tasks and their current status.
+
+    Returns:
+        dict with list of tasks.
+    """
+    import builtins
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+    if not _fs or not _demo_id:
+        return {"tasks": [], "error": "Firestore not available (client=" + str(bool(_fs)) + ", demo_id=" + repr(_demo_id) + ")"}
+    try:
+        _docs = _fs.collection(_demo_id + "_task_executions").order_by(
+            "started_at", direction="DESCENDING"
+        ).limit(20).stream()
+        _tasks = []
+        for _doc in _docs:
+            _d = _doc.to_dict()
+            _tasks.append({
+                "task_id": _d.get("task_id"),
+                "status": _d.get("status"),
+                "progress_pct": _d.get("progress_pct", 0),
+                "result_summary": _d.get("result_summary", "")[:200],
+            })
+        return {"tasks": _tasks, "total": len(_tasks)}
+    except Exception as _fs_err:
+        return {"tasks": [], "error": "Firestore query failed: " + str(_fs_err)[:200]}
+
+
+def get_task_result(task_id: str, tool_context: ToolContext) -> dict:
+    """Gets the detailed result of a specific background task.
+
+    Args:
+        task_id: The ticket-id returned from register_background_task.
+
+    Returns:
+        dict with status, progress, and result.
+    """
+    import builtins
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+    if not _fs or not _demo_id:
+        return {"error": "Firestore not available (client=" + str(bool(_fs)) + ", demo_id=" + repr(_demo_id) + ")"}
+    try:
+        _ref = _fs.collection(_demo_id + "_task_executions").document(task_id)
+        _doc = _ref.get()
+        if not _doc.exists:
+            return {"error": "Task not found: " + task_id}
+        _d = _doc.to_dict()
+        # Mark as reported
+        if _d.get("status") in ("completed", "failed") and not _d.get("reported_to_user"):
+            try:
+                _ref.update({"reported_to_user": True})
+            except Exception:
+                pass  # Non-critical: best-effort mark
+        return {
+            "task_id": _d.get("task_id"),
+            "status": _d.get("status"),
+            "progress_pct": _d.get("progress_pct", 0),
+            "result_summary": _d.get("result_summary", ""),
+            "log_tail": _d.get("log_tail", ""),
+            "started_at": _d.get("started_at", ""),
+            "completed_at": _d.get("completed_at", ""),
+            "_MANDATORY_ACTION": "YOU MUST present result_summary below as formatted markdown text in your response. "
+                "Output the result_summary content VERBATIM as text. Do NOT skip it. Do NOT output only suggestion chips. "
+                "If your response contains NO text and only A2UI JSON, you have FAILED.",
+        }
+    except Exception as _fs_err:
+        return {"error": "Firestore read failed: " + str(_fs_err)[:200]}
+
+
+def cancel_background_task(task_id: str, tool_context: ToolContext) -> dict:
+    """Cancels a pending or running background task.
+
+    Args:
+        task_id: The ticket-id of the task to cancel.
+
+    Returns:
+        dict with cancellation status.
+    """
+    import builtins
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+    if not _fs or not _demo_id:
+        return {"error": "Firestore not available (client=" + str(bool(_fs)) + ", demo_id=" + repr(_demo_id) + ")"}
+    try:
+        _ref = _fs.collection(_demo_id + "_task_executions").document(task_id)
+        _doc = _ref.get()
+        if not _doc.exists:
+            return {"error": "Task not found: " + task_id}
+        _status = _doc.to_dict().get("status", "")
+        if _status in ("completed", "failed", "cancelled"):
+            return {"error": "Task already in terminal state: " + _status}
+        _ref.update({"status": "cancelled"})
+        return {"status": "cancelled", "task_id": task_id}
+    except Exception as _fs_err:
+        return {"error": "Firestore operation failed: " + str(_fs_err)[:200]}
+
+
+def update_task_progress(
+    task_id: str,
+    current_step: str,
+    progress_pct: int,
+    log_entry: str,
+    tool_context: ToolContext,
+    workflow_state: dict | None = None,
+) -> dict:
+    """Updates progress of a running background task. Call this after each
+    major workflow step completes to report real-time progress.
+
+    Args:
+        task_id: The ticket-id of the background task.
+        current_step: Name of the step just completed (e.g. 'CLASSIFY').
+        progress_pct: Estimated completion percentage (10-90, not 0 or 100).
+        log_entry: Brief description of what was done and key metrics.
+        workflow_state: Optional structured state for workflow tracking.
+            Keys: completed_steps (list of step names), pending_items (int),
+            auto_processed (int), deferred_for_approval (int),
+            errors (int), current_phase (str).
+
+    Returns:
+        dict with update status.
+    """
+    import builtins
+    import datetime as _dt
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+    if not _fs or not _demo_id:
+        return {"error": "Firestore not available"}
+    try:
+        _ref = _fs.collection(_demo_id + "_task_executions").document(task_id)
+        _doc = _ref.get()
+        if not _doc.exists:
+            return {"error": "Task not found: " + task_id}
+        _current = _doc.to_dict()
+        if _current.get("status") not in ("working", "pending"):
+            return {"error": "Task not in active state: " + _current.get("status", "")}
+        _now = _dt.datetime.now(_dt.timezone.utc).strftime("%H:%M:%S")
+        _existing_log = _current.get("log_tail", "")
+        _new_log = _existing_log + ("[" + _now + "] " + current_step + ": " + log_entry + chr(10)) if _existing_log else ("[" + _now + "] " + current_step + ": " + log_entry + chr(10))
+        # Keep log_tail to last 1500 chars to prevent unbounded growth
+        if len(_new_log) > 1500:
+            _new_log = _new_log[-1500:]
+        _pct = max(10, min(90, progress_pct))
+        _update_data = {
+            "progress_pct": _pct,
+            "log_tail": _new_log,
+        }
+        if workflow_state and isinstance(workflow_state, dict):
+            _update_data["workflow_state"] = workflow_state
+        _ref.update(_update_data)
+        return {"status": "updated", "task_id": task_id, "progress_pct": _pct, "step": current_step}
+    except Exception as _fs_err:
+        return {"error": "Firestore update failed: " + str(_fs_err)[:200]}
+
+def register_scheduled_task(
+    task_name: str,
+    task_description: str,
+    task_prompt: str,
+    schedule_cron: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Registers a new scheduled task with automatic Cloud Scheduler job creation.
+
+    Args:
+        task_name: Short identifier (e.g. 'daily_report').
+        task_description: What the task does.
+        task_prompt: Detailed instruction for each execution.
+        schedule_cron: Cron expression (e.g. '0 9 * * 1-5' for weekdays 9am).
+
+    Returns:
+        dict with task_id, schedule, and job_name.
+    """
+    import builtins, json as _json, logging as _logging
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+    _project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+    _region = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+    if _region == "global":
+        _region = "us-central1"
+    _task_id = str(_task_uuid.uuid4())[:8]
+    _now = _task_dt.datetime.now(_task_dt.timezone.utc).isoformat()
+
+    # 1. Save definition to Firestore
+    _def_doc = {
+        "task_id": _task_id,
+        "task_name": task_name,
+        "task_description": task_description,
+        "task_prompt": task_prompt,
+        "task_type": "scheduled",
+        "schedule_cron": schedule_cron,
+        "created_at": _now,
+    }
+    if _fs and _demo_id:
+        _fs.collection(_demo_id + "_task_definitions").document(_task_id).set(_def_doc)
+        # Create initial execution document so Data Viewer shows correct status
+        _exec_doc = {
+            "task_id": _task_id,
+            "definition_id": _task_id,
+            "status": "scheduled",
+            "progress_pct": 0,
+            "log_tail": "",
+            "result_summary": "",
+            "started_at": "",
+            "completed_at": "",
+            "reported_to_user": False,
+        }
+        _fs.collection(_demo_id + "_task_executions").document(_task_id).set(_exec_doc)
+
+    # 2. Create Cloud Scheduler job
+    _job_name = ""
+    _sched_topic = _demo_id + "-sched-tasks"
+    try:
+        from google.cloud import scheduler_v1
+        _sched_client = scheduler_v1.CloudSchedulerClient()
+        _parent = "projects/" + _project_id + "/locations/" + _region
+        _job_id = _demo_id + "-sched-" + _task_id
+
+        _payload = _json.dumps({"task_id": _task_id, "demo_id": _demo_id}).encode("utf-8")
+        _topic_path = "projects/" + _project_id + "/topics/" + _sched_topic
+
+        _job = scheduler_v1.Job(
+            name=_parent + "/jobs/" + _job_id,
+            schedule=schedule_cron,
+            time_zone="Asia/Tokyo",
+            pubsub_target=scheduler_v1.PubsubTarget(
+                topic_name=_topic_path,
+                data=_payload,
+            ),
+        )
+        _created = _sched_client.create_job(parent=_parent, job=_job)
+        _job_name = _created.name
+        _logging.warning("Created Cloud Scheduler job: " + _job_name)
+    except Exception as _e:
+        _logging.error("Failed to create scheduler job: " + str(_e))
+        return {
+            "status": "partial",
+            "task_id": _task_id,
+            "error": "Firestore saved but scheduler creation failed: " + str(_e)[:200],
+        }
+
+    return {
+        "status": "scheduled",
+        "task_id": _task_id,
+        "task_name": task_name,
+        "schedule": schedule_cron,
+        "job_name": _job_name,
+        "message": "Scheduled task registered. Will execute at: " + schedule_cron,
+    }
+
+
+def update_scheduled_task(
+    task_id: str,
+    schedule_cron: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Updates the schedule of an existing scheduled task.
+
+    Args:
+        task_id: The task_id of the scheduled task to update.
+        schedule_cron: New cron expression (e.g. '0 18 * * 1-5' for weekdays 6pm).
+
+    Returns:
+        dict with updated schedule info.
+    """
+    import builtins, logging as _logging
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+    _project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+    _region = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+    if _region == "global":
+        _region = "us-central1"
+
+    if not _fs or not _demo_id:
+        return {"error": "Firestore not available (client=" + str(bool(_fs)) + ", demo_id=" + repr(_demo_id) + ")"}
+
+    # Update Firestore definition
+    _def_ref = _fs.collection(_demo_id + "_task_definitions").document(task_id)
+    _def_doc = _def_ref.get()
+    if not _def_doc.exists:
+        return {"error": "Task not found: " + task_id}
+    _def_data = _def_doc.to_dict()
+    if _def_data.get("task_type") != "scheduled":
+        return {"error": "Task is not a scheduled task"}
+
+    _def_ref.update({"schedule_cron": schedule_cron})
+
+    # Update Cloud Scheduler job
+    _job_id = _demo_id + "-sched-" + task_id
+    try:
+        from google.cloud import scheduler_v1
+        from google.protobuf import field_mask_pb2
+        _client = scheduler_v1.CloudSchedulerClient()
+        _job_name = "projects/" + _project_id + "/locations/" + _region + "/jobs/" + _job_id
+        _job = scheduler_v1.Job(name=_job_name, schedule=schedule_cron)
+        _mask = field_mask_pb2.FieldMask(paths=["schedule"])
+        _updated = _client.update_job(job=_job, update_mask=_mask)
+        _logging.warning("Updated scheduler job: " + _updated.name + " -> " + schedule_cron)
+        return {
+            "status": "updated",
+            "task_id": task_id,
+            "new_schedule": schedule_cron,
+            "job_name": _updated.name,
+        }
+    except Exception as _e:
+        _logging.error("Failed to update scheduler job: " + str(_e))
+        return {
+            "status": "partial",
+            "task_id": task_id,
+            "message": "Firestore updated but scheduler update failed: " + str(_e)[:200],
+        }
+
+
+def delete_scheduled_task(
+    task_id: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Deletes a scheduled task and its Cloud Scheduler job.
+
+    Args:
+        task_id: The task_id of the scheduled task to delete.
+
+    Returns:
+        dict with deletion status.
+    """
+    import builtins, logging as _logging
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+    _project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+    _region = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+    if _region == "global":
+        _region = "us-central1"
+
+    if not _fs or not _demo_id:
+        return {"error": "Firestore not available (client=" + str(bool(_fs)) + ", demo_id=" + repr(_demo_id) + ")"}
+
+    # Check definition exists
+    _def_ref = _fs.collection(_demo_id + "_task_definitions").document(task_id)
+    _def_doc = _def_ref.get()
+    if not _def_doc.exists:
+        return {"error": "Task not found: " + task_id}
+
+    # Delete Cloud Scheduler job
+    _job_id = _demo_id + "-sched-" + task_id
+    try:
+        from google.cloud import scheduler_v1
+        _client = scheduler_v1.CloudSchedulerClient()
+        _job_name = "projects/" + _project_id + "/locations/" + _region + "/jobs/" + _job_id
+        _client.delete_job(name=_job_name)
+        _logging.warning("Deleted scheduler job: " + _job_name)
+    except Exception as _e:
+        _logging.warning("Scheduler job deletion failed (may not exist): " + str(_e)[:200])
+
+    # Delete Firestore documents (definition + execution)
+    _def_ref.delete()
+    _fs.collection(_demo_id + "_task_executions").document(task_id).delete()
+
+    return {
+        "status": "deleted",
+        "task_id": task_id,
+        "message": "Scheduled task, execution record, and Cloud Scheduler job deleted.",
+    }
 __TOOLS_EOF__
 
 mkdir -p adk_agent/app/examples/0.8
@@ -5333,6 +6499,136 @@ ${ (params.importedMcpList || []).some(m => m.type === 'remote' && m.auth_type =
 # =============================================================================
 
 base_instruction = """
+You are an autonomous business operations agent. Your mission is DUAL:
+(A) ANALYZE: Answer questions by strategically combining insights from BigQuery, Google Maps, and operational databases.
+(B) EXECUTE: Carry out multi-step operational workflows — scan for actionable items, apply business rules, update records, and report results.
+When the user gives a task, determine whether it is an ANALYSIS request or an EXECUTION request (or both), and act accordingly.
+
+--- WORKFLOW EXECUTION MODE (CRITICAL) ---
+When the user requests an operational action (e.g., "process all pending items", "resolve flagged anomalies",
+"update all expired records", "run the reconciliation workflow"), you MUST follow this execution pattern:
+
+SINGLE TASK RULE (CRITICAL — NO DUPLICATES):
+When executing a workflow via background mode, you MUST call register_background_task
+EXACTLY ONCE for the entire workflow. The single task_prompt MUST contain the complete
+dependency chain (all steps from SCAN through AUDIT). Do NOT register separate tasks
+for individual steps, and do NOT register a second task from a different routing path
+(such as Background-First Routing or Proactive Suggestion). One user workflow request
+= exactly one register_background_task call. If you have already called
+register_background_task for this workflow, do NOT call it again under any circumstance.
+
+MULTI-STEP DEPENDENT WORKFLOW ARCHITECTURE:
+Workflows are NOT simple data updates. They are PIPELINES of interdependent steps
+where each step's OUTPUT becomes the next step's INPUT. You MUST:
+- Design workflows as explicit step chains with data dependencies
+- Show intermediate results between steps to the user
+- Handle partial failures (mark failed step, report what succeeded, continue or stop)
+- Model workflows as BUSINESS PROCESSES: each step maps to a real organizational
+  function (data collection, risk assessment, decision making, execution, audit)
+- ANALYSIS DEPTH at CLASSIFY step: do NOT use simple threshold checks alone.
+  Cross-reference multiple data dimensions, calculate composite scores, and
+  explain the classification logic in plain language so stakeholders can verify
+
+STANDARD DEPENDENCY CHAIN (adapt steps to the actual task):
+Step 1: SCAN (no dependency) — Query data source, identify ALL items matching criteria
+  Output: item_count, item_list, category_breakdown
+Step 2: CLASSIFY (depends on SCAN output) — Deep analysis with multi-perspective evaluation:
+  a. Apply business rules to assign priority/risk level
+  b. Cross-reference with related data sources (e.g., historical trends, reference tables)
+  c. Calculate composite risk/priority scores using multiple dimensions
+  d. Explain classification rationale for non-obvious decisions
+  Output: auto_processable_items, manual_review_items, risk_categories, classification_rationale
+Step 3: PROCESS (depends on CLASSIFY output) — Execute auto-processable items sequentially
+  Output: success_count, failure_count, processed_item_details
+Step 4: ESCALATE (depends on PROCESS remainder) — Present items needing human approval
+  For each escalated item: explain WHY it was escalated and recommend a specific action
+  Output: escalation_list with per-item rationale and recommended_action
+Step 5: NOTIFY (depends on PROCESS + ESCALATE results) — Draft notification/report with results
+  Output: draft_text (mark as [MANUAL — Draft Only] per Action Honesty rules)
+Step 6: REPORT (depends on ALL prior steps) — Generate comprehensive execution summary:
+  a. Executive summary with key business metrics (before/after comparison)
+  b. Detailed per-item action log with timestamps
+  c. Statistical analysis of changes (distributions, outliers, trends)
+  d. Recommendations for follow-up actions or process improvements
+  Output: structured_report with business_metrics, action_log, statistical_summary, recommendations
+  (audit trail is logged automatically by the system — do NOT write to any audit or activity_log table)
+
+EXECUTION MODE SELECTION (MANDATORY):
+After presenting the Workflow Execution Plan (A2UI Pattern I), you MUST ask the user
+to choose an execution mode by presenting 3 suggestion chip buttons:
+
+A. Immediate/Synchronous — For small-scope workflows (10 items or fewer).
+   Execute all steps in the current conversation. Show real-time progress via
+   A2UI Workflow Execution Plan card updates (change step icons from hourglass_empty
+   to check_circle as each completes).
+
+B. Background/Async — For large-scope workflows (more than 10 items) or
+   workflows that may take more than 30 seconds. Use register_background_task
+   to submit the complete workflow as a background job. Include the FULL
+   dependency chain definition in the task_prompt so the background agent
+   can execute all steps autonomously.
+   When executing in background mode, call update_task_progress after completing
+   each major step to report real-time progress (current_step, progress_pct,
+   log_entry). This allows users to monitor via get_task_result.
+
+C. Scheduled/Recurring — For monitoring or periodic workflows. Use
+   register_scheduled_task with a cron expression. Suggest an appropriate
+   schedule based on the business context (e.g., weekday mornings for
+   operational checks, hourly for critical monitoring).
+
+1. SCAN: Query the relevant data source to identify ALL items matching the criteria. Present a summary count.
+2. PLAN: Present a Workflow Execution Plan card (A2UI Pattern I) showing:
+   - Total items found and breakdown by category/severity
+   - Each execution step with status indicators and dependencies
+   - Which steps are auto-executed vs. require approval
+   - Estimated scope of changes
+   - Execution mode selection buttons (Immediate / Background / Scheduled)
+   Then wait for the user to choose the execution mode.
+3. EXECUTE: Based on the selected mode, process the dependency chain:
+   - LOW-RISK actions (status updates, log entries, routine corrections within tolerance): Execute autonomously WITHOUT asking per-item confirmation. Show progress.
+   - HIGH-RISK actions (deletes, large value changes, policy overrides): Present a confirmation card per item or per batch.
+4. PROGRESS: Update the Workflow Progress card to show real-time step completion.
+   For each completed step, show: step name, items processed, intermediate results.
+5. REPORT: Generate a comprehensive Execution Summary showing:
+   - Total items processed / auto-resolved / escalated / failed
+   - Specific actions taken per item (brief)
+   - Exceptions or items requiring follow-up
+   - Timeline of actions with timestamps
+   The summary MUST be a rich interactive card, not plain text.
+
+AUTONOMOUS DECISION MAKING: When your instructions define clear business rules
+(e.g., "if discrepancy < 5%, auto-approve"), you MUST apply them without asking
+the user for each item. Only escalate when the rules say to or when the situation
+falls outside defined thresholds.
+
+PROACTIVE ACTION PROPOSAL (CRITICAL — DIFFERENTIATOR):
+After completing ANY analysis or data retrieval, you MUST proactively propose
+concrete workflow actions you can execute automatically on the user's behalf.
+Do NOT wait for the user to ask — actively suggest what you can do next.
+Examples of proactive proposals:
+- After finding anomalies: "12件の異常を検出しました。許容範囲内の8件を自動処理し、残り4件をエスカレーションしましょうか？"
+- After a data overview: "PENDINGステータスの案件が5件あります。一括処理ワークフローを開始できます。"
+- After a comparison: "3つの不整合を発見しました。修正ワークフローを実行して自動的に是正できます。"
+- After any query result: "これらのレコードに対して [specific action] を自動実行できます。実行計画をお見せしましょうか？"
+Your default stance is: "I can do this for you automatically" — not "Here is the data, what would you like to do?"
+Always frame your proposals with specific counts, scope, and what will happen automatically vs. what needs approval.
+
+PROACTIVE MONITORING: When the user asks you to "monitor" or "watch" a condition,
+suggest using register_scheduled_task to create a recurring check. Define the check
+logic clearly so your background instance can execute the full workflow autonomously.
+
+ACTION HONESTY (CRITICAL — ANTI-HALLUCINATION):
+You MUST NEVER claim to have performed an action that you do not have a tool for.
+Specifically:
+- You CANNOT send emails, Slack messages, or any notifications. You DO NOT have email or messaging tools.
+- You CANNOT make external API calls other than through the tools explicitly listed above (BigQuery, Maps, Firestore, generate_image).
+- When a workflow step involves notification (e.g., "notify the manager"), you MUST clearly state:
+  "I have DRAFTED a notification/email below, but I cannot send it automatically. Please copy and send it manually, or forward it through your organization's communication channel."
+- In the workflow plan card, label notification steps as '[MANUAL — Draft Only]' instead of '[AUTO]'.
+- NEVER say "メールを送信しました" (email sent), "通知を配信しました" (notification delivered), or similar claims.
+  Instead say "通知文を作成しました。手動での送信をお願いします。" (I have drafted the notification. Please send it manually.)
+--- END WORKFLOW EXECUTION MODE ---
+
 Help the user answer questions by strategically combining insights from BigQuery and Google Maps:
 
 1. **BigQuery Toolset**: Access and modify data in the [PROJECT_ID].[DATASET_ID] dataset.
@@ -5367,6 +6663,17 @@ Help the user answer questions by strategically combining insights from BigQuery
      * After 2 failed attempts with the SAME error, STOP retrying that approach and inform the user of the specific error.
    - FIRESTORE SCHEMA AWARENESS (CRITICAL): Before adding or updating any document in Firestore, you MUST first query existing documents (e.g. using \\\`list_documents\\\` or \\\`get_document\\\`) to explicitly inspect the active data schema, field names, and data types!
    - SCHEMA CONSISTENCY: You MUST write updates back to the collection in a completely consistent fashion using the EXACT field structures you discovered. Do not hallucinate new fields!
+   - FIRESTORE VALUE TYPE FORMAT (CRITICAL - PREVENTS ERRORS):
+      * The Firestore REST API requires TYPED values in the \\\`fields\\\` object. NEVER send null, None, or empty typed wrappers.
+      * String fields: \\\`"fieldName": {"stringValue": "text"}\\\`
+      * Number fields: \\\`"fieldName": {"integerValue": "123"}\\\` or \\\`"fieldName": {"doubleValue": 1.5}\\\`
+      * Boolean fields: \\\`"fieldName": {"booleanValue": true}\\\`
+      * Map/object fields: \\\`"fieldName": {"mapValue": {"fields": {"key1": {"stringValue": "val1"}}}}\\\`. The \\\`mapValue\\\` MUST contain a \\\`fields\\\` object, NEVER null or empty.
+      * Array fields: \\\`"fieldName": {"arrayValue": {"values": [{"stringValue": "item1"}]}}\\\`. The \\\`arrayValue\\\` MUST contain a \\\`values\\\` array, NEVER null or empty. For empty arrays use \\\`{"arrayValue": {"values": []}}\\\`.
+      * WRONG: \\\`{"mapValue": null}\\\` or \\\`{"arrayValue": null}\\\` -- causes 'Cannot convert firestore.v1.Value with type unset' error.
+      * WRONG: \\\`{"mapValue": {}}\\\` without a \\\`fields\\\` key.
+      * If you need to REMOVE a field, omit it from \\\`fields\\\` and add the field name to \\\`updateMask.fieldPaths\\\`.
+      * ALWAYS copy the exact Value type structure from the \\\`get_document\\\` response when updating. Do not simplify or restructure the types.
 
 ${ (params.importedMcpList && params.importedMcpList.length > 0) ? params.importedMcpList.map((mcp, idx) => {
   if (mcp.type === 'remote') {
@@ -5499,8 +6806,37 @@ if _viewer_url:
         "- After merely READING from Firestore (no write).\\n"
         "- In every response (only when there is something new to observe).\\n\\n"
         "NEVER fabricate or modify this URL. Always use exactly: " + _viewer_url + "\\n"
+        "TASK MANAGEMENT TAB:\\n"
+        "The Data Viewer also has a Tasks tab (click the Tasks tab at the top) where users can:\\n"
+        "- View all background tasks and their status\\n"
+        "- See task progress and results\\n"
+        "- Cancel running tasks\\n"
+        "- Delete completed tasks\\n"
+        "When you create a background task, mention that the user can monitor it in the Data Viewer Tasks tab: "
+        "[View Task Status](" + _viewer_url + ")\\n\\n"
         "--- END DATA VIEWER INTEGRATION ---\\n"
     )
+
+# === EXECUTION & RESULT PRESENTATION REMINDER (must be last for recency bias) ===
+instruction += (
+    "\\n\\n=== WORKFLOW EXECUTION REMINDER (HIGHEST PRIORITY) ===\\n"
+    "When the user says 'Execute immediately' or 'Approved', you MUST immediately call the "
+    "appropriate data tools (execute_sql, update_document, etc.) to perform EACH step of the workflow. "
+    "Do NOT just describe what you would do. Actually DO IT by calling tools one by one. "
+    "If you respond without making ANY tool calls after 'Execute immediately', you have FAILED. "
+    "CORRECT: call execute_sql -> check result -> call next tool -> report. "
+    "WRONG: say 'I will now execute...' without any tool calls.\\n"
+    "=== END EXECUTION REMINDER ===\\n"
+    "\\n=== RESULT PRESENTATION REMINDER (HIGHEST PRIORITY) ===\\n"
+    "After receiving ANY tool result (get_task_result, execute_sql, etc.), your response MUST contain "
+    "the actual results as markdown text FIRST, then A2UI suggestion chips SECOND. "
+    "NEVER respond with ONLY A2UI suggestion chips and no text. "
+    "If the tool returned data, you MUST display that data. "
+    "A response with has_text=False is a CRITICAL FAILURE. "
+    "CORRECT: Show results as markdown text + suggestion chips. "
+    "WRONG: Output only <a2ui-json> chips without showing the results.\\n"
+    "=== END RESULT PRESENTATION REMINDER ===\\n"
+)
 
 schema_manager = A2uiSchemaManager(
     version=VERSION_0_8,
@@ -5531,13 +6867,13 @@ _RETRY_OPTIONS = types.HttpRetryOptions(
 
 # Pro model — used by deep_analysis_agent for complex multi-step reasoning
 gemini_pro_model = Gemini(
-    model=os.environ.get("AGENT_MODEL", "gemini-3.1-pro-preview"),
+    model=os.environ.get("AGENT_MODEL", "gemini-3.5-flash"),
     retry_options=_RETRY_OPTIONS
 )
 
 # Flash-Lite model — used by root_agent (coordinator) for most interactions
 gemini_lite_model = Gemini(
-    model=os.environ.get("AGENT_MODEL_LITE", "gemini-3.1-flash-lite"),
+    model=os.environ.get("AGENT_MODEL_LITE", "gemini-3.5-flash"),
     retry_options=_RETRY_OPTIONS
 )
 
@@ -5575,13 +6911,217 @@ async def a2ui_metadata_callback(callback_context: adk_callback_context.Callback
                 break
     return None
 
+async def _enforce_task_result_text(callback_context: adk_callback_context.CallbackContext, llm_response: adk_llm_response.LlmResponse) -> adk_llm_response.LlmResponse | None:
+    """General server-side enforcement: if ANY tool returned substantial data
+    but the model response has no meaningful text, force-inject the result."""
+    _pending = callback_context.session.state.pop('_last_tool_result', None)
+    if not _pending:
+        return None
+    # If model is making another function call, put result back and wait
+    if llm_response.content and llm_response.content.parts:
+        for _p in llm_response.content.parts:
+            if _p.function_call:
+                callback_context.session.state['_last_tool_result'] = _pending
+                return None
+    import re as _re_enf
+    _has_text = False
+    if llm_response.content and llm_response.content.parts:
+        for _p in llm_response.content.parts:
+            if _p.text:
+                _stripped = _re_enf.sub(r'<a2ui[-_]json>.*?</a2ui[-_]json>', '', _p.text, flags=_re_enf.DOTALL).strip()
+                if len(_stripped) > 20:
+                    _has_text = True
+                    break
+    if not _has_text:
+        import logging as _enf_log
+        _enf_log.getLogger('enforce_result').warning(
+            'LLM omitted tool result text, force-injecting (%d chars)', len(_pending)
+        )
+        _result_part = types.Part.from_text(text=_pending)
+        if llm_response.content and llm_response.content.parts:
+            llm_response.content.parts.insert(0, _result_part)
+        else:
+            llm_response.content = types.Content(parts=[_result_part], role='model')
+    return None
+
 # --- Shared tools list ---
 _all_tools = [t for t in ${ enableWorkspaceMcp ? `[maps_toolset, bigquery_toolset, firestore_toolset, tools.generate_image, slack_mcp_toolset] + custom_mcp_toolsets + [tools.get_gmail_mcp_toolset(), tools.get_drive_mcp_toolset(), tools.get_calendar_mcp_toolset(), tools.get_chat_mcp_toolset(), tools.get_people_mcp_toolset()]` : `[maps_toolset, bigquery_toolset, firestore_toolset, tools.generate_image, slack_mcp_toolset] + custom_mcp_toolsets` } if t is not None]
+
+# --- Background task management tools ---
+_all_tools.append(tools.background_task_tool)
+_all_tools.append(tools.list_background_tasks)
+_all_tools.append(tools.get_task_result)
+_all_tools.append(tools.cancel_background_task)
+_all_tools.append(tools.update_task_progress)
+_all_tools.append(tools.register_scheduled_task)
+_all_tools.append(tools.update_scheduled_task)
+_all_tools.append(tools.delete_scheduled_task)
 
 # --- Agent Sandbox Code Executor (always enabled) ---
 _code_executor = AgentEngineSandboxCodeExecutor(
     sandbox_resource_name=os.environ.get("SANDBOX_RESOURCE_NAME", ""),
 )
+
+# --- Before-Agent Callback: Inject completed background task results ---
+def _inject_completed_tasks(callback_context):
+    """Checks Firestore for completed tasks not yet reported and injects results."""
+    import builtins, logging as _logging
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+    if not _fs or not _demo_id:
+        return None
+    try:
+        _docs = _fs.collection(_demo_id + "_task_executions").where(
+            "reported_to_user", "==", False
+        ).where(
+            "status", "in", ["completed", "failed"]
+        ).limit(5).stream()
+        _summaries = []
+        for _doc in _docs:
+            _d = _doc.to_dict()
+            _status_icon = "completed" if _d.get("status") == "completed" else "failed"
+            _summaries.append(
+                "[" + _status_icon.upper() + "] Task '" + _d.get("task_id", "") + "': "
+                + _d.get("result_summary", "")[:300]
+            )
+            _doc.reference.update({"reported_to_user": True})
+        if _summaries:
+            _msg = "--- BACKGROUND TASK RESULTS ---" + chr(10) + chr(10).join(_summaries) + chr(10) + "--- END RESULTS ---"
+            _logging.warning("Injecting " + str(len(_summaries)) + " completed task results into session.")
+            callback_context.state["_bg_task_results"] = _msg
+    except Exception as _e:
+        _logging.error("Failed to inject task results: " + str(_e))
+    return None
+
+# =============================================================================
+# After Tool Callback — BigQuery DML Activity Logging
+# Intercepts execute_sql tool responses containing DML results and
+# records them in the {DEMO_ID}_activity_log Firestore collection.
+# =============================================================================
+_DML_KEYWORDS = ('INSERT', 'UPDATE', 'DELETE', 'MERGE')
+
+def _log_bq_activity(tool, args, tool_context, tool_response):
+    """Log data operations + store tool result for text enforcement."""
+    _tool_name = getattr(tool, 'name', '')
+    # --- General: store last substantial tool result for after_model enforcement ---
+    try:
+        _summ = ''
+        if isinstance(tool_response, dict) and not tool_response.get('error'):
+            _summ = tool_response.get('result_summary', '') or tool_response.get('result', '')
+            if not _summ:
+                _summ = str(tool_response)
+        elif isinstance(tool_response, str) and len(tool_response) > 30:
+            _summ = tool_response
+        if _summ and len(str(_summ)) > 30:
+            tool_context.state['_last_tool_result'] = str(_summ)
+    except Exception:
+        pass
+    # --- Activity logging ---
+    try:
+        import builtins
+        _fs = getattr(builtins, '_firestore_client', None)
+        _demo_id = os.environ.get("DEMO_ID", "")
+        if not _fs or not _demo_id:
+            return None
+        _col_name = _demo_id + "_activity_log"
+        from datetime import datetime, timezone
+        # --- Firestore document operations ---
+        _firestore_ops = {'add_document': 'INSERT', 'update_document': 'UPDATE', 'delete_document': 'DELETE'}
+        if _tool_name in _firestore_ops:
+            _op = _firestore_ops[_tool_name]
+            _a = args or {}
+            _collection = _a.get('collection', _a.get('collection_id', ''))
+            _doc_id = _a.get('document_id', _a.get('doc_id', ''))
+            
+            # Fallback to parse 'name' parameter
+            _name = _a.get('name', '')
+            if _name and not (_collection or _doc_id):
+                if '/documents/' in _name:
+                    _path = _name.split('/documents/', 1)[1]
+                    _parts = _path.split('/')
+                    if len(_parts) >= 2:
+                        _collection = _parts[0]
+                        _doc_id = '/'.join(_parts[1:])
+                    elif len(_parts) == 1:
+                        _collection = _parts[0]
+
+            _target = _collection + '/' + _doc_id if _doc_id else _collection
+            
+            # Extract operation details (updated fields)
+            _op_details = []
+            _doc_body = _a.get('document', _a.get('fields', _a.get('data', {})))
+            if isinstance(_doc_body, dict):
+                _fields = _doc_body.get('fields', _doc_body)
+                if isinstance(_fields, dict):
+                    for _k, _v in _fields.items():
+                        _val_str = ''
+                        if isinstance(_v, dict):
+                            for _t, _val in _v.items():
+                                if _t.endswith('Value'):
+                                    _val_str = str(_val)
+                                    break
+                            if not _val_str:
+                                _val_str = str(_v)
+                        else:
+                            _val_str = str(_v)
+                        _op_details.append(f"{_k}: {_val_str}")
+            
+            _detail_lines = [_tool_name + '(' + _target + ')']
+            if _op_details:
+                _detail_lines.append("Fields: {" + ', '.join(_op_details) + "}")
+            _detail = chr(10).join(_detail_lines)
+
+            _fs.collection(_col_name).add({
+                "source": "firestore",
+                "operation": _op,
+                "target": _target,
+                "detail": _detail,
+                "rows_affected": 1,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "status": "success",
+            })
+            return None
+        # --- BigQuery DML operations ---
+        if _tool_name not in ('execute_sql', 'query', 'run_query', 'execute_query'):
+            return None
+        _sql = (args or {}).get('query', (args or {}).get('sql', (args or {}).get('statement', '')))
+        if not _sql:
+            return None
+        _sql_upper = _sql.strip().upper()
+        _is_dml = any(_sql_upper.startswith(kw) for kw in _DML_KEYWORDS)
+        if not _is_dml:
+            return None
+        _op = _sql_upper.split()[0] if _sql_upper else 'DML'
+        # Extract target table from SQL (best-effort)
+        _parts = _sql.strip().split()
+        _target = ''
+        if _op == 'INSERT' and 'INTO' in _sql.upper():
+            for _i, _p in enumerate(_parts):
+                if _p.upper() == 'INTO' and _i + 1 < len(_parts):
+                    _target = _parts[_i + 1].strip('(').strip(chr(96)).strip(chr(34))
+                    break
+        elif _op in ('UPDATE', 'DELETE', 'MERGE') and len(_parts) > 1:
+            _target = _parts[1].strip(chr(96)).strip(chr(34))
+        # Extract rows affected from tool_response (best-effort)
+        _rows = 0
+        if isinstance(tool_response, dict):
+            _rows = tool_response.get('num_dml_affected_rows', tool_response.get('numDmlAffectedRows', 0))
+            if not _rows:
+                _result = tool_response.get('result', tool_response)
+                if isinstance(_result, dict):
+                    _rows = _result.get('num_dml_affected_rows', _result.get('numDmlAffectedRows', 0))
+        _fs.collection(_col_name).add({
+            "source": "bigquery",
+            "operation": _op,
+            "target": _target,
+            "detail": _sql[:300],
+            "rows_affected": int(_rows) if _rows else 0,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "status": "success",
+        })
+    except Exception:
+        pass  # Best-effort: never break tool execution
+    return None
 
 # --- Deep analysis sub-agent (Pro) ---
 # Delegated to by root_agent for complex multi-step reasoning tasks.
@@ -5600,6 +7140,15 @@ deep_analysis_agent = LlmAgent(
 You are the deep analysis specialist. You have been delegated a complex task
 from the coordinator agent. Your analysis MUST be rigorous, evidence-based,
 and actionable.
+
+DEPTH OVER SPEED: You are specifically chosen because this task requires
+deep reasoning that the coordinator cannot provide. Take the time needed to:
+- Run multiple sophisticated queries before drawing conclusions
+- Cross-reference data from at least 2 different sources when possible
+- Evaluate findings from multiple business perspectives (financial, operational, risk)
+- Use the Code Execution sandbox for statistical analysis when raw SQL is insufficient
+Do NOT produce a shallow summary — the user explicitly requested deep analysis.
+
 
 1. ANALYSIS RIGOR (MANDATORY):
    a. EVIDENCE FIRST: Every claim or recommendation MUST be backed by
@@ -5671,6 +7220,33 @@ and actionable.
       because [logical connection]."
       Never state conclusions without showing the logical path.
 
+--- ANTI-SHALLOW GUARD (MANDATORY SELF-CHECK BEFORE FINAL OUTPUT) ---
+Before writing your final analysis report, you MUST self-evaluate:
+  CHECKLIST (every item must be YES):
+  - Did I execute at least 3 distinct data queries (SQL or Firestore)?
+  - Did I cross-reference data from at least 2 different tables/sources?
+  - Did I use Code Execution sandbox for at least 1 statistical calculation
+    (correlation, regression, distribution, moving average, ranking score)?
+  - Does every conclusion cite a specific data point with an actual number?
+  - Did I evaluate from at least 2 business perspectives
+    (financial, operational, risk, customer impact, temporal trend)?
+  - Is my report structured with explicit methodology, findings, and
+    actionable recommendations with quantified expected impact?
+
+  If ANY answer is NO:
+  -> Go back and deepen that specific area BEFORE producing the final report.
+  -> Execute additional queries, run Code Execution for statistics, or
+     cross-reference with another data source.
+  -> Do NOT produce a shallow summary and call it "deep analysis".
+
+  MINIMUM QUALITY BAR:
+  - Total tool calls: at least 5 (queries + code execution combined)
+  - Distinct data dimensions analyzed: at least 3
+  - Statistical metrics computed: at least 2 (e.g., averages AND percentiles,
+    or correlation AND trend slope)
+  - Recommendations: at least 3, each with quantified business impact
+--- END ANTI-SHALLOW GUARD ---
+
 3. When your analysis is complete and you have provided the final response
    to the user, transfer control back to root_agent so it can handle
    subsequent simpler interactions efficiently.
@@ -5691,6 +7267,13 @@ and actionable.
    artifact generation (CSV/reports/emails), procedural algorithms,
    data format transformation, and text processing on non-SQL data.
    Prefer BigQuery SQL for aggregation, filtering, JOINs, and window functions.
+
+   FORBIDDEN USE (CRITICAL — NEVER VIOLATE):
+   NEVER use Code Execution to simulate, fake, or substitute for
+   background task registration. When the user asks for "background"
+   execution, you MUST call the register_background_task tool — NOT
+   write Python code that generates a UUID or prints a fake task ID.
+   Code Execution is ONLY for data processing and computation.
 
    Proactively suggest and use Code Execution when you see an opportunity
    to deliver higher-value insights — do not wait for the user to ask.
@@ -5724,10 +7307,27 @@ and actionable.
    - ALWAYS wrap code in """ + chr(96)*3 + """python ... """ + chr(96)*3 + """ block
    - ALWAYS use print() to output results — the sandbox captures stdout
    - The sandbox is STATEFUL: variables, imports, and data persist across calls
-   - Available libraries: pandas, numpy, scikit-learn, matplotlib
+   - ALLOWED libraries ONLY: pandas, numpy, scikit-learn, matplotlib,
+     json, math, re, datetime, collections
    - Do NOT install packages (pip install is forbidden)
    - Maximum execution time is 300 seconds per call
    - When combining data from multiple tool calls, use Python to merge/transform
+
+   FORBIDDEN IMPORTS (CRITICAL — CAUSES IMMEDIATE FAILURE):
+   NEVER import google.cloud, google.auth, bigquery, firestore, or any
+   Google Cloud SDK library in Code Execution. The sandbox does NOT have
+   these packages. Attempting to import them causes:
+     ModuleNotFoundError: No module named 'google.cloud'
+   To access BigQuery: use execute_sql / execute_sql_readonly tool FIRST,
+   then copy the returned data into Python variables for processing.
+   To access Firestore: use get_document / list_documents tools FIRST.
+   NEVER create bigquery.Client() or firestore.Client() in Code Execution.
+
+   CORRECT WORKFLOW (MANDATORY):
+   Step 1: Call tools (execute_sql, get_document, MCP tools) to fetch data
+   Step 2: Copy the tool results into Python variables as dicts/lists
+   Step 3: Process with pandas/numpy/sklearn in Code Execution
+   Step 4: Print results and present to user
 
    CODE EXECUTION OUTPUT RULE (MANDATORY):
    After receiving the code_execution_result, your FINAL text response
@@ -5745,10 +7345,74 @@ and actionable.
    Pattern C: Firestore -> Python -> A2UI
    Pattern D: BigQuery + Firestore + MCP -> Python -> A2UI (flagship)
    Pattern E: Python -> Artifact (CSV/HTML/Markdown)
+
+--- BACKGROUND TASK MANAGEMENT ---
+You have tools to create and manage background tasks.
+When your analysis is expected to be very complex (3+ minutes)
+or the user explicitly asks for a background/scheduled task,
+use these tools instead of running inline:
+
+CRITICAL RULE — TOOL CALL REQUIRED:
+To run a background task, you MUST call the register_background_task
+tool via function_call. NEVER use Code Execution (Python sandbox) to
+generate a UUID or simulate task registration. Code that does
+"import uuid; task_id = str(uuid.uuid4())" is FAKE — it does NOT
+actually register anything. Only the register_background_task tool
+connects to Firestore and triggers the async worker.
+
+IMMEDIATE TASKS:
+- register_background_task: Creates a task that runs asynchronously.
+  Returns a ticket-id immediately. Use get_task_result to check later.
+- get_task_result: Check status and result of a specific task.
+- list_background_tasks: Show all tasks with status.
+- cancel_background_task: Cancel a pending/running task.
+
+SCHEDULED TASKS:
+- register_scheduled_task: Register a recurring task with cron schedule.
+- update_scheduled_task: Change the cron schedule of an existing task.
+- delete_scheduled_task: Remove a scheduled task and its Cloud Scheduler job.
+
+WHEN TO USE:
+- User explicitly asks for "background", "schedule", "periodic", "monitor"
+- Analysis expected to take more than 2 minutes
+- User wants recurring reports or monitoring
+
+PROACTIVE SUGGESTION RULE (CRITICAL):
+Before starting any complex analysis, you MUST evaluate the expected
+workload. If ANY of the following complexity triggers are matched,
+PROACTIVELY suggest running it as a background task BEFORE executing:
+
+COMPLEXITY TRIGGERS:
+- JOINing 3+ tables or data sources
+- Combining BigQuery + Firestore + MCP data (cross-source analysis)
+- Statistical modeling, ML scoring, or simulation tasks
+- Generating comprehensive multi-section reports
+- User described the request as "detailed", "comprehensive", or "thorough"
+- Any task requiring 3+ sequential tool calls with intermediate processing
+
+SUGGESTION FLOW:
+1. Assess the request complexity against the triggers above
+2. If matched, respond with a brief explanation of the complexity
+   and present two choices via A2UI suggestion chips:
+   - "Run in Background" -> register_background_task with the full prompt
+   - "Run Now (may take a few minutes)" -> execute inline as normal
+3. If background chosen: register the task, confirm the ticket-id,
+   and tell the user they can monitor progress in the Data Viewer
+   Tasks tab or ask you for status anytime
+4. If inline chosen: proceed with normal analysis
+
+IMPORTANT: Be specific about WHY you suggest background execution
+(e.g., "This requires cross-referencing 4 tables with statistical
+analysis") so the user can make an informed decision.
+
+After registering a task, inform the user they can also monitor it
+in the Data Viewer Tasks tab if available.
+--- END BACKGROUND TASK MANAGEMENT ---
 """,
     tools=_all_tools,
     code_executor=_code_executor,
-    after_model_callback=[inject_image_callback, a2ui_metadata_callback],
+    after_model_callback=[inject_image_callback, a2ui_metadata_callback, _enforce_task_result_text],
+    after_tool_callback=_log_bq_activity,
     disallow_transfer_to_parent=False,
     disallow_transfer_to_peers=False,
 )
@@ -5785,7 +7449,65 @@ Transfer to deep_analysis_agent ONLY when the request requires BOTH:
    sources, identify patterns/trends, draw conclusions, or produce
    strategic recommendations
 
-Examples that SHOULD be transferred:
+CRITICAL — BACKGROUND-FIRST ROUTING (NEVER SKIP):
+When you determine a request qualifies for deep_analysis_agent transfer,
+you MUST propose background execution FIRST, BEFORE transferring.
+Do NOT transfer to deep_analysis_agent and then suggest background —
+you must suggest it at the root_agent level.
+
+EXCLUSION: If you are already inside the WORKFLOW EXECUTION MODE flow
+(i.e., the user chose an execution mode from a Workflow Execution Plan card),
+do NOT apply this routing — the workflow mode handles task registration
+itself. This rule applies ONLY to pure analytical requests that are NOT
+part of an active workflow execution. Never register a second background
+task for a request that has already been registered via workflow mode.
+
+Flow:
+1. Recognize that the request is complex enough for deep_analysis_agent
+2. Tell the user: "This is a complex analysis that benefits from
+   deep analysis. Since it involves multi-step reasoning and may take
+   several minutes, I recommend running it as a background task."
+3. Present two A2UI suggestion chips:
+   - "Run in Background" (recommended) — register_background_task
+   - "Run Inline" — transfer to deep_analysis_agent as normal
+4. If user chooses background: call register_background_task with a
+   COMPREHENSIVE task_prompt following the TASK_PROMPT CONSTRUCTION RULES below.
+5. If user chooses inline: transfer to deep_analysis_agent as normal
+
+TASK_PROMPT CONSTRUCTION RULES (CRITICAL — PREVENTS SHALLOW RESULTS):
+The task_prompt you pass to register_background_task MUST contain ALL of the
+following. A vague or generic task_prompt is the #1 cause of shallow results.
+
+1. VERBATIM ANALYSIS ITEMS: Copy the EXACT analysis items you promised in
+   your preceding proactive proposal. If you said "competitive price trend
+   correlation analysis and FAQ response efficiency simulation", those exact
+   phrases MUST appear in the task_prompt. Do NOT summarize or generalize.
+
+2. CONCRETE SUB-TASKS: For EACH promised analysis item, specify:
+   a. What data to query (table names, key columns, date ranges)
+   b. What analytical method to apply (correlation, regression, simulation,
+      clustering, time-series decomposition, distribution analysis, etc.)
+   c. What output is expected (specific metrics, rankings, recommendations)
+   Example: "ANALYSIS ITEM 1: Competitive Price Trend Correlation
+   - Query pricing_history table for last 12 months, GROUP BY competitor + month
+   - Query our_pricing table for the same period
+   - Use Code Execution to calculate Pearson correlation coefficient between
+     our price changes and competitor price changes
+   - Output: correlation matrix, top 3 correlated competitors, recommended
+     pricing response strategy with expected margin impact"
+
+3. SUCCESS CRITERIA: Define what makes this analysis "deep" vs. "shallow":
+   - Minimum 5 tool calls (SQL queries + Code Execution combined)
+   - At least 1 Code Execution block for statistical computation
+   - Cross-reference at least 2 data sources
+   - Every conclusion must cite specific numbers
+   - At least 3 actionable recommendations with quantified business impact
+
+4. CONTEXT FROM CONVERSATION: Include any relevant findings from the initial
+   (shallow) analysis that should serve as a starting point, so the background
+   agent does not repeat work already done.
+
+Examples that SHOULD trigger this flow:
 - "Analyze sales trends across all regions and recommend a strategy"
 - "Compare this quarter's performance against last year and explain why"
 - "Investigate why errors are spiking and suggest fixes"
@@ -5802,10 +7524,11 @@ Every response you produce — regardless of complexity — MUST be thorough,
 detailed, and polished. Terse or minimal answers are unacceptable.
 
 1. GREETINGS & SELF-INTRODUCTION: When the user greets you or asks what
-   you can do, respond warmly and provide a comprehensive overview of your
-   capabilities. List the specific data sources available (BigQuery tables,
-   Firestore collections, Maps, etc.), the types of analysis you can
-   perform, and concrete example questions the user could ask. Make the
+   you can do, or when they request a new task start, respond warmly and
+   provide a comprehensive overview of your capabilities. You MUST present
+   this overview using a rich onboarding A2UI Welcome Card or a structured
+   A2UI component (such as a List with icons or suggestion chips) --
+   NEVER output plain text markdown lists for your capabilities. Make the
    user feel welcomed and confident in your abilities.
 
 2. DATA RESULTS: When presenting query results, always provide context:
@@ -5848,6 +7571,72 @@ detailed, and polished. Terse or minimal answers are unacceptable.
    and the database operation completes, issue a deleteSurface command
    for 'confirmation-surface' wrapped in <a2ui-json> tags to remove it.
 
+--- BACKGROUND TASK MANAGEMENT ---
+You have tools to create and manage background tasks:
+
+CRITICAL RULE — TOOL CALL REQUIRED:
+To run a background task, you MUST call the register_background_task
+tool via function_call. NEVER use Code Execution (Python sandbox) to
+generate a UUID or simulate task registration. Code that does
+"import uuid; task_id = str(uuid.uuid4())" is FAKE — it does NOT
+actually register anything. Only the register_background_task tool
+connects to Firestore and triggers the async worker.
+
+IMMEDIATE TASKS:
+- register_background_task: Creates a task that runs asynchronously.
+  Returns a ticket-id immediately. Use get_task_result to check later.
+- get_task_result: Check status and result of a specific task.
+- list_background_tasks: Show all tasks with status.
+- cancel_background_task: Cancel a pending/running task.
+
+SCHEDULED TASKS:
+- register_scheduled_task: Register a recurring task with cron schedule.
+  The task runs via Cloud Scheduler at the specified intervals.
+- update_scheduled_task: Change the cron schedule of an existing scheduled task.
+- delete_scheduled_task: Remove a scheduled task and its Cloud Scheduler job.
+
+WHEN TO USE:
+- User explicitly asks for "background", "schedule", "periodic", "monitor"
+- Analysis expected to take more than 2 minutes
+- User wants recurring reports or monitoring
+
+PROACTIVE SUGGESTION RULE (CRITICAL):
+When you receive a complex analysis request that qualifies for
+deep_analysis_agent transfer, you MUST suggest background execution
+BEFORE transferring. This is the SAME rule as the BACKGROUND-FIRST
+ROUTING rule above — it applies to ALL deep-analysis-level requests,
+not just ones with specific keywords. The following are additional
+signals that STRONGLY favor background execution:
+- Cross-source analysis (BigQuery + Firestore + MCP combined)
+- Comprehensive or multi-section reports
+- Large-scale data processing (many tables, many rows)
+- Statistical modeling or simulation
+For these requests, recommend background as the DEFAULT option.
+Present two A2UI suggestion chips: "Run in Background" (recommended)
+and "Run Inline".
+- If background: register the task directly with register_background_task
+- If inline: transfer to deep_analysis_agent as normal
+
+EXCLUSION (CRITICAL — PREVENTS DUPLICATE TASKS):
+If you have ALREADY called register_background_task for the current
+user request (e.g., via the WORKFLOW EXECUTION MODE flow), do NOT
+call it again from this rule. One user request = one task registration.
+Check your conversation history — if a register_background_task
+function_call already exists for this request, skip this rule entirely.
+
+RESULT NOTIFICATION:
+- When completed tasks exist, you will receive a summary automatically
+- Present the result_summary text DIRECTLY as your response in markdown format
+- DO NOT convert result_summary into A2UI cards — it is already formatted text
+- DO NOT truncate or summarize the result_summary — show the FULL content
+- After the result text, add suggestion chips in a separate <a2ui-json> block
+- For scheduled tasks, show execution timeline
+
+PROGRESS REPORTING:
+- Use get_task_result to show progress_pct and log_tail
+- Report progress as percentage when user asks about status
+--- END BACKGROUND TASK MANAGEMENT ---
+
 --- PROACTIVE ANALYSIS SUGGESTIONS (CRITICAL) ---
 After EVERY response that presents data or analysis results, you MUST
 evaluate whether a higher-value follow-up is possible and suggest it.
@@ -5878,12 +7667,69 @@ Suggestion format: State WHAT + WHY in 1 sentence, then include
 a suggestion chip for one-click execution.
 ---
 
+--- ANALYSIS DEPTH SELF-ASSESSMENT (FOR ANALYSIS REQUESTS ONLY) ---
+After completing an analysis request (market, competitor, demand, trend,
+comparison, anomaly detection, risk assessment), self-evaluate depth:
+
+SHALLOW indicators: single data source, single query, <5 data points,
+no statistics, no cross-reference, fewer than 3 tool calls.
+-> MUST: (1) Acknowledge as quick overview, (2) list 3 SPECIFIC deeper
+   analyses as a STRUCTURED ANALYSIS PLAN (see format below), (3) propose
+   background deep-dive with A2UI chips:
+   sendText "Execute in background" / sendText "Run inline" / sendText "This is sufficient"
+
+STANDARD indicators: 2+ sources, JOINs used, 5+ data points.
+-> Include improvement suggestions as suggestion chips.
+
+COMPREHENSIVE indicators: 3+ sources, statistical analysis, multi-perspective.
+-> Full report with A2UI dashboard cards.
+
+STRUCTURED ANALYSIS PLAN FORMAT (MANDATORY FOR SHALLOW PROPOSALS):
+When proposing deeper analysis, do NOT just list vague descriptions.
+You MUST generate a structured plan that can be directly used as task_prompt:
+
+"This is a quick overview. I can perform deeper analysis including:
+
+ANALYSIS 1: [Specific Name]
+- Data: [Which tables/collections to query, which columns]
+- Method: [Specific analytical technique: correlation, regression, clustering, etc.]
+- Output: [What metrics/insights will be produced]
+- Business Value: [Why this matters - quantify if possible]
+
+ANALYSIS 2: [Specific Name]
+- Data: [Which tables/collections to query]
+- Method: [Specific technique]
+- Output: [Expected deliverables]
+- Business Value: [Impact]
+
+ANALYSIS 3: [Specific Name]
+- Data: [Which tables/collections]
+- Method: [Specific technique]
+- Output: [Expected deliverables]
+- Business Value: [Impact]
+
+I recommend running this as a background task for comprehensive results."
+
+CRITICAL: When the user subsequently selects "Execute in background" or
+"Run in Background", you MUST copy this structured plan VERBATIM into the
+task_prompt of register_background_task following the TASK_PROMPT CONSTRUCTION
+RULES above. This is how the background agent knows EXACTLY what analyses to
+perform. A task_prompt without this structure produces shallow results.
+--- END SELF-ASSESSMENT ---
+
 7. CODE EXECUTION SANDBOX (PROGRAMMABLE BRIDGE):
    You have access to a secure Python sandbox for code execution.
    Use it for tasks that SQL cannot handle: cross-source data integration,
    artifact generation (CSV/reports/emails), procedural algorithms,
    data format transformation, and text processing on non-SQL data.
    Prefer BigQuery SQL for aggregation, filtering, JOINs, and window functions.
+
+   FORBIDDEN USE (CRITICAL — NEVER VIOLATE):
+   NEVER use Code Execution to simulate, fake, or substitute for
+   background task registration. When the user asks for "background"
+   execution, you MUST call the register_background_task tool — NOT
+   write Python code that generates a UUID or prints a fake task ID.
+   Code Execution is ONLY for data processing and computation.
 
    HOW TO EXECUTE CODE (MANDATORY FORMAT):
    To run Python code, write it in a fenced code block with the
@@ -5901,23 +7747,252 @@ a suggestion chip for one-click execution.
    - Wrap code in """ + chr(96)*3 + """python ... """ + chr(96)*3 + """ blocks
    - Use print() for output — sandbox captures stdout
    - Stateful: variables persist across code blocks
-   - Libraries: pandas, numpy, scikit-learn, matplotlib
+   - ALLOWED libraries ONLY: pandas, numpy, scikit-learn, matplotlib,
+     json, math, re, datetime, collections
    - No pip install; max 300s per call
    - After receiving code execution output, your FINAL text response
      MUST include the actual data (CSV, tables, stats) -- the user
      cannot see the raw execution output, only your response text
 
+   FORBIDDEN IMPORTS (CRITICAL — CAUSES IMMEDIATE FAILURE):
+   NEVER import google.cloud, google.auth, bigquery, firestore, or any
+   Google Cloud SDK library in Code Execution. The sandbox does NOT have
+   these packages. Attempting to import them causes:
+     ModuleNotFoundError: No module named 'google.cloud'
+   To access BigQuery: use execute_sql / execute_sql_readonly tool FIRST,
+   then copy the returned data into Python variables for processing.
+   To access Firestore: use get_document / list_documents tools FIRST.
+   NEVER create bigquery.Client() or firestore.Client() in Code Execution.
+
+   CORRECT WORKFLOW (MANDATORY — ALWAYS FOLLOW THIS ORDER):
+   Step 1: Call tools (execute_sql, get_document, MCP tools) to fetch data
+   Step 2: Copy the tool results into Python variables as dicts/lists
+   Step 3: Process with pandas/numpy/sklearn in Code Execution
+   Step 4: Print results and present to user
+
    WORKFLOW PATTERNS:
-   Pattern A: BigQuery -> Python -> A2UI
-   Pattern B: MCP -> Python -> A2UI
-   Pattern C: Firestore -> Python -> A2UI
-   Pattern D: BigQuery + Firestore + MCP -> Python -> A2UI (flagship)
+   Pattern A: execute_sql tool -> copy results -> Python -> A2UI
+   Pattern B: MCP tool -> copy results -> Python -> A2UI
+   Pattern C: Firestore tool -> copy results -> Python -> A2UI
+   Pattern D: Multiple tools -> copy all results -> Python -> A2UI (flagship)
    Pattern E: Python -> Artifact (CSV/HTML/Markdown)
+
+--- FINAL REMINDER (HIGHEST PRIORITY) ---
+You MUST end EVERY response with <a2ui-json> suggestion chips.
+This applies to ALL responses without exception — including simple
+text answers, tool explanations, follow-ups, and error messages.
+A response without <a2ui-json> suggestion chips is SYSTEM FAILURE.
+Use surfaceId 'suggestions' and include 3-4 context-aware chip buttons.
+---
 """,
     tools=_all_tools,
     code_executor=_code_executor,
     sub_agents=[deep_analysis_agent],
-    after_model_callback=[inject_image_callback, a2ui_metadata_callback],
+    before_agent_callback=_inject_completed_tasks,
+    after_model_callback=[inject_image_callback, a2ui_metadata_callback, _enforce_task_result_text],
+    after_tool_callback=_log_bq_activity,
+)
+
+# --- Background execution agent (Pro) ---
+# Used exclusively by the /execute_task worker for background tasks.
+# Standalone agent: no transfer logic, no A2UI formatting, no suggestion chips.
+_bg_tools = [t for t in _all_tools if t is not tools.background_task_tool]
+_bg_tools = [t for t in _bg_tools if t is not tools.register_scheduled_task]
+
+background_agent = LlmAgent(
+    model=gemini_pro_model,
+    name='background_agent',
+    description='Autonomous background worker for deep analysis and workflow execution.',
+    instruction=final_instruction + r"""
+
+--- BACKGROUND EXECUTION AGENT (CRITICAL) ---
+You are an AUTONOMOUS BACKGROUND WORKER. You execute tasks WITHOUT user interaction.
+
+EXECUTION RULES:
+1. EXECUTE all operations DIRECTLY using data tools. You ARE the final executor.
+2. NEVER call register_background_task or register_scheduled_task — you are the
+   background worker. Calling them creates infinite loops.
+3. Do NOT produce A2UI JSON cards or suggestion chips — there is no UI client.
+4. Do NOT transfer to any other agent — you are standalone.
+5. Call update_task_progress after each major step to report real-time progress.
+6. Your final response is stored as result_summary in Firestore. Make it comprehensive.
+
+--- DEEP MULTI-STEP REASONING (MANDATORY) ---
+You MUST prioritize analytical depth over speed. Your analysis must be:
+
+1. MULTI-DIMENSIONAL DATA INTEGRATION:
+   - Use sophisticated SQL: JOINs across 3+ tables, window functions (LAG, LEAD,
+     RANK, NTILE, moving averages), CTEs, CASE expressions, subqueries
+   - Cross-reference BigQuery with Firestore operational data
+   - Use Maps API for geospatial context when location data exists
+   - Execute Python code in the sandbox for statistical models (regression,
+     clustering, outlier detection) when SQL alone is insufficient
+   - ALWAYS retrieve actual data before drawing conclusions — never speculate
+
+2. MULTI-PERSPECTIVE ANALYSIS (MANDATORY FOR ALL ANALYSIS TASKS):
+   For every analytical conclusion, evaluate from at least 3 of these perspectives:
+   - FINANCIAL IMPACT: Cost implications, ROI, budget variance
+   - OPERATIONAL EFFICIENCY: Process bottlenecks, throughput, utilization rates
+   - RISK ASSESSMENT: Probability and severity of adverse outcomes
+   - CUSTOMER/STAKEHOLDER IMPACT: Service quality, satisfaction, SLA compliance
+   - TEMPORAL TRENDS: Period-over-period changes, seasonality, trajectory
+   Structure your report with explicit sections for each perspective analyzed.
+
+3. VERIFIABLE CHAIN OF LOGIC:
+   - Document your reasoning at every step using update_task_progress
+   - Each step must explain: WHAT you did, WHY, WHAT the data showed, and
+     HOW it connects to the next step
+   - For complex SQL: include plain-language explanation of the computation
+   - State assumptions explicitly (e.g., NULL handling, date ranges)
+   - Final conclusions MUST follow the format:
+     "Based on [data A] + [data B], we conclude [X] because [logic]"
+
+4. QUANTITATIVE DEPTH:
+   - Every claim must be backed by specific numbers (counts, percentages, deltas)
+   - Include rankings, percentiles, and distributions — not just averages
+   - Calculate statistical significance when comparing groups
+   - Provide confidence levels for predictions or estimates
+
+5. CODE EXECUTION SANDBOX:
+   You have access to a secure Python sandbox for code execution.
+   Use it for tasks that SQL cannot handle: cross-source data integration,
+   artifact generation (CSV/reports), procedural algorithms, statistical
+   modeling, and text processing on non-SQL data.
+   Prefer BigQuery SQL for aggregation, filtering, JOINs, and window functions.
+
+   HOW TO EXECUTE CODE (MANDATORY FORMAT):
+   Write Python code in a fenced code block with the "python" language tag.
+   The system automatically detects and executes it.
+
+   RULES:
+   - Wrap code in """ + chr(96)*3 + """python ... """ + chr(96)*3 + """ blocks
+   - Use print() for output — sandbox captures stdout
+   - Stateful: variables persist across code blocks
+   - ALLOWED libraries ONLY: pandas, numpy, scikit-learn, matplotlib,
+     json, math, re, datetime, collections
+   - No pip install; max 300s per call
+
+   FORBIDDEN IMPORTS (CRITICAL):
+   NEVER import google.cloud, google.auth, bigquery, firestore in Code Execution.
+   The sandbox does NOT have these packages.
+   To access BigQuery: use execute_sql tool FIRST, then copy results into Python.
+   To access Firestore: use get_document / list_documents tools FIRST.
+
+--- WORKFLOW EXECUTION (BACKGROUND MODE) ---
+When executing a workflow, follow this pipeline pattern:
+
+STEP 1 — SCAN: Query data sources, identify ALL matching items
+  -> Call update_task_progress(current_step='SCAN', progress_pct=15, ...)
+STEP 2 — ANALYZE: Deep multi-perspective analysis of scanned items
+  -> Call update_task_progress(current_step='ANALYZE', progress_pct=30, ...)
+  -> This step MUST be the most thorough: classify by risk, identify patterns,
+     calculate business impact metrics, compare against historical baselines
+STEP 3 — PLAN: Construct execution plan based on analysis
+  -> Call update_task_progress(current_step='PLAN', progress_pct=45, ...)
+  -> Document which items are auto-processable vs. require approval
+  -> Explain the rationale for each classification decision
+STEP 4 — EXECUTE: Process auto-approved items
+  -> Call update_task_progress(current_step='EXECUTE', progress_pct=65, ...)
+  -> LOW-RISK (within defined thresholds): execute autonomously
+  -> HIGH-RISK (exceeds thresholds): tag as [REQUIRES_APPROVAL] in output,
+     do NOT execute — list them with full justification for human review
+STEP 5 — VERIFY: Validate executed changes
+  -> Call update_task_progress(current_step='VERIFY', progress_pct=80, ...)
+  -> Re-query affected records to confirm changes applied correctly
+STEP 6 — REPORT: Generate comprehensive execution summary
+  -> Call update_task_progress(current_step='REPORT', progress_pct=90, ...)
+  -> Include: total items, auto-processed count, deferred count, error count
+  -> For each deferred item: explain WHY it needs approval and WHAT action
+     is recommended
+  -> Include statistical summary of changes (before/after metrics)
+
+--- TASK TYPE DETECTION (READ task_prompt CAREFULLY) ---
+Before starting execution, classify the task_prompt as one of:
+  (A) WORKFLOW TASK: Contains operational verbs like "process", "resolve",
+      "update records", "auto-approve", "reconcile", "batch-execute"
+      -> Follow the WORKFLOW EXECUTION pipeline above
+  (B) ANALYTICAL TASK: Contains analytical verbs/nouns like "correlation",
+      "simulation", "forecast", "trend analysis", "regression", "comparison",
+      "distribution", "clustering", "statistical", "what-if", "benchmark"
+      -> Follow the ANALYTICAL TASK pipeline below
+  (C) MIXED: Contains both operational and analytical elements
+      -> Follow ANALYTICAL TASK pipeline FIRST, then WORKFLOW EXECUTION
+
+--- ANALYTICAL TASK MODE (FOR ANALYSIS/RESEARCH/STATISTICAL TASKS) ---
+When the task_prompt describes analytical work, follow this ANALYSIS pipeline:
+
+STEP 1 - DATA COLLECTION (progress_pct=10-20):
+  Execute MULTIPLE SQL queries to gather raw data from ALL relevant tables.
+  Do NOT stop after one query. Query at least 3 different table/view combos.
+  -> Call update_task_progress(current_step='DATA_COLLECTION', progress_pct=15)
+
+STEP 2 - EXPLORATORY ANALYSIS (progress_pct=20-35):
+  Examine data distributions, identify patterns, detect outliers.
+  Use Code Execution sandbox: compute summary statistics, histograms,
+  value distributions, NULL rates, cardinality checks.
+  -> Call update_task_progress(current_step='EXPLORATORY', progress_pct=30)
+
+STEP 3 - DEEP STATISTICAL ANALYSIS (progress_pct=35-60):
+  For EACH analysis item specified in the task_prompt:
+  a. Execute the specific analytical method requested
+     (correlation -> Pearson/Spearman coefficients;
+      simulation -> Monte Carlo or scenario modeling;
+      trend -> moving averages, linear regression, seasonal decomposition;
+      clustering -> k-means or hierarchical;
+      comparison -> statistical significance tests)
+  b. Use Code Execution with pandas/numpy/scikit-learn for computations
+  c. Produce specific numerical results (coefficients, p-values, intervals)
+  -> Call update_task_progress after each sub-analysis with specific findings
+
+STEP 4 - CROSS-REFERENCE INTEGRATION (progress_pct=60-75):
+  Merge findings across data sources. Identify:
+  - Confirmations (data point A supports finding B)
+  - Contradictions (data point A conflicts with finding B -> investigate why)
+  - Gaps (what data is missing that would strengthen conclusions)
+  -> Call update_task_progress(current_step='CROSS_REFERENCE', progress_pct=70)
+
+STEP 5 - INSIGHT SYNTHESIS AND RECOMMENDATIONS (progress_pct=75-90):
+  Generate actionable conclusions:
+  - Each conclusion MUST cite specific data points with actual numbers
+  - Rank recommendations by quantified business impact
+  - Include confidence levels for predictions/estimates
+  - Provide at least 3 specific, actionable recommendations
+  -> Call update_task_progress(current_step='SYNTHESIS', progress_pct=85)
+
+STEP 6 - COMPREHENSIVE REPORT (progress_pct=90-100):
+  Produce the final report with these sections:
+  a. Executive Summary (top 3 findings with key numbers)
+  b. Methodology (what data sources, what analytical methods, why)
+  c. Detailed Findings (one section per analysis item, with data evidence)
+  d. Statistical Evidence (tables of computed metrics)
+  e. Strategic Recommendations (3+ items, each with quantified expected impact)
+  f. Limitations and Next Steps
+  -> Call update_task_progress(current_step='REPORT', progress_pct=95)
+
+--- ANTI-SHALLOW GUARD (MANDATORY SELF-CHECK BEFORE FINAL REPORT) ---
+Before writing the final report, verify ALL of the following:
+  [ ] Executed at least 5 distinct tool calls (SQL queries + Code Execution)
+  [ ] Used Code Execution for at least 1 statistical computation
+  [ ] Cross-referenced data from at least 2 different tables/sources
+  [ ] Every conclusion cites a specific number (not ranges or generalities)
+  [ ] Addressed EACH analysis item specified in the task_prompt
+  [ ] Produced at least 3 actionable recommendations with quantified impact
+  [ ] Evaluated from at least 2 business perspectives
+
+If ANY check fails, go BACK and execute additional queries or Code Execution
+blocks to fill the gap. Do NOT submit a shallow report.
+--- END ANTI-SHALLOW GUARD ---
+
+ACTION HONESTY (CRITICAL — ANTI-HALLUCINATION):
+You MUST NEVER claim to have performed an action that you do not have a tool for.
+- You CANNOT send emails, Slack messages, or any notifications.
+- When a workflow step involves notification, state:
+  "I have DRAFTED a notification below, but I cannot send it automatically."
+""",
+    tools=_bg_tools,
+    code_executor=_code_executor,
+    after_model_callback=[_enforce_task_result_text],
+    after_tool_callback=_log_bq_activity,
 )
 
 app = App(
@@ -5932,13 +8007,13 @@ app = App(
         overlap_size=3
     ),
     context_cache_config=ContextCacheConfig(
-        min_tokens=4096,       # Cache system prompt + A2UI schema when >= 4096 tokens
+        min_tokens=2048,       # Lower threshold for more aggressive caching
         ttl_seconds=3600,      # Keep cache warm for 1 hour
-        cache_intervals=10,    # Revalidate every 10 invocations
+        cache_intervals=20,    # Less frequent cache recreation for stability
     ),
 )
 
-__all__ = ["root_agent", "app"]
+__all__ = ["root_agent", "app", "background_agent"]
 __AGENT_EOF__
 
 cat <<'__PART_CONVERTERS_EOF__' > adk_agent/app/part_converters.py
@@ -6303,6 +8378,8 @@ from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
 from google.adk.a2a.converters.utils import _get_adk_metadata_key
 from google.adk.a2a.utils.agent_card_builder import AgentCardBuilder
 from google.adk.artifacts import GcsArtifactService, InMemoryArtifactService
+from google.adk.apps.app import App, EventsCompactionConfig
+from google.adk.plugins import ReflectAndRetryToolPlugin, LoggingPlugin
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.cloud import logging as google_cloud_logging
@@ -6319,7 +8396,7 @@ from a2ui.a2a.extension import get_a2ui_agent_extension
 # Use the original create_a2ui_part directly (no patching).
 create_a2ui_part = _original_create_a2ui_part
 
-from adk_agent.app.agent import app as adk_app
+from adk_agent.app.agent import app as adk_app, background_agent
 import adk_agent.app.part_converters as part_converters
 
 # CRITICAL: Disable OpenTelemetry HTTPX instrumentation to prevent it from colliding
@@ -6351,6 +8428,26 @@ artifact_service = (
 
 runner = Runner(
     app=adk_app,
+    artifact_service=artifact_service,
+    session_service=InMemorySessionService(),
+)
+
+# Background task runner — uses Pro model agent for deep reasoning
+background_app = App(
+    name="background_app",
+    root_agent=background_agent,
+    plugins=[
+        ReflectAndRetryToolPlugin(),
+        LoggingPlugin()
+    ],
+    events_compaction_config=EventsCompactionConfig(
+        compaction_interval=20,
+        overlap_size=3
+    ),
+)
+
+background_runner = Runner(
+    app=background_app,
     artifact_service=artifact_service,
     session_service=InMemorySessionService(),
 )
@@ -6488,8 +8585,8 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
         # Maps agent name → model string for the thinking accordion header.
         # =============================================================================
         _agent_model_map = {
-            'root_agent': os.environ.get("AGENT_MODEL_LITE", "gemini-3.1-flash-lite"),
-            'deep_analysis_agent': os.environ.get("AGENT_MODEL", "gemini-3.1-pro-preview"),
+            'root_agent': os.environ.get("AGENT_MODEL_LITE", "gemini-3.5-flash"),
+            'deep_analysis_agent': os.environ.get("AGENT_MODEL", "gemini-3.5-flash"),
         }
         _model_announced = set()  # Track which agents have been announced
 
@@ -6794,6 +8891,64 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                                   )
                               task_result_aggregator.process_event(a2a_event)
                               await event_queue.enqueue_event(a2a_event)
+
+                      # -------------------------------------------------------
+                      # SAFETY NET 2: Detect untagged A2UI JSON in text output.
+                      # When the LLM emits A2UI component JSON WITHOUT
+                      # <a2ui-json> tags, the parser treats it as plain text.
+                      # Detect this by looking for A2UI-specific JSON keys
+                      # (beginRendering, surfaceUpdate, surfaceId) in a JSON
+                      # array structure without any <a2ui-json> wrapper.
+                      # When found, extract the A2UI JSON, parse it into
+                      # components, and replace the raw text with clean text.
+                      # -------------------------------------------------------
+                      if not _parser_found_a2ui and '<a2ui-json>' not in part.text:
+                          import re as _re2
+                          import json as _json2
+                          # Check for untagged A2UI: text contains A2UI structural keys
+                          _a2ui_keys = ('"beginRendering"', '"surfaceUpdate"', '"surfaceId"', '"deleteSurface"')
+                          _has_untagged = any(k in part.text for k in _a2ui_keys)
+                          if _has_untagged:
+                              logger.log_text(f"[a2ui_untagged_safety] Detected untagged A2UI JSON in {len(part.text)} chars of text")
+                              # Try to find and extract JSON array containing A2UI
+                              # Look for [...] blocks containing A2UI keys
+                              _json_arr_re = _re2.compile(r'(\[\s*\{[^\[]*?(?:"beginRendering"|"surfaceUpdate"|"deleteSurface").*?\}\s*\])', _re2.DOTALL)
+                              _json_matches = _json_arr_re.findall(part.text)
+                              _untagged_parts = []
+                              _extracted_text = part.text
+                              for _jm in _json_matches:
+                                  try:
+                                      _pj = _json2.loads(_jm)
+                                      _pj_items = _pj if isinstance(_pj, list) else [_pj]
+                                      for _pji in _pj_items:
+                                          if isinstance(_pji, dict):
+                                              _ui_p = create_a2ui_part(_pji)
+                                              _untagged_parts.append(_ui_p)
+                                              artifact_media_parts.append(_ui_p)
+                                      _extracted_text = _extracted_text.replace(_jm, '')
+                                      _ut_keys = [list(i.keys())[0] if isinstance(i, dict) and i else '?' for i in _pj_items]
+                                      logger.log_text(f"[a2ui_untagged_safety] Recovered {len(_pj_items)} A2UI component(s), keys={_ut_keys}")
+                                  except Exception as _ute:
+                                      logger.log_text(f"[a2ui_untagged_safety] JSON parse failed: {_ute}")
+                              # Emit recovered A2UI parts
+                              if _untagged_parts:
+                                  _ut_event = TaskStatusUpdateEvent(
+                                      task_id=context.task_id,
+                                      context_id=context.context_id,
+                                      status=TaskStatus(
+                                          state=TaskState.working,
+                                          message=Message(message_id=str(uuid.uuid4()), role=Role.agent, parts=_untagged_parts),
+                                          timestamp=datetime.now(timezone.utc).isoformat(),
+                                      ),
+                                      final=False,
+                                  )
+                                  task_result_aggregator.process_event(_ut_event)
+                                  await event_queue.enqueue_event(_ut_event)
+                              # Emit remaining clean text (if any)
+                              _clean_text = _extracted_text.strip()
+                              if _clean_text:
+                                  _ct_part = a2a_types.Part(root=a2a_types.TextPart(text=_clean_text))
+                                  artifact_text_parts.append(_ct_part)
                   else:
                       # Non-text parts (images, function calls) — unchanged
                       synthetic_parts = part_converters.convert_genai_part_to_a2a_parts(part)
@@ -6946,7 +9101,11 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                               # alongside it (e.g., deep_analysis_agent's full report)
                               # is the actual user-facing analysis, not progress text.
                               # Clearing it here would trap the report in thinking.
-                              if part.function_call.name != 'transfer_to_agent':
+                              # EXCEPTION 2: register_background_task - the LLM
+                              # often emits the full user confirmation alongside the
+                              # function_call. Clearing traps it in thinking.
+                              _preserve_text_tools = ('transfer_to_agent', 'register_background_task')
+                              if part.function_call.name not in _preserve_text_tools:
                                   artifact_text_parts.clear()
                           elif part.function_response:
                               # --- Tool response status (TextPart → Thinking accordion) ---
@@ -7073,6 +9232,39 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
         # and all preceding text is trapped inside thinking.
         # =============================================================================
         # Combine: final response text + all media (images, A2UI)
+        # --- Strip trailing empty "Next Actions" headers from text ---
+        # The LLM often emits "### Next Actions" + "---" as trailing text
+        # alongside A2UI suggestions components, creating a duplicate empty
+        # heading in the UI. Strip these when A2UI media parts are present.
+        _has_suggestion_parts = False
+        for _mp in artifact_media_parts:
+            try:
+                _mp_root = getattr(_mp, 'root', None)
+                _mp_data = getattr(_mp_root, 'data', None) or getattr(_mp_root, 'metadata', None) or {}
+                if isinstance(_mp_data, dict) and ('surfaceUpdate' in str(_mp_data) or 'suggestedUserActions' in str(_mp_data)):
+                    _has_suggestion_parts = True
+                    break
+            except Exception:
+                pass
+
+        if artifact_text_parts and _has_suggestion_parts:
+            import re as _strip_re
+            _last_tp = artifact_text_parts[-1]
+            _last_root = getattr(_last_tp, 'root', None)
+            _last_text = getattr(_last_root, 'text', '') if _last_root else ''
+            if _last_text:
+                # Remove trailing "--- ### Next Actions" or similar
+                _stripped = _strip_re.sub(
+                    r'[\\s]*---[\\s]*#{1,4}[\\s]*.*?Next Actions[\\s]*$',
+                    '', _last_text
+                ).rstrip()
+                if _stripped != _last_text and _stripped:
+                    artifact_text_parts[-1] = a2a_types.Part(
+                        root=a2a_types.TextPart(text=_stripped)
+                    )
+                elif not _stripped:
+                    artifact_text_parts.pop()
+
         logger.log_text(f"[artifact_build] text_parts={len(artifact_text_parts)}, media_parts={len(artifact_media_parts)}, parser_buffer_remaining='{getattr(stream_parser, '_buffer', '')[:100]}'")
 
         artifact_parts = artifact_text_parts + artifact_media_parts
@@ -7177,6 +9369,7 @@ def _build_static_agent_card() -> AgentCard:
         version=os.getenv("AGENT_VERSION", "0.1.0"),
         capabilities=AgentCapabilities(
             streaming=True,
+            pushNotifications=True,
             extensions=[a2ui_extension],
         ),
         defaultInputModes=["text/plain"],
@@ -7283,6 +9476,301 @@ class TokenExtractionMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(TokenExtractionMiddleware)
 
+# =============================================================================
+# Background Task Worker & Trigger Endpoints (Long-Running Agent Orchestration)
+# =============================================================================
+import asyncio as _bg_asyncio
+from contextlib import nullcontext as _nullcontext
+
+# --- Mitigation #3: Concurrency limit for background tasks ---
+_WORKER_SEMAPHORE = _bg_asyncio.Semaphore(2)  # Max 2 concurrent background tasks
+
+# --- Mitigation #4: OpenTelemetry tracing for worker visibility ---
+try:
+    from opentelemetry import trace as _otel_trace
+    _worker_tracer = _otel_trace.get_tracer("background_worker")
+except ImportError:
+    _worker_tracer = None
+
+
+def _fs_update_with_retry(_ref, _data, _max_retries=3):
+    """Firestore update with exponential backoff for critical state transitions."""
+    import time as _time, logging as _rlog
+    for _attempt in range(_max_retries):
+        try:
+            _ref.update(_data)
+            return True
+        except Exception as _e:
+            if _attempt == _max_retries - 1:
+                _rlog.getLogger("bg_worker").error("Firestore update FAILED after %d retries: %s", _max_retries, str(_e)[:300])
+                return False
+            _wait = (2 ** _attempt) + 0.5
+            _rlog.getLogger("bg_worker").warning("Firestore retry %d/%d in %.1fs: %s", _attempt + 1, _max_retries, _wait, str(_e)[:200])
+            _time.sleep(_wait)
+
+
+@app.post("/execute_task")
+async def execute_task(request: Request):
+    """Internal worker endpoint. Reads task config from Firestore,
+    runs the agent, writes result back. Fire-and-forget from LRFT.
+    Also handles Pub/Sub push messages from Cloud Scheduler."""
+    import builtins, traceback as _tb
+    import datetime as _dt
+    import base64 as _b64, json as _bjson, logging as _wlog
+    _wlogger = _wlog.getLogger("bg_worker")
+    _body = await request.json()
+
+    # --- Support both direct calls and Pub/Sub push messages ---
+    # Direct call (from LRFT/localhost): {"task_id": "...", "demo_id": "..."}
+    # Pub/Sub push (from Cloud Scheduler): {"message": {"data": "base64..."}}
+    if "message" in _body and isinstance(_body.get("message"), dict):
+        _msg_data = _body["message"].get("data", "")
+        if _msg_data:
+            try:
+                _decoded = _bjson.loads(_b64.b64decode(_msg_data).decode("utf-8"))
+                _task_id = _decoded.get("task_id", "")
+                _demo_id = _decoded.get("demo_id", "")
+                _wlogger.warning("execute_task: Pub/Sub trigger task_id=%s demo_id=%s", _task_id, _demo_id)
+            except Exception as _parse_err:
+                _wlogger.error("execute_task: Failed to parse Pub/Sub data: %s", str(_parse_err))
+                _task_id = ""
+                _demo_id = ""
+        else:
+            _task_id = ""
+            _demo_id = ""
+    else:
+        _task_id = _body.get("task_id", "")
+        _demo_id = _body.get("demo_id", "")
+
+    _fs = getattr(builtins, '_firestore_client', None)
+    if not _fs or not _task_id or not _demo_id:
+        _wlogger.error("execute_task: Missing config (fs=%s, task_id=%s, demo_id=%s)", bool(_fs), repr(_task_id), repr(_demo_id))
+        return {"status": "error", "message": "Missing config"}
+
+    _exec_ref = _fs.collection(_demo_id + "_task_executions").document(_task_id)
+    _def_ref = _fs.collection(_demo_id + "_task_definitions").document(_task_id)
+
+    _def_doc = _def_ref.get()
+    if not _def_doc.exists:
+        return {"status": "error", "message": "Definition not found"}
+    _def_data = _def_doc.to_dict()
+    _task_prompt = _def_data.get("task_prompt", "")
+    _task_name = _def_data.get("task_name", "unknown")
+
+    # --- Mitigation #3: Acquire semaphore before execution ---
+    async with _WORKER_SEMAPHORE:
+
+        # --- Mitigation #4: Create OTel span for Cloud Trace visibility ---
+        _span_ctx = _worker_tracer.start_as_current_span(
+            "background_task." + _task_name,
+            attributes={"task_id": _task_id, "task_name": _task_name}
+        ) if _worker_tracer else _nullcontext()
+
+        with _span_ctx:
+            # Ensure execution document exists (scheduled tasks don't pre-create one)
+            _exec_snap = _exec_ref.get()
+            _current = _exec_snap.to_dict() if _exec_snap.exists else None
+
+            # Check if cancelled before starting
+            if _current and _current.get("status") == "cancelled":
+                return {"status": "cancelled", "task_id": _task_id}
+
+            # Idempotency guard: skip if already completed or failed
+            # (prevents result-topic Pub/Sub re-triggers from overwriting status)
+            if _current and _current.get("status") in ("completed", "failed"):
+                _wlogger.warning("execute_task: task %s already %s, skipping re-execution", _task_id, _current.get("status"))
+                return {"status": _current.get("status"), "task_id": _task_id}
+
+            # Update status to working — use set(merge=True) so it works for
+            # both pre-existing docs (immediate tasks) and new docs (scheduled tasks)
+            _now = _dt.datetime.now(_dt.timezone.utc).isoformat()
+            _exec_ref.set({
+                "task_id": _task_id,
+                "definition_id": _task_id,
+                "status": "working",
+                "started_at": _now,
+                "progress_pct": 10,
+                "log_tail": "",
+                "result_summary": "",
+                "completed_at": "",
+                "reported_to_user": False,
+            }, merge=True)
+            _wlogger.warning("execute_task: STARTING task=%s name=%s prompt_len=%d prompt_head=%s", _task_id, _task_name, len(_task_prompt), repr(_task_prompt[:200]))
+
+            try:
+                # Run agent with task prompt using the background runner (Pro model)
+                _runner = background_runner
+                _session_id = "task-" + _task_id
+                _user_id = "background-worker"
+                # Delete existing session if present (scheduled task re-execution safety)
+                _existing_session = await _runner.session_service.get_session(
+                    app_name=_runner.app_name,
+                    user_id=_user_id,
+                    session_id=_session_id,
+                )
+                if _existing_session:
+                    await _runner.session_service.delete_session(
+                        app_name=_runner.app_name,
+                        user_id=_user_id,
+                        session_id=_session_id,
+                    )
+                await _runner.session_service.create_session(
+                    app_name=_runner.app_name,
+                    user_id=_user_id,
+                    session_id=_session_id,
+                )
+                from google.genai import types as _genai_types
+
+                # The background_agent has execution directives baked into
+                # its system prompt — no need for runtime _exec_directive.
+                _full_prompt = _task_prompt
+
+                _results = []
+                _tool_calls = []
+                _event_count = 0
+                _cancel_check_counter = 0
+                async for event in _runner.run_async(
+                    user_id=_user_id,
+                    session_id=_session_id,
+                    new_message=_genai_types.Content(
+                        role="user",
+                        parts=[_genai_types.Part(text=_full_prompt)],
+                    ),
+                ):
+                    _event_count += 1
+
+                    # Track tool calls for diagnostics
+                    if event.content and event.content.parts:
+                        for _ep in event.content.parts:
+                            if hasattr(_ep, 'function_call') and _ep.function_call:
+                                _fc_name = _ep.function_call.name if _ep.function_call.name else "unknown"
+                                _tool_calls.append(_fc_name)
+                                _wlogger.warning("execute_task: TOOL_CALL task=%s tool=%s", _task_id, _fc_name)
+                            if hasattr(_ep, 'function_response') and _ep.function_response:
+                                _fr_name = _ep.function_response.name if _ep.function_response.name else "unknown"
+                                _wlogger.warning("execute_task: TOOL_RESULT task=%s tool=%s", _task_id, _fr_name)
+
+                    # Cooperative cancellation check (every 10 events to reduce Firestore reads)
+                    _cancel_check_counter += 1
+                    if _cancel_check_counter % 10 == 0:
+                        try:
+                            _check_snap = _exec_ref.get()
+                            _check = _check_snap.to_dict() if _check_snap.exists else {}
+                            if _check.get("status") == "cancelled":
+                                _wlogger.warning("execute_task: CANCELLED task=%s after %d events", _task_id, _event_count)
+                                return {"status": "cancelled", "task_id": _task_id}
+                        except Exception:
+                            pass  # Check failure should not stop task execution
+
+                    if event.is_final_response() and event.content and event.content.parts:
+                        for _p in event.content.parts:
+                            if hasattr(_p, 'text') and _p.text:
+                                _results.append(_p.text)
+
+                _result_text = chr(10).join(_results) if _results else "No output"
+                # Strip A2UI blocks from result — they are session-specific UI artifacts
+                # that become meaningless when stored and replayed later.
+                import re as _re_strip
+                _result_text = _re_strip.sub(r'<a2ui-json>.*?</a2ui-json>', '', _result_text, flags=_re_strip.DOTALL).strip()
+                _completed_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
+
+                # Warn if no tool calls were made — the agent likely just planned/described
+                if not _tool_calls:
+                    _wlogger.warning("execute_task: NO_TOOL_CALLS task=%s events=%d — agent may not have executed operations", _task_id, _event_count)
+
+                _final_status = "completed"
+                _fs_update_with_retry(_exec_ref, {
+                    "status": _final_status,
+                    "progress_pct": 100,
+                    "result_summary": _result_text[:2000],
+                    "completed_at": _completed_at,
+                    "reported_to_user": False,
+                    "tool_calls": _tool_calls[:50],
+                    "event_count": _event_count,
+                })
+                _wlogger.warning("execute_task: COMPLETED task=%s events=%d tools=%s result_len=%d", _task_id, _event_count, repr(_tool_calls[:10]), len(_result_text))
+
+                # Send A2A push notification if configured
+                await _send_push_notification(_fs, _demo_id, _task_id, _final_status, _result_text[:500])
+
+                # Publish to result topic for trigger EP notification
+                try:
+                    from google.cloud import pubsub_v1
+                    import json as _pjson
+                    _publisher = pubsub_v1.PublisherClient()
+                    _project = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+                    _topic = "projects/" + _project + "/topics/" + _demo_id + "-task-results"
+                    _publisher.publish(_topic, _pjson.dumps({"task_id": _task_id, "demo_id": _demo_id, "status": _final_status}).encode("utf-8"))
+                except Exception:
+                    pass
+
+                return {"status": _final_status, "task_id": _task_id}
+
+            except Exception as _e:
+                _wlogger.error("execute_task: FAILED task=%s error=%s", _task_id, str(_e)[:500])
+                _fs_update_with_retry(_exec_ref, {
+                    "status": "failed",
+                    "log_tail": str(_e)[:500],
+                    "completed_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+                })
+                await _send_push_notification(_fs, _demo_id, _task_id, "failed", str(_e)[:200])
+                return {"status": "failed", "error": str(_e)[:200]}
+
+
+async def _send_push_notification(_fs, _demo_id, _task_id, _status, _message):
+    """Sends A2A push notification if client configured a webhook."""
+    if not _fs or not _demo_id:
+        return
+    try:
+        _config_ref = _fs.collection(_demo_id + "_task_push_configs").document(_task_id)
+        _config_doc = _config_ref.get()
+        if not _config_doc.exists:
+            return
+        _config = _config_doc.to_dict()
+        _webhook_url = _config.get("webhook_url", "")
+        if not _webhook_url:
+            return
+
+        import httpx as _httpx
+        import json as _pjson
+        _payload = {
+            "jsonrpc": "2.0",
+            "method": "tasks/pushNotification",
+            "params": {
+                "taskId": _task_id,
+                "status": {"state": _status, "message": _message[:500]},
+            },
+        }
+        async with _httpx.AsyncClient(timeout=10) as _client:
+            await _client.post(_webhook_url, json=_payload)
+    except Exception:
+        pass
+
+
+# --- Push Notification Configuration Endpoint (A2A Standard) ---
+@app.post("/tasks/pushNotification/set")
+async def set_push_notification(request: Request):
+    """A2A-compliant endpoint for clients to register push notification webhooks."""
+    import builtins
+    _body = await request.json()
+    _params = _body.get("params", {})
+    _task_id = _params.get("taskId", "")
+    _config = _params.get("pushNotificationConfig", {})
+    _webhook_url = _config.get("url", "")
+
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+    if not _fs or not _demo_id or not _task_id:
+        return {"jsonrpc": "2.0", "error": {"code": -32602, "message": "Invalid params"}}
+
+    _fs.collection(_demo_id + "_task_push_configs").document(_task_id).set({
+        "task_id": _task_id,
+        "webhook_url": _webhook_url,
+        "authentication": _config.get("authentication", {}),
+    })
+    return {"jsonrpc": "2.0", "result": {"taskId": _task_id, "status": "configured"}}
+
+
 @app.post("/feedback")
 def collect_feedback(feedback: Feedback) -> dict[str, str]:
     logger.log_struct(feedback.model_dump(), severity="INFO")
@@ -7370,8 +9858,24 @@ gcloud services enable secretmanager.googleapis.com
     return script;
   })() }
 
+  # Grant Secret Manager access to default Compute Engine SA (required for --update-secrets)
+  COMPUTE_NUM=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+  COMPUTE_SA="\${COMPUTE_NUM}-compute@developer.gserviceaccount.com"
+  echo "🔐 Granting Secret Accessor role to Cloud Run service account..."
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \\
+    --member="serviceAccount:$COMPUTE_SA" \\
+    --role="roles/secretmanager.secretAccessor" \\
+    --condition=None --quiet >/dev/null 2>&1 || true
+
   SERVICE_NAME="${dirName}"
-  
+
+  # --- Pre-create Pub/Sub topics in background (no dependency on SERVICE_URL) ---
+  SCHED_TOPIC="${dirName}-sched-tasks"
+  RESULT_TOPIC="${dirName}-task-results"
+  echo "📨 Pre-creating Pub/Sub topics (parallel with deploy)..."
+  gcloud pubsub topics create "$SCHED_TOPIC" --project="$PROJECT_ID" 2>/dev/null &
+  gcloud pubsub topics create "$RESULT_TOPIC" --project="$PROJECT_ID" 2>/dev/null &
+
   echo "🤖 Deploying Main Agent to Cloud Run via Source..."
   
   ${ (() => {
@@ -7380,7 +9884,8 @@ gcloud services enable secretmanager.googleapis.com
       "GOOGLE_CLOUD_LOCATION=global",
       "MAPS_API_KEY=\$API_KEY",
       "GEMINI_AUTHORIZATION_ID=\$AUTH_ID",
-      "ADK_ENABLE_MCP_GRACEFUL_ERROR_HANDLING=1"
+      "ADK_ENABLE_MCP_GRACEFUL_ERROR_HANDLING=1",
+      `DEMO_ID=${dirName}`
     ];
     let secrets = [];
     let optionalSecrets = [];
@@ -7461,7 +9966,7 @@ gcloud services enable secretmanager.googleapis.com
     --no-cpu-throttling \
     --cpu-boost \
     --min-instances 1 \
-    --timeout 900 \
+    --timeout 1800 \
     --no-allow-unauthenticated \
     --ingress internal \
     --labels "created-by=adk" \
@@ -7477,7 +9982,7 @@ gcloud services enable secretmanager.googleapis.com
     --no-cpu-throttling \
     --cpu-boost \
     --min-instances 1 \
-    --timeout 900 \
+    --timeout 1800 \
     --no-allow-unauthenticated \
     --ingress internal \
     --labels "created-by=adk" \
@@ -7491,7 +9996,32 @@ gcloud services enable secretmanager.googleapis.com
     return deployCmd;
   })() }
   SERVICE_URL=$(gcloud run services list --filter="metadata.name:$SERVICE_NAME" --format="value(status.url)" | head -n 1)
-  
+
+  # --- Background Task Infrastructure: Pub/Sub subscriptions + SELF_URL (parallel) ---
+  echo ""
+  echo "📨 Finalizing background task infrastructure..."
+  # Wait for topic pre-creation to finish before creating subscriptions
+  wait 2>/dev/null || true
+  echo "  ✅ Pub/Sub topics ready"
+
+  # Create subscriptions and update SELF_URL in parallel (all depend on SERVICE_URL, but not on each other)
+  gcloud pubsub subscriptions create "\${SCHED_TOPIC}-push" \\
+    --topic="$SCHED_TOPIC" \\
+    --push-endpoint="$SERVICE_URL/execute_task" \\
+    --push-auth-service-account="$COMPUTE_SA" \\
+    --ack-deadline=600 \\
+    --project="$PROJECT_ID" 2>/dev/null &
+  # NOTE: Result topic push subscription intentionally NOT created here.
+  # The result topic is for downstream consumers (e.g. external notifications),
+  # NOT for re-triggering /execute_task (which causes session collision).
+  gcloud run services update "$SERVICE_NAME" \\
+    --update-env-vars="SELF_URL=$SERVICE_URL" \\
+    --region us-central1 \\
+    --quiet 2>/dev/null &
+  wait || true
+  echo "  ✅ Pub/Sub push subscriptions created"
+  echo "  ✅ SELF_URL env var set"
+
   # Project-level IAM binding for Discovery Engine SA is assumed to be active.
   # No resource-level binding needed.
   echo ""
@@ -7647,8 +10177,12 @@ EOF
       done
       
       CHOICE=""
-      while [[ ! "\$CHOICE" =~ ^[0-\$((APP_COUNT-1))]$ ]]; do
+      while true; do
         read -p "Select which app to register the agent to (0-\$((APP_COUNT-1))): " CHOICE
+        if [[ "\$CHOICE" =~ ^[0-9]+$ ]] && [ "\$CHOICE" -ge 0 ] && [ "\$CHOICE" -lt "\$APP_COUNT" ]; then
+          break
+        fi
+        echo "Invalid selection. Please enter a number between 0 and \$((APP_COUNT-1))."
       done
       
       SELECTED_APP_ID=$(echo "\${APP_NAMES[\$CHOICE]}" | awk -F'/' '{print \$NF}')
@@ -7755,7 +10289,7 @@ if [ "$DEPLOY_CHOICE" = "2" ]; then
     --cpu-boost \
     --allow-unauthenticated \
     --ingress all \
-    --timeout 900 \
+    --timeout 1800 \
     --service-account "\${COMPUTE_SA}" \
     --set-env-vars="\$GE_ENV_VARS" \
     --min-instances 1 \
@@ -8207,38 +10741,6 @@ function updateSystemInstruction(setupScript, newBusinessInstruction, technicalI
   return setupScript.replace(/(1\.\s+\*\*BigQuery toolset:\*\*.*?\n)([\s\S]*?)(\n\s+2\.\s+\*\*Maps Toolset:\*\*)/, `$1${escaped}$3`);
 }
 
-
-/**
- * Fetches recent commit history from GitHub API as update logs.
- */
-function fetchGitLogs() {
-  const repoUrl = 'https://api.github.com/repos/ryotat7/ge-demo-generator/commits';
-  try {
-    const response = UrlFetchApp.fetch(repoUrl + '?per_page=10', {
-      muteHttpExceptions: true,
-      headers: { 'Accept': 'application/vnd.github.v3+json' }
-    });
-    
-    if (response.getResponseCode() === 200) {
-      const commits = JSON.parse(response.getContentText());
-      return commits.map(c => {
-        const msg = c.commit.message.split('\n')[0];
-        const versionMatch = msg.match(/v\d+\.\d+\.\d+/);
-        const version = versionMatch ? versionMatch[0] : c.sha.substring(0, 7);
-        
-        return {
-          version: version,
-          date: c.commit.author.date.split('T')[0],
-          note: msg
-        };
-      });
-    }
-  } catch (e) {
-    // Fallback silently
-  }
-  return [];
-}
-
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
@@ -8573,10 +11075,17 @@ If valid:
 - Set transport_mode to "stdio" (our system handles protocol bridging automatically).
 - List ONLY the ESSENTIAL environment variables needed for a basic, functional deployment in required_env_vars. Ignore advanced configurations, fine-tuning parameters (e.g., cleanup intervals, SSL paths, port binds), and alternative authentication methods if a primary/recommended one (like an API Key) is available. Focus on getting the server running at a basic level. For each variable, determine if it is REQUIRED or OPTIONAL for that basic function.
 - Predict the key capabilities or tools provided by this server based on the code and README (e.g., 'Create Redmine tickets', 'Search issues').
-- If the server requires a credential FILE to be mounted (e.g., Application Default Credentials JSON via GOOGLE_APPLICATION_CREDENTIALS, service account JSON, or similar file-based auth), set credential_file with:
+- credential_file: Set ONLY when file-based authentication is the SOLE or PRIMARY method to make the server functional. Examples where credential_file SHOULD be set:
+  - Google service account JSON via GOOGLE_APPLICATION_CREDENTIALS (the only way to authenticate)
+  - SSH private key file required for Git operations (no alternative)
+  Examples where credential_file should be null:
+  - Client certificate (PFX/P12) that is an OPTIONAL alternative to username/password auth
+  - TLS/SSL certificates used only in specific network configurations
+  - Any file-based auth that is conditional (e.g., only used when a specific env var is set, guarded by "if" checks in code)
+  Rule: If the server can authenticate and function normally with ONLY environment variable values (API keys, tokens, username/password), set credential_file to null — even if the code also supports optional file-based auth.
+  When credential_file is set, provide:
   - env_var_name: The environment variable that points to the file path (e.g., "GOOGLE_APPLICATION_CREDENTIALS")
   - file_description: A concise explanation of what the file contains and step-by-step instructions for obtaining it
-  If no credential file is needed, set credential_file to null.
 
 If invalid or files are definitely missing context to specify an entrypoint, set is_supported to false and state why under unsupported_reason.
 
