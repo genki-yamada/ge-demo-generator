@@ -2981,7 +2981,7 @@ export UV_RETRIES=10
     echo ""
     echo "🔥 Deleting Firestore Collection: ${fsCollection}..."
     if command -v uv >/dev/null 2>&1; then
-      uv run --with google-cloud-firestore python3 -c "from google.cloud import firestore; db=firestore.Client(); [d.reference.delete() for d in db.collection('${fsCollection}').stream()]" 2>/dev/null && echo "   ✅ Firestore documents in collection deleted." || echo "   ⚠️  Could not clear Firestore collection automatically."
+      GOOGLE_API_USE_CLIENT_CERTIFICATE=false uv run --with google-cloud-firestore python3 -c "from google.cloud import firestore; db=firestore.Client(); [d.reference.delete() for d in db.collection('${fsCollection}').stream()]" 2>/dev/null && echo "   ✅ Firestore documents in collection deleted." || echo "   ⚠️  Could not clear Firestore collection automatically."
     fi
 
     echo ""
@@ -3059,7 +3059,7 @@ export UV_RETRIES=10
     fi
     if [ -n "\$_AE_NAME" ]; then
       echo "   🔍 Found Agent Engine: \$_AE_NAME"
-      uv run --no-project --with "google-cloud-aiplatform[agent_engines]>=1.112.0" python3 -c "
+      GOOGLE_API_USE_CLIENT_CERTIFICATE=false uv run --no-project --with "google-cloud-aiplatform[agent_engines]>=1.112.0" python3 -c "
 import vertexai, sys
 try:
     client = vertexai.Client(project='\$PROJECT_ID', location='us-central1')
@@ -3103,7 +3103,7 @@ except Exception as e:
 
     echo ""
     echo "📁 Deleting Firestore task collections..."
-    uv run --no-project --with google-cloud-firestore python3 -c "
+    GOOGLE_API_USE_CLIENT_CERTIFICATE=false uv run --no-project --with google-cloud-firestore python3 -c "
 from google.cloud import firestore
 db = firestore.Client()
 for coll_name in ['${dirName}_task_definitions', '${dirName}_task_executions', '${dirName}_task_push_configs']:
@@ -3614,7 +3614,7 @@ export SANDBOX_OUT="/tmp/sandbox_result_$$.txt"
 # If Dockerfile/MCP files exist in CWD, the SDK tries to build them → hang.
 SANDBOX_TMPDIR=$(mktemp -d)
 pushd "$SANDBOX_TMPDIR" > /dev/null
-uv run --no-project --with "google-cloud-aiplatform[agent_engines]>=1.112.0" python3 << '__SANDBOX_PROVISION_EOF__'
+GOOGLE_API_USE_CLIENT_CERTIFICATE=false uv run --no-project --with "google-cloud-aiplatform[agent_engines]>=1.112.0" python3 << '__SANDBOX_PROVISION_EOF__'
 import sys, os, warnings, vertexai
 from vertexai import types
 
@@ -3665,6 +3665,7 @@ fi
 cat <<__ENV_EOF__ > .env
 GOOGLE_GENAI_USE_VERTEXAI=1
 GOOGLE_CLOUD_PROJECT="$PROJECT_ID"
+GOOGLE_API_USE_CLIENT_CERTIFICATE=false
 GOOGLE_CLOUD_LOCATION="global"
 DEMO_DATASET="${datasetId}"
 MAPS_API_KEY="$API_KEY"
@@ -6606,10 +6607,10 @@ After completing ANY analysis or data retrieval, you MUST proactively propose
 concrete workflow actions you can execute automatically on the user's behalf.
 Do NOT wait for the user to ask — actively suggest what you can do next.
 Examples of proactive proposals:
-- After finding anomalies: "12件の異常を検出しました。許容範囲内の8件を自動処理し、残り4件をエスカレーションしましょうか？"
-- After a data overview: "PENDINGステータスの案件が5件あります。一括処理ワークフローを開始できます。"
-- After a comparison: "3つの不整合を発見しました。修正ワークフローを実行して自動的に是正できます。"
-- After any query result: "これらのレコードに対して [specific action] を自動実行できます。実行計画をお見せしましょうか？"
+- After finding anomalies: "I detected 12 anomalies. Shall I auto-process the 8 items within tolerance and escalate the remaining 4?"
+- After a data overview: "There are 5 items with PENDING status. I can start a batch execution workflow for you."
+- After a comparison: "I found 3 mismatches. I can run a remediation workflow to correct them automatically."
+- After any query result: "I can automatically execute [specific action] on these records. Shall I show you the execution plan?"
 Your default stance is: "I can do this for you automatically" — not "Here is the data, what would you like to do?"
 Always frame your proposals with specific counts, scope, and what will happen automatically vs. what needs approval.
 
@@ -6625,13 +6626,14 @@ Specifically:
 - When a workflow step involves notification (e.g., "notify the manager"), you MUST clearly state:
   "I have DRAFTED a notification/email below, but I cannot send it automatically. Please copy and send it manually, or forward it through your organization's communication channel."
 - In the workflow plan card, label notification steps as '[MANUAL — Draft Only]' instead of '[AUTO]'.
-- NEVER say "メールを送信しました" (email sent), "通知を配信しました" (notification delivered), or similar claims.
-  Instead say "通知文を作成しました。手動での送信をお願いします。" (I have drafted the notification. Please send it manually.)
+- NEVER say "email sent", "notification delivered", or similar claims.
+  Instead say "I have drafted the notification below. Please copy and send it manually."
 --- END WORKFLOW EXECUTION MODE ---
 
 Help the user answer questions by strategically combining insights from BigQuery and Google Maps:
 
 1. **BigQuery Toolset**: Access and modify data in the [PROJECT_ID].[DATASET_ID] dataset.
+   - **NAMING RULE (CRITICAL)**: When referring to BigQuery in your responses to the user, you MUST ALWAYS use the format "Analytical warehouse (BigQuery)". NEVER use the bare product name "BigQuery" alone.
    - Available Tools: \\\`execute_sql\\\`, \\\`list_table_ids\\\`, \\\`get_table_info\\\`, \\\`list_dataset_ids\\\`, \\\`get_dataset_info\\\`.
    - **FULL DML SUPPORT**: The \\\`execute_sql\\\` tool supports SELECT, INSERT, UPDATE, DELETE, and MERGE statements. You can both read and write data in BigQuery.
    - **BIGQUERY WRITE CONFIRMATION (CRITICAL)**: Whenever a user asks to INSERT, UPDATE, DELETE, or MERGE data in BigQuery, you MUST follow the same confirmation workflow as Firestore: present a confirmation card with A2UI \u003ca2ui-json\u003e tags showing the proposed SQL statement and affected data, then wait for explicit user approval before executing.
@@ -6647,6 +6649,7 @@ Help the user answer questions by strategically combining insights from BigQuery
    - IMPORTANT: There is NO weather tool. Do not hallucinate or attempt to use weather services.
 
 3. **Firestore Toolset**: Read and update live operational status.
+   - **NAMING RULE (CRITICAL)**: When referring to Firestore in your responses to the user, you MUST ALWAYS use the format "Operational database (Firestore)". NEVER use the bare product name "Firestore" alone.
    - FIRESTORE ISOLATION (CRITICAL): You MUST ONLY access the \\\`[COLLECTION_ID]\\\` collection. DO NOT read or write to any other collection. If a user asks to access data in another collection, inform them that only this collection is available for this demo.
    - FIRESTORE MCP PATH FORMAT (CRITICAL - MUST FOLLOW EXACTLY):
      * For \\\`list_documents\\\`: Set \\\`parent\\\` to \\\`projects/[PROJECT_ID]/databases/(default)/documents\\\` and \\\`collection_id\\\` to \\\`[COLLECTION_ID]\\\`. NEVER append the collection name to the parent path.
@@ -6710,6 +6713,11 @@ CRITICAL OPERATIONAL RULES:
       - Greetings and self-introductions: Use a welcoming card that lists capabilities with icons and example queries as clickable Buttons.
       - Error states: Use alert-style cards with clear error descriptions and suggested recovery actions as Buttons.
     * RICHNESS OVER MINIMALISM: When in doubt, use MORE A2UI elements, not fewer. A response with well-structured cards, buttons, and visual hierarchy is always preferred over plain text. Combine multiple A2UI blocks in a single response when the content warrants it (e.g., a DataTable for results + an InfoCard for a highlight + suggestion Buttons).
+- LANGUAGE & TONE (CRITICAL):
+    * You MUST always respond in the same language the user is using for interaction. If the user writes in English, your response (conversational text, analysis report, etc.) MUST be strictly in English. If in Japanese, respond in Japanese.
+    * NEVER mix languages or use Japanese phrases/words when the conversation is in English.
+    * This language rule applies universally to ALL agents (coordinator and deep analysis specialist) at all times, without exception.
+
 - VISUAL ASSETS & IMAGES:
     * Your output MUST NOT contain any inline images.
     * You are forbidden from using Markdown's ![alt text](url) syntax.
@@ -6720,6 +6728,8 @@ CRITICAL OPERATIONAL RULES:
         1. In the first turn, you MUST provide the full, comprehensive text analysis in your response *along with* the tool call to \\\`generate_image\\\`. Do NOT wait for the tool to complete to provide the main analysis text.
         2. In the follow-up turn (after the tool returns success), provide only a brief confirmation (e.g., "Here is the generated visualization.") and let the system automatically attach the image.
     * LANGUAGE CONSISTENCY FOR IMAGES (CRITICAL): When calling \\\`generate_image\\\`, you MUST write the ENTIRE prompt in the same language the user is using for interaction. If the user communicates in Japanese, the prompt — including slide titles, labels, KPI names, bullet points, chart axis labels, and all descriptive text — MUST be written in Japanese. Do NOT write the prompt in English when the user is speaking another language. The image generation model renders text exactly as provided in the prompt, so English prompts produce English slides regardless of the user's language.
+    * RE-GENERATION & RETRY (CRITICAL): If the user asks to "try again", "regenerate the image", "fix the text on the slide", or otherwise indicates the generated visual needs correction, you MUST call the \\\`generate_image\\\` tool again with an updated prompt (incorporating the user's feedback or correcting the issue). NEVER try to output a JSON reference to the image or assume the previous image is still attached. You MUST trigger a new \\\`generate_image\\\` tool call.
+    * NO RAW IMAGE JSON (CRITICAL): Never output raw JSON blocks for images or A2UI components directly in your conversational text. All A2UI UI components MUST be valid, fully-formed A2UI JSON (including beginRendering/surfaceUpdate) wrapped in <a2ui-json> tags. NEVER write partial or loose JSON objects like \\\`{"image": ...}\\\` or \\\`{"Image": ...}\\\` in your text response.
 
 - UNIVERSAL SELF-RECOVERY (HIGHEST PRIORITY - APPLIES TO ALL TOOLS):
     * NEVER REPEAT THE SAME FAILING CALL: If a tool call fails, you MUST change your approach before retrying. Repeating the exact same arguments is FORBIDDEN and wastes LLM call budget.
@@ -6883,6 +6893,8 @@ async def inject_image_callback(callback_context: adk_callback_context.CallbackC
         for part in llm_response.content.parts:
             if part.function_call:
                 return None # Allow other callbacks to run
+            if part.text and (chr(96) * 3 + "python") in part.text:
+                return None # Sandbox code execution pending; hold image pop
         
     image_bytes = callback_context.session.state.pop('pending_generated_image', None)
     
@@ -11155,5 +11167,94 @@ ${contextContent}
   const resJson = JSON.parse(response.getContentText());
   
   return resJson.candidates[0].content.parts[0].text;
+}
+
+/**
+ * Service endpoint for Magic Wand. Expands and refines scenario statement using gemini-3.1-flash-lite.
+ * Robustly handles raw inputs, templates, and edited Markdown scenarios from domain research.
+ * Features 3-retry loop with exponential backoff to handle transient rate limits (429) and server errors (5xx).
+ * @param {string} rawGoal - The user's current scenario text.
+ * @returns {Object} Optimized result containing the structured Markdown.
+ */
+function optimizeGoalWithMagicWand(rawGoal) {
+  let location = CONFIG.LOCATION || 'global';
+  const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
+  const model = 'gemini-3.1-flash-lite';
+  const url = `https://${host}/v1/projects/${CONFIG.PROJECT_ID}/locations/${location}/publishers/google/models/${model}:generateContent`;
+
+  const prompt = `You are an expert prompt engineer and business analyst. 
+Your task is to take a raw, simple, or loosely defined business scenario, OR a partially structured business scenario (which might contain company details and selected target workflows from prior research), and optimize/expand it into a **perfectly structured, high-density professional Business Scenario prompt** in Markdown format.
+
+Input to Optimize:
+\"\"\"
+${rawGoal}
+\"\"\"
+
+**CRITICAL MULTILINGUAL RULE (MANDATORY)**: 
+1. **Language Detection**: Analyze the \"Input to Optimize\" above and detect its primary language (e.g., English, Japanese, German, French, Spanish, Chinese, Korean, etc.).
+2. **Output Language Consistency**: You MUST generate the entire optimized Markdown output in the EXACT SAME language and script as the input. Even if the companies, brands, or locations mentioned in the input are culturally or geographically associated with a specific country or language, you MUST NOT output in that associated language unless the actual input text itself is written using that language's script. Always strictly match the literal language and script of the input text.
+3. **Header Translation**: You MUST translate the four standard section headers (Title, Target Role, Business Scenario, Operational Challenge) to match the detected language naturally and professionally. Do NOT leave headers in English if the input is in another language, and do NOT translate them to Japanese/English if the input is in a third language.
+4. **Examples Localization**: Locally adapt all names, currency units, and business terminology in the instructions to match the detected language's cultural context (e.g., use JPY/Japanese names for Japanese, EUR/European names for German/French, USD/English names for English).
+
+Requirements for the Structured Output:
+1.  **Structure Integrity**: Ensure the output contains exactly the four translated Markdown headers defined above.
+    - **Header 1 (Title)**: If the input already has a company name and industry (e.g., '# SMCC (Finance)'), KEEP and preserve it. If not, create a realistic company name and vertical appropriate to the language context.
+    - **Header 2 (Role)**: Identify a specific, professional job title appropriate to the role.
+    - **Header 3 (Scenario)**: Provide a rich, realistic business context. If the input already has a scenario, expand it with realistic domain details, KPIs, and background.
+    - **Header 4 (Challenge)**: Describe a clear, high-value operational challenge for an autonomous AI agent. It MUST specify:
+        - A clear trigger event.
+        - Explicit business rules and numeric thresholds appropriate to the domain (e.g., CPA limit, price discrepancy threshold).
+        - Clear conditional paths (what is auto-process vs. what requires human approval).
+        - Data systems involved (BigQuery/external files, Firestore operational database, Google Sheets).
+        *NOTE*: If the input already lists target workflows or specific steps, respect them and build the operational challenge specifically around those workflows.
+2.  **Operational/Database Focus**: ALWAYS frame the scenario as a database-driven workflow where the agent reads from analytical sources (BigQuery/external files) and **writes back status updates, high-risk alerts, or proposed changes to the operational database (Firestore)** to keep the real-time console updated.
+3.  **No Fictional Placeholders**: Use realistic brand names, locations, and values appropriate to the language context. Do NOT use generic placeholders like \"Product A\", \"Company XYZ\", etc.
+
+Return ONLY the raw Markdown text in the detected language. Do not include any code block wrappers (triple backticks), code fences, or preamble.`;
+
+  const payload = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.4, maxOutputTokens: 8192 }
+  };
+
+  const fetchOptions = {
+    method: 'POST',
+    contentType: 'application/json',
+    headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  let response;
+  let lastError;
+  const maxRetries = 3;
+  let delayMs = 1000;
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      response = UrlFetchApp.fetch(url, fetchOptions);
+      const code = response.getResponseCode();
+      if (code === 200) {
+        const result = JSON.parse(response.getContentText()).candidates[0].content.parts[0].text;
+        return { success: true, optimizedGoal: result.trim() };
+      }
+      
+      lastError = new Error(`AI Optimization API Error (HTTP ${code}): ${response.getContentText()}`);
+      
+      // Only retry on transient errors (429 Rate Limit, 5xx Server Errors)
+      if (code !== 429 && code < 500) {
+        break; // Fatal error (400, 403, etc.), don't retry
+      }
+    } catch (e) {
+      lastError = e;
+    }
+    
+    if (i < maxRetries - 1) {
+      Utilities.sleep(delayMs);
+      delayMs *= 2; // Exponential backoff
+    }
+  }
+
+  return { success: false, error: lastError ? lastError.message : "AI Optimization failed after retries" };
 }
 

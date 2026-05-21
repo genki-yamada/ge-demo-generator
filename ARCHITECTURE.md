@@ -77,15 +77,15 @@ When the user runs the generated setup script in Cloud Shell, the following arch
 
 ### 3.2 Agent Architecture
 
-The synthesized agent uses a **dual-model sub-agent delegation** pattern for optimal latency and cost. A Flash-Lite coordinator handles the majority of interactions, while a Pro sub-agent is delegated to for complex multi-step reasoning tasks.
+The synthesized agent uses a **triple-agent architecture** for optimal latency, cost, and autonomous execution. A coordinator handles the majority of chat interactions, an analytical sub-agent is delegated to for complex inline reasoning, and a standalone background worker processes long-running tasks and scheduled cron jobs asynchronously.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  root_agent (LlmAgent — Coordinator)                         │
-│  Model: gemini-3.1-flash-lite (AGENT_MODEL_LITE)     │
+│  Model: gemini-3.5-flash (AGENT_MODEL_LITE)          │
 │  Role: Handles most interactions directly                     │
 │  Instruction: Generated system prompt + A2UI schema          │
-│               + Model Routing Rules                          │
+│               + Model Routing Rules + Background Tasking     │
 │                                                              │
 │  Tools (shared):                                             │
 │  ├── BigQuery MCP Toolset (execute_sql, list_tables, ..)     │
@@ -101,11 +101,19 @@ The synthesized agent uses a **dual-model sub-agent delegation** pattern for opt
 │       └── People MCP                                         │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐    │
-│  │  deep_analysis_agent (LlmAgent — Sub-agent)          │    │
-│  │  Model: gemini-3.1-pro-preview (AGENT_MODEL)         │    │
-│  │  Role: Complex multi-step analysis                    │    │
+│  │  deep_analysis_agent (LlmAgent — Analytical Sub)     │    │
+│  │  Model: gemini-3.5-flash (AGENT_MODEL)               │    │
+│  │  Role: Complex inline multi-step analysis             │    │
 │  │  Tools: Same shared toolset                           │    │
 │  │  Transfer: Returns to root_agent on completion        │    │
+│  └──────────────────────────────────────────────────────┘    │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │  background_agent (LlmAgent — Background Worker)     │    │
+│  │  Model: gemini-3.5-flash (AGENT_MODEL)               │    │
+│  │  Role: Async pipeline execution & cron tasks          │    │
+│  │  Tools: BigQuery, Maps, Firestore, Custom MCP         │    │
+│  │  Trigger: /execute_task endpoint (Firestore-backed)   │    │
 │  └──────────────────────────────────────────────────────┘    │
 │                                                              │
 │  Callbacks (both agents):                                    │
@@ -118,15 +126,15 @@ The synthesized agent uses a **dual-model sub-agent delegation** pattern for opt
 │                                                              │
 │  App Config:                                                 │
 │  ├── EventsCompactionConfig (interval=20, overlap=3)         │
-│  └── ContextCacheConfig (min_tokens=4096, ttl=3600s)         │
+│  └── ContextCacheConfig (min_tokens=2048, ttl=3600s)         │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Routing logic**: The coordinator (Flash-Lite) delegates to `deep_analysis_agent` (Pro) only when a request requires 3+ sequential tool calls with intermediate reasoning, cross-table correlation, or strategic business recommendations. All other interactions—including A2UI card generation, simple queries, and Firestore operations—are handled directly by the coordinator.
+**Routing logic**: The coordinator delegates to `deep_analysis_agent` only when a request requires 3+ sequential tool calls with intermediate reasoning, cross-table correlation, or strategic business recommendations. Long-running background tasks and scheduled cron jobs are routed to `background_agent` via Firestore task registration and the `/execute_task` endpoint. All other interactions—including A2UI card generation, simple queries, and Firestore operations—are handled directly by the coordinator.
 
 **Model configurability**: The setup script accepts `--model <name>` and `--model-lite <name>` CLI flags to override the default model assignments. The selected models are persisted to the `.env` file and read via `AGENT_MODEL` / `AGENT_MODEL_LITE` environment variables at runtime.
 
-**Context caching**: The `App` object is configured with `ContextCacheConfig` to cache the system instruction and A2UI schema (when >= 4096 tokens) for up to 1 hour, significantly reducing time-to-first-token on repeated requests.
+**Context caching**: The `App` object is configured with `ContextCacheConfig` to cache system instructions and schemas when exceeding 2048 tokens, keeping the cache warm for 1 hour to maximize performance.
 
 **Model transparency**: The FastAPI A2A server injects a `🧠 Model: <name>` status event into the streaming response the first time each agent processes a request, providing real-time visibility into which model is handling the interaction.
 
@@ -144,6 +152,7 @@ The agent is served via a **FastAPI application** (`fast_api_app.py`) that imple
 - **Token Extraction Middleware**: Captures OAuth tokens from HTTP headers or request body for Workspace MCP authentication passthrough.
 - **GCS Artifact Service**: Stores generated images in GCS for Gemini Enterprise file rendering.
 - **Model Announcement**: Emits model name in the streaming accordion header once per agent per request for runtime transparency.
+- **Background Runner & `/execute_task` Endpoint**: Houses a secondary async runner (`background_app`) utilizing the `background_agent` that listens on `/execute_task` to process background operational pipeline workflows and scheduled cron task jobs.
 
 ### 3.5 Data Viewer Dashboard
 
@@ -164,7 +173,10 @@ The A2UI integration provides rich interactive UI components in Gemini Enterpris
 - **Tag-Based Extraction**: The agent wraps UI payloads in `<a2ui-json>` tags. The stream parser extracts, heals, and validates these payloads.
 - **DataPart Conversion**: A2UI JSON payloads are converted to A2A `DataPart` objects for proper rendering in Gemini Enterprise.
 - **Interactive Components**: Cards, Columns, Rows, Buttons (with `sendText` actions), Dividers, Tabs, Text, Icons, Images, Modals, Forms (with `dataModelUpdate` for data binding), Lists, and suggestion chip bars.
-- **Form Data Binding**: Interactive forms use `dataModelUpdate` messages for initial values and `path`-based bindings for TextField, Slider, CheckBox, and DateTimeInput components.
+- **Form Data Binding**: Interactive forms use `dataModelUpdate` messages for initial values and `path`-based bindings for TextField (supporting `shortText` and multi-line `longText`), Slider, CheckBox, and DateTimeInput components.
+- **Welcome Onboarding Card**: Rendered on the first user interaction. Features a customized list of key capabilities using Icon + Text rows and action buttons designed to initiate immediate/background operations.
+- **Workflow Execution Plan**: Standardized layout for batch operations. Features a mandatory subtitle declaring sequential pipeline step order, connector arrows (` ↓ `), numbered step prefixes (`Step N/M :`), real-time status icons (`play_arrow`, `check_circle`, `hourglass_empty`, `pan_tool`, `error`), and dual control rows (Execution Mode buttons and Control buttons). Employs a progress variant for real-time console status sync.
+- **Context-Aware Suggestion Chips**: Section added at the end of every response using a dedicated Column schema (root -> Column [Divider, Section Title '💡 Next Actions', chipRow]) with context-aware labels to expand conversation paths.
 - **Fallback**: If the stream parser fails, a regex-based fallback extracts A2UI blocks to prevent data loss.
 
 ---
@@ -216,8 +228,12 @@ Users can import any GitHub-hosted MCP server by providing the repository URL. T
 ```mermaid
 graph TD
     User([User Prompt via Gemini Enterprise]) --> A2AServer[FastAPI A2A Server]
-    A2AServer --> RootAgent[root_agent - Flash-Lite Coordinator]
-    RootAgent -->|complex tasks| DeepAgent[deep_analysis_agent - Pro]
+    A2AServer -->|Chat Request| RootAgent[root_agent - Coordinator]
+    RootAgent -->|complex inline tasks| DeepAgent[deep_analysis_agent - Analytical Sub]
+    RootAgent -->|register_background_task| FirestoreDB[(Firestore DB)]
+    
+    A2AServer -->|/execute_task| BackgroundAgent[background_agent - Background Worker]
+    FirestoreDB -.->|Pulls Task| BackgroundAgent
 
     subgraph "MCP Toolsets (StreamableHTTP)"
         RootAgent --> BQToolset[BigQuery MCP]
@@ -226,12 +242,21 @@ graph TD
         RootAgent --> SlackMCP[Slack MCP - optional]
         RootAgent --> CustomMCP[Custom MCP - optional]
         RootAgent --> WorkspaceMCP[Workspace MCP - optional]
+
+        DeepAgent --> BQToolset
+        DeepAgent --> MapsToolset
+        DeepAgent --> FSToolset
+        
+        BackgroundAgent --> BQToolset
+        BackgroundAgent --> MapsToolset
+        BackgroundAgent --> FSToolset
+        BackgroundAgent --> CustomMCP
     end
 
     subgraph "External Resources"
         BQToolset --> BigQuery[(BigQuery Dataset)]
         MapsToolset --> GoogleMaps[Google Maps API]
-        FSToolset --> Firestore[(Firestore Database)]
+        FSToolset --> FirestoreDB
         SlackMCP --> SlackAPI[Slack API]
         CustomMCP --> ExternalSystem[External System e.g. Redmine]
         WorkspaceMCP --> Workspace[Gmail / Drive / Calendar / People]
@@ -239,10 +264,12 @@ graph TD
 
     subgraph "Agent-to-UI - A2UI"
         RootAgent -- "A2UI JSON via DataPart" --> GE[Gemini Enterprise UI]
-        Firestore -. "Real-time Snapshot" .-> DataViewer[Data Viewer Dashboard]
+        FirestoreDB -. "Real-time Snapshot" .-> DataViewer[Data Viewer Dashboard]
     end
 
-    RootAgent -- "generate_image tool" --> GeminiImage[Gemini Flash Image]
+    RootAgent -- "generate_image" --> GeminiImage[Gemini Flash Image]
+    DeepAgent -- "generate_image" --> GeminiImage
+    BackgroundAgent -- "generate_image" --> GeminiImage
     GeminiImage --> GCSArtifact[(GCS Artifact Bucket)]
     GCSArtifact --> GE
 
@@ -260,7 +287,7 @@ The setup script offers three deployment options and supports model override via
 bash setup-demo-xxx.sh
 
 # Override models
-bash setup-demo-xxx.sh --model gemini-flash-latest --model-lite gemini-flash-lite-latest
+bash setup-demo-xxx.sh --model gemini-2.5-pro --model-lite gemini-2.5-flash
 
 # Cleanup
 bash setup-demo-xxx.sh --cleanup
@@ -309,11 +336,11 @@ After running the setup script, the following directory structure is created:
 ├── adk_agent/
 │   └── app/
 │       ├── __init__.py
-│       ├── agent.py                   # LlmAgent + A2UI schema manager
-│       │                              # + ContextCacheConfig + plugins
+│       ├── agent.py                   # LlmAgent definitions (root_agent, deep_analysis_agent, background_agent)
+│       │                              # + A2UI schema manager + ContextCacheConfig + plugins
 │       ├── tools.py                   # MCP toolset factories + generate_image
 │       │                              # + Workspace MCP + Slack MCP
-│       ├── fast_api_app.py            # A2A server, streaming, middleware
+│       ├── fast_api_app.py            # A2A server, background task runner, streaming, middleware
 │       ├── part_converters.py         # A2A↔GenAI type conversion utilities
 │       ├── examples/0.8/             # A2UI BasicCatalog example JSONs
 │       └── app_utils/
@@ -331,7 +358,7 @@ After running the setup script, the following directory structure is created:
 
 1. **Prompt**: The user says in Gemini Enterprise: *"Approve safety issue #104 and log update notes."*
 2. **A2A Routing**: Gemini Enterprise sends the message via A2A JSON-RPC to the Cloud Run FastAPI server.
-3. **Model Announcement**: The server emits a `🧠 Model: gemini-3.1-flash-lite` status event in the thinking accordion.
+3. **Model Announcement**: The server emits a `🧠 Model: gemini-3.5-flash` status event in the thinking accordion.
 4. **Reasoning**: The `root_agent` identifies a write request and plans to use the Firestore MCP toolset.
 5. **Confirmation**: The agent renders an A2UI confirmation card (via `<a2ui-json>` tags) showing before/after data with Approve/Reject buttons and a `dataModelUpdate` for pre-populated fields.
 6. **User Approval**: The user clicks "Approve" in the interactive card, which sends a `sendText` action back to the agent.
@@ -371,7 +398,7 @@ After running the setup script, the following directory structure is created:
 - **Async Token Cache**: MCP authentication tokens are cached with async-safe locking and automatic expiry refresh.
 
 ### Agent Resilience
-- **Context Caching**: `ContextCacheConfig` caches the system instruction and A2UI schema (>= 4096 tokens) for 1 hour with 10-invocation revalidation, reducing time-to-first-token.
+- **Context Caching**: `ContextCacheConfig` caches the system instruction and A2UI schema (>= 2048 tokens) for 1 hour with 10-invocation revalidation, reducing time-to-first-token.
 - **Events Compaction**: `EventsCompactionConfig` compacts event history every 20 events with a 3-event overlap to prevent context window overflow in long conversations.
 - **ReflectAndRetryToolPlugin**: Automatically retries failed tool calls with error reflection, improving robustness against transient MCP failures.
 - **Tool Name Deduplication**: `get_custom_mcp_toolsets` uses `tool_name_prefix` to prevent "Duplicate function declaration" errors when multiple MCP servers expose identical tool names.

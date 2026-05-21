@@ -9,18 +9,20 @@ The **GE Demo Generator** is a low-code web application built on Google Apps Scr
 - **Reality-Grounded Demos**: The tool provisions actual BigQuery analytics, Google Maps grounding, and Firestore persistence databases for a raw, living demo experience.
 
 ### ⚙️ Technical Features
-- **Dual-Model Agent Architecture**: A Flash-Lite coordinator (`root_agent`) handles routine interactions while a Pro sub-agent (`deep_analysis_agent`) is delegated to for complex multi-step reasoning. Models are configurable via `--model` and `--model-lite` CLI flags.
+- **Triple-Agent Autonomous Architecture**: Features a multi-agent execution framework powered by **Gemini 3.5 Flash** by default. Consists of a coordinator (`root_agent`) for chat, simple retrieval, and A2UI card rendering; an analytical sub-agent (`deep_analysis_agent`) for complex inline calculations; and a standalone background worker (`background_agent`) run asynchronously for long-running background tasks and recurring cron scheduled tasks. Models are configurable via `--model` and `--model-lite` CLI flags.
+- **Autonomous Workflow Pipelines & Guardrails**: Incorporates advanced background pipelines for both workflow-based operations (`SCAN -> ANALYZE -> PLAN -> EXECUTE -> VERIFY -> REPORT` with human-in-the-loop escalations) and deep analytical tasks. All background tasks are protected by an **Anti-Shallow Guard** self-check to ensure rigorous statistical results and extensive data tool coverage.
 - **MCP Server Catalog**: A curated catalog of pre-configured MCP servers (Government & Legal, Finance, Social, Japan-Specific, Google Official) with one-click add, recipe bundles, and custom URL import.
-- **A2UI (Agent-to-UI) Compliant**: Streams interactive Bento Grid layouts, Analytics Charts, and interactive confirmation cards using the A2UI SDK (`a2ui-agent-sdk`) via `<a2ui-json>` tags embedded in model responses.
-- **A2A Protocol Server**: The synthesized agent runs as a FastAPI-based A2A server on Cloud Run, compatible with Gemini Enterprise agent registration.
+- **A2UI (Agent-to-UI) Compliant**: Streams interactive Bento Grid layouts, Analytics Charts, and interactive confirmation cards using the A2UI SDK (`a2ui-agent-sdk`) via `<a2ui-json>` tags embedded in model responses. Integrates rich Welcome Card onboarding and step-by-step Workflow Execution Plan patterns.
+- **A2A Protocol Server**: The synthesized agent runs as a FastAPI-based A2A server on Cloud Run, compatible with Gemini Enterprise agent registration, and features a standalone `/execute_task` worker for background processing.
 - **Real-Time Persistence Layer**: The agent modifies Firestore via MCP, and a synthesized **Data Viewer** dashboard (Flask on Cloud Run Functions Gen2) watches Firestore collections and updates in real-time.
 - **Three Deployment Targets**: Local (Cloud Shell `adk web`), Cloud Run (public URL with `--min-instances 1`), and Gemini Enterprise (automated Cloud Run + Discovery Engine registration).
 - **Custom & Managed MCP Import**: Import third-party MCP servers from GitHub (bridged via `supergateway` stdio→StreamableHTTP) or integrate managed remote MCP servers (e.g., Slack with automated OAuth2 flow).
 - **Image Generation**: Built-in `generate_image` tool produces professional infographics and business summary visuals via `gemini-3.1-flash-image-preview`.
-- **Context Caching**: `ContextCacheConfig` caches the system instruction and A2UI schema to reduce time-to-first-token.
+- **Context Caching**: `ContextCacheConfig` aggressively caches system instructions and A2UI schemas to reduce time-to-first-token.
 - **Google Workspace MCP**: Optional integration with Gmail, Drive, Calendar, and People MCP servers via OAuth token passthrough.
 - **Customer Domain Research**: Gemini-powered company research via Google Search grounding — automatically identifies business challenges and agent-automatable workflows from a customer's domain.
 - **Model Transparency**: Real-time model name announcement in the streaming response accordion for runtime visibility.
+- **Premium Live Architecture Dashboard**: Displays a high-fidelity interactive target architecture diagram SVG during the synthesis step with active pulsing and success glowing states across BigQuery, Gemini Agent, and Cloud Run nodes. Features an animated Dynamic Tips Carousel rotating every 12 seconds, a real-time Elapsed Timer, and an Automatic Retry Mechanism (up to 2 retries) for Apps Script generation robustness.
 
 ---
 
@@ -108,11 +110,11 @@ The `.claspignore` file controls which files are pushed. Only these files are de
 
 ## 5. Google Cloud Project Setup
 
-### 5.1 Link Apps Script to Your GCP Project
+### 5.1 Link Apps Script to Your Google Cloud Project
 
 1. In the Apps Script editor, go to **Project Settings** (Gear Icon).
-2. Under **Google Cloud Platform (GCP) Project**, click **Change project**.
-3. Enter your GCP **Project Number** (not Project ID) and click **Set project**.
+2. Under **Google Cloud Platform Project**, click **Change project**.
+3. Enter your Google Cloud **Project Number** (not Project ID) and click **Set project**.
 
 ### 5.2 Enable Advanced Services
 
@@ -145,7 +147,7 @@ This codebase contains **no hardcoded parameters**. All configuration is managed
 | Property | Default | Description |
 |---|---|---|
 | `LOCATION` | `global` | Vertex AI API location (e.g., `us-central1`, `global`) |
-| `MODEL` | `gemini-3.1-pro-preview` | Gemini model name for data generation |
+| `MODEL` | `gemini-3.5-flash` | Gemini model name for data generation |
 
 ### 6.3 Setting Properties
 
@@ -217,8 +219,8 @@ When a user generates a demo through the web UI, the tool:
    - Creates a BigQuery dataset and loads CSV data
    - Provisions Firestore with operational documents
    - Deploys a **Data Viewer** web app (Flask on Cloud Run Functions Gen2)
-   - Scaffolds an ADK agent project with MCP toolsets, A2UI support, and an A2A FastAPI server
-   - Supports model override via `--model` and `--model-lite` CLI flags
+   - Scaffolds an ADK agent project with MCP toolsets, A2UI support, and an A2A FastAPI server exposing a chat agent (`root_agent` and `deep_analysis_agent` sub-agent) and a background worker (`background_agent` via `/execute_task` runner)
+   - Defaults to **Gemini 3.5 Flash** for all three agents, with support for model override via `--model` and `--model-lite` CLI flags
    - Offers three deployment targets:
      - **[1] Local**: Launches `adk web` on a local port
      - **[2] Cloud Run**: Builds a Docker image and deploys to Cloud Run with `--min-instances 1`

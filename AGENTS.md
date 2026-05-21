@@ -337,6 +337,25 @@ The lines starting with `💡` have no `#` prefix → `SyntaxError: invalid char
 > layer processes ALL content (including comments) before it reaches the heredoc.
 > Rule #1 (no `\n` in string literals) applies equally to comments.
 
+#### Example J: Checking for triple-backtick code blocks inside Python code in Code.gs
+
+When writing Python code inside a quoted heredoc (e.g., `__AGENT_EOF__`), you may need to search string content for markdown code blocks (such as ````python``). Writing literal backticks inside `Code.gs` is strictly forbidden by Rule 8.
+
+**WRONG** — causes `SyntaxError: Unexpected identifier 'python'` during Clasp push:
+```javascript
+# In Code.gs, inside a <<'__AGENT_EOF__' heredoc:
+if "```python" in part.text:
+    return None
+```
+
+**RIGHT** — construct the backtick fence dynamically using character codes:
+```javascript
+# In Code.gs:
+if (chr(96) * 3 + "python") in part.text:
+    return None
+```
+
+
 ### 2.4 ADK Instruction Template Engine Hazard
 
 ADK's `instructions_utils.inject_session_state()` (called automatically before every
@@ -612,6 +631,7 @@ awk 'NR<=N && /<<.*EOF/' Code.gs | tail -1
 | 2026-05-13 | `Firestore not available (client=False, ...)` — background task tools fail | Firestore client init code placed inside `${ enableWorkspaceMcp ? ... }` conditional block from first commit (`6e331c7`). When `enableWorkspaceMcp=false`, init code was never emitted, leaving `builtins._firestore_client` unset | Move Firestore init outside the conditional block; add AGENTS.md Section 10 and Golden Rule #10 |
 | 2026-05-18 | `SyntaxError: Unexpected string` (L7293) | `strip('"')` in Python code inside `__AGENT_EOF__` heredoc — GAS JS parser misinterpreted the bare double quote in the Python string literal | Replace `'"'` with `chr(34)` — avoids GAS parser quote-nesting confusion |
 | 2026-05-19 | `SyntaxError: invalid character '💡' (U+1F4A1)` (L917 in deployed fast_api_app.py) | `\n` in Python comments inside JS template literal: JS converted `\n` to real newline (0x0a), splitting the comment across lines. Second line had no `#` prefix, exposing `💡 Next Actions` as executable Python code | Replace literal `\n` sequences in comments with plain-text descriptions (e.g., `"---" + newline + "### Next Actions"`) |
+| 2026-05-21 | `SyntaxError: Unexpected identifier 'python'` (L7259) | Backtick triplets (` ``` `) used in Python code literal inside heredoc broke JS template literal delimiter in Code.gs during clasp push | Replace with dynamic string construction (`(chr(96) * 3 + "python")`) |
 
 ---
 
