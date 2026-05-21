@@ -93,7 +93,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v9.86-public',
+  APP_VERSION: 'v9.87-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
