@@ -3615,11 +3615,13 @@ export SANDBOX_OUT="/tmp/sandbox_result_$$.txt"
 SANDBOX_TMPDIR=$(mktemp -d)
 pushd "$SANDBOX_TMPDIR" > /dev/null
 GOOGLE_API_USE_CLIENT_CERTIFICATE=false uv run --no-project --with "google-cloud-aiplatform[agent_engines]>=1.112.0" python3 << '__SANDBOX_PROVISION_EOF__'
-import sys, os, warnings, vertexai
+import sys, os, warnings, time, vertexai
 from vertexai import types
 
 # Suppress harmless "STATE_RUNNING is not a valid State" warning from google-genai SDK
 warnings.filterwarnings('ignore', message='STATE_RUNNING is not a valid', category=UserWarning, module='google.genai')
+
+_MAX_RETRIES = 5
 
 print('  📦 Step 1/3: Initializing Vertex AI client (us-central1)...')
 sys.stdout.flush()
@@ -3627,20 +3629,46 @@ client = vertexai.Client(project=os.environ.get('PROJECT_ID', ''), location='us-
 
 print('  📦 Step 2/3: Creating Agent Engine...')
 sys.stdout.flush()
-agent_engine = client.agent_engines.create(
-    config={'display_name': '${dirName}-sandbox'},
-)
+agent_engine = None
+for _attempt in range(_MAX_RETRIES):
+    try:
+        agent_engine = client.agent_engines.create(
+            config={'display_name': '${dirName}-sandbox'},
+        )
+        break
+    except Exception as _e:
+        if _attempt < _MAX_RETRIES - 1:
+            _wait = 15 * (_attempt + 1)
+            print('  ⚠️  Attempt ' + str(_attempt + 1) + '/' + str(_MAX_RETRIES) + ' failed: ' + str(_e)[:200])
+            print('  ⏳ Retrying in ' + str(_wait) + 's...')
+            sys.stdout.flush()
+            time.sleep(_wait)
+        else:
+            raise
 agent_engine_name = agent_engine.api_resource.name
 print('  ✅ Agent Engine: ' + agent_engine_name)
 sys.stdout.flush()
 
 print('  📦 Step 3/3: Creating Sandbox (this may take a few minutes)...')
 sys.stdout.flush()
-sandbox_operation = client.agent_engines.sandboxes.create(
-    name=agent_engine_name,
-    config=types.CreateAgentEngineSandboxConfig(display_name='code-sandbox'),
-    spec={'code_execution_environment': {}},
-)
+sandbox_operation = None
+for _attempt in range(_MAX_RETRIES):
+    try:
+        sandbox_operation = client.agent_engines.sandboxes.create(
+            name=agent_engine_name,
+            config=types.CreateAgentEngineSandboxConfig(display_name='code-sandbox'),
+            spec={'code_execution_environment': {}},
+        )
+        break
+    except Exception as _e:
+        if _attempt < _MAX_RETRIES - 1:
+            _wait = 15 * (_attempt + 1)
+            print('  ⚠️  Attempt ' + str(_attempt + 1) + '/' + str(_MAX_RETRIES) + ' failed: ' + str(_e)[:200])
+            print('  ⏳ Retrying in ' + str(_wait) + 's...')
+            sys.stdout.flush()
+            time.sleep(_wait)
+        else:
+            raise
 sandbox_resource_name = sandbox_operation.response.name
 print('  ✅ Sandbox: ' + sandbox_resource_name)
 
