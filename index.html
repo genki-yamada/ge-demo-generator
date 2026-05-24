@@ -36,6 +36,15 @@
     }
   </script>
   <style>
+    /* Self-contained custom spinner rotation animation for robust PDF loader loading state */
+    @keyframes custom-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .spinner-loader {
+      animation: custom-spin 0.9s linear infinite !important;
+    }
+
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
     body {
@@ -1258,9 +1267,6 @@
                 <span>🧪 <strong>Agent Sandbox (Code Execution):</strong> Next '26 — Secure Python sandbox for advanced analysis, NLP & data science. <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/scale/sandbox/code-execution-overview" target="_blank" class="text-sky-400 underline cursor-pointer hover:text-sky-300 focus:outline-none">Learn more</a></span>
               </div>
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
-                <span>🧠 <strong>Dual-Agent Architecture:</strong> Root Agent (Gemini 3.5 Flash) + Deep Analysis Agent (Gemini 3.5 Flash) — fast response & deep reasoning in one.</span>
-              </div>
-              <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
                 <span><svg class="w-3.5 h-3.5 inline-block -mt-0.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> <strong>External Data Sources:</strong> Browse our curated catalog of MCP servers — government data, finance, legal & more! <button onclick="openMcpModal()" class="text-sky-400 underline cursor-pointer hover:text-sky-300 focus:outline-none">Browse catalog</button></span>
               </div>
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
@@ -1270,13 +1276,7 @@
                 <span>🤖 <strong>A2A + A2UI:</strong> Standard A2A messaging, Human-in-the-loop, and interactive UI components (cards, forms, approvals).</span>
               </div>
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
-                <span>🔥 <strong>Dynamic Ops Viewer:</strong> Real-time Firestore data write-backs and tracking are now active.</span>
-              </div>
-              <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
-                <span>🎨 <strong>Image Summaries:</strong> Intelligent generation of visual presentations for final result outputs.</span>
-              </div>
-              <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
-                <span>⚡ <strong>Autonomous Workflow Operator:</strong> Multi-step dependent workflows — the agent scans, classifies, processes & audits on your behalf.</span>
+                <span>⚡ <strong>Agentic Workflow:</strong> Instantly generate custom zero-code demos with unstructured documents (images/PDFs), AI-proposed SKU mapping chips, and Human-in-the-loop approval!</span>
               </div>
             </div>
 
@@ -4350,11 +4350,52 @@
         if (res.externalFiles && res.externalFiles.length > 0) {
           extFilesSection.classList.remove('hidden');
           res.externalFiles.forEach((file, index) => {
-            // Treat as Excel if file.fileName ends with .xlsx or .csv (we convert CSV to Excel)
             const isExcel = file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.fileName.endsWith('.xlsx') || file.fileName.endsWith('.csv');
-            const fileTypeLabel = isExcel ? 'Excel (.xlsx)' : 'PDF (.pdf)';
-            const fileIcon = isExcel ? '📊' : '📄';
+            const isImage = file.fileName.endsWith('.jpg') || file.fileName.endsWith('.jpeg') || file.fileName.endsWith('.png') || (file.mimeType && file.mimeType.startsWith('image/'));
             
+            const fileTypeLabel = isExcel ? 'Excel (.xlsx)' : (isImage ? 'Image (JPEG/PNG)' : 'PDF (.pdf)');
+            const fileIcon = isExcel ? '📊' : (isImage ? '🖼️' : '📄');
+            
+            // Generate dedicated high-fidelity preview header block for each file type
+            let previewHeaderHtml = '';
+            
+            if (isImage && file.base64Data) {
+              // Image thumbnail preview
+              previewHeaderHtml = `
+                <div class="mb-3 rounded-xl overflow-hidden border border-white/10 bg-black/50 flex items-center justify-center cursor-pointer hover:border-amber-500/40 transition-all aspect-video relative group/img" onclick="openDocModal(${index})" title="Click to preview document">
+                  <img src="data:image/jpeg;base64,${file.base64Data}" class="w-full h-full object-cover hover:scale-[1.03] transition-transform duration-300" alt="${file.fileName}"/>
+                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path></svg>
+                    Preview Document
+                  </div>
+                </div>
+              `;
+            } else if (isExcel) {
+              // Excel Mock Icon Preview Block
+              previewHeaderHtml = `
+                <div class="mb-3 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.03] hover:bg-emerald-500/[0.06] flex flex-col items-center justify-center cursor-pointer hover:border-emerald-500/40 transition-all aspect-video relative group/img" onclick="openDocModal(${index})" title="Click to preview spreadsheet">
+                  <div class="text-3xl mb-1 transition-transform duration-300 group-hover/img:scale-110">📊</div>
+                  <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-mono">Excel Ledger Table</span>
+                  <div class="absolute inset-0 bg-emerald-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5 rounded-xl">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path></svg>
+                    Preview Spreadsheet
+                  </div>
+                </div>
+              `;
+            } else {
+              // PDF Mock Icon Preview Block
+              previewHeaderHtml = `
+                <div class="mb-3 rounded-xl border border-red-500/10 bg-red-500/[0.03] hover:bg-red-500/[0.06] flex flex-col items-center justify-center cursor-pointer hover:border-red-500/40 transition-all aspect-video relative group/img" onclick="openDocModal(${index})" title="Click to preview document">
+                  <div class="text-3xl mb-1 transition-transform duration-300 group-hover/img:scale-110">📄</div>
+                  <span class="text-[10px] font-bold text-red-400 uppercase tracking-widest font-mono">PDF Document Scan</span>
+                  <div class="absolute inset-0 bg-red-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5 rounded-xl">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path></svg>
+                    Preview Document
+                  </div>
+                </div>
+              `;
+            }
+
             const div = document.createElement('div');
             div.className = "flex flex-col justify-between p-4 rounded-xl bg-black/40 border border-white/5 group hover:border-amber-500/30 transition-all shadow-lg";
             div.innerHTML = `
@@ -4363,10 +4404,11 @@
                   <span class="text-xl">${fileIcon}</span>
                   <span class="text-[12px] font-bold text-white font-mono break-all">${file.fileName}</span>
                 </div>
+                ${previewHeaderHtml}
                 <p class="text-[11px] text-gray-400 mb-3">${file.description || 'No description'}</p>
-                <div class="text-[10px] text-gray-500 mb-2">Type: ${fileTypeLabel}</div>
+                <div class="text-[10px] text-gray-500 mb-3">Type: ${fileTypeLabel}</div>
               </div>
-              <button onclick="${isExcel ? 'downloadExternalExcel' : 'downloadExternalPDF'}(${index})" class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-amber-500/20 hover:bg-amber-500 text-amber-400 font-bold rounded-lg text-[11px] transition-all uppercase tracking-wider border border-amber-500/30">
+              <button onclick="${isExcel ? 'downloadExternalExcel' : (isImage ? 'downloadExternalImage' : 'downloadExternalPDF')}(${index})" class="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-400 font-bold rounded-lg text-[11px] transition-all uppercase tracking-wider border border-amber-500/30 cursor-pointer">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                 </svg>
@@ -5006,7 +5048,239 @@
     function downloadScript() { if (currentData) downloadFile(currentData.setupScript, 'setup.sh', 'text/x-shellscript'); }
     function downloadAllCSV() { if (currentData && currentData.rawTables) currentData.rawTables.forEach(t => downloadFile(t.csvData, `${t.tableName}.csv`, 'text/csv')); }
 
-        window.downloadExternalPDF = function(index) {
+    window.downloadExternalImage = function(index) {
+      if (!currentData || !currentData.externalFiles || !currentData.externalFiles[index]) return;
+      const file = currentData.externalFiles[index];
+      if (!file.base64Data) {
+        showToast('No image data available to download.');
+        return;
+      }
+      
+      showToast('Preparing image download...');
+      
+      const byteCharacters = atob(file.base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const mime = file.mimeType || 'image/jpeg';
+      const blob = new Blob([byteArray], {type: mime});
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Image downloaded successfully!');
+    };
+
+    // Universal Document Preview Modal Controller (Image, PDF, Excel/CSV)
+    window.openDocModal = function(index) {
+      if (!currentData || !currentData.externalFiles || !currentData.externalFiles[index]) return;
+      const file = currentData.externalFiles[index];
+      
+      const modal = document.getElementById('docPreviewModal');
+      const title = document.getElementById('docPreviewTitle');
+      const icon = document.getElementById('docPreviewIcon');
+      
+      const viewImg = document.getElementById('previewContainerImage');
+      const viewPdf = document.getElementById('previewContainerPDF');
+      const viewExcel = document.getElementById('previewContainerExcel');
+      
+      if (!modal || !title || !icon) return;
+      
+      // Reset viewports
+      viewImg.classList.replace('flex', 'hidden');
+      viewPdf.classList.replace('flex', 'hidden');
+      viewExcel.classList.replace('flex', 'hidden');
+      
+      title.innerText = file.fileName;
+      
+      const isExcel = file.fileName.endsWith('.xlsx') || file.fileName.endsWith('.csv') || file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      const isImage = file.fileName.endsWith('.jpg') || file.fileName.endsWith('.jpeg') || file.fileName.endsWith('.png') || (file.mimeType && file.mimeType.startsWith('image/'));
+      
+      // Image Viewport Population
+      if (isImage && file.base64Data) {
+        icon.innerText = '🖼️';
+        const img = document.getElementById('imagePreviewSrc');
+        img.src = 'data:image/jpeg;base64,' + file.base64Data;
+        
+        // Shrink card height to fit image perfectly to prevent black borders
+        modal.querySelector('.relative').style.height = 'auto';
+        
+        viewImg.classList.replace('hidden', 'flex');
+      }
+      // PDF Viewport Population (Google Drive Embed Preview with Robust Loading Spinner)
+      else if (file.mimeType === 'application/pdf') {
+        icon.innerText = '📄';
+        
+        const spinner = document.getElementById('pdfLoadingSpinner');
+        const pdfFrame = document.getElementById('pdfPreviewFrame');
+        
+        // Set modal container height to ensure correct vertical space allocation
+        modal.querySelector('.relative').style.height = '85vh';
+        
+        // Reveal the parent container first to allow absolute positioning layout computations to run correctly
+        viewPdf.classList.replace('hidden', 'flex');
+        
+        // Force spinner visibility and ensure iframe stays hidden during loading
+        if (spinner) spinner.classList.remove('hidden');
+        if (pdfFrame) {
+          pdfFrame.src = '';
+          pdfFrame.classList.add('hidden');
+        }
+        
+        showToast('Generating high-fidelity PDF preview...');
+        
+        // Call server to generate and save temp PDF to Google Drive (fully private)
+        google.script.run
+          .withSuccessHandler(function(response) {
+            if (response && response.success && response.fileId) {
+              // Mount Drive preview URL to bypass sandbox restrictions via cookie session
+              pdfFrame.src = 'https://drive.google.com/file/d/' + response.fileId + '/preview';
+              showToast('PDF generated! Loading preview viewer...');
+            } else {
+              if (spinner) spinner.classList.add('hidden');
+              showToast('Failed to generate PDF preview.', 4000);
+            }
+          })
+          .withFailureHandler(function(err) {
+            if (spinner) spinner.classList.add('hidden');
+            showToast('Failed to generate PDF preview: ' + err.message, 4000);
+          })
+          .generatePdfFromServer(file.fileContent || '', file.fileName);
+      }
+      // Excel / CSV Data Table Rendering
+      else if (isExcel) {
+        icon.innerText = '📊';
+        const csvContent = file.fileContent || '';
+        
+        const head = document.getElementById('excelPreviewHead');
+        const body = document.getElementById('excelPreviewBody');
+        
+        // Clear containers
+        head.innerHTML = '';
+        body.innerHTML = '';
+        
+        // Remove any previously injected metadata div
+        const existingMeta = viewExcel.querySelector('.excel-metadata');
+        if (existingMeta) existingMeta.remove();
+        
+        if (csvContent) {
+          // Support both LF and CRLF line endings
+          const rawRows = csvContent.split(/\r?\n/).map(row => row.trim()).filter(row => row.length > 0);
+          
+          if (rawRows.length > 0) {
+            // Determine delimiter dynamically per line (tab or comma)
+            const parsedLines = rawRows.map(row => {
+              const delim = row.includes('\t') ? '\t' : ',';
+              return row.split(delim).map(col => col.replace(/"/g, '').trim());
+            });
+            
+            // Detect maximum columns to distinguish data table from metadata rows
+            const maxCols = Math.max(...parsedLines.map(cols => cols.length));
+            
+            const metadataLines = [];
+            let tableHeaderIndex = -1;
+            
+            // Distinguish header and metadata
+            for (let i = 0; i < parsedLines.length; i++) {
+              if (parsedLines[i].length === maxCols && tableHeaderIndex === -1) {
+                tableHeaderIndex = i;
+              } else if (tableHeaderIndex === -1) {
+                metadataLines.push(parsedLines[i].join(' '));
+              }
+            }
+            
+            // If no clear header found, default to row 0
+            if (tableHeaderIndex === -1) tableHeaderIndex = 0;
+            
+            // Render Top Metadata block if exists
+            if (metadataLines.length > 0) {
+              const metaDiv = document.createElement('div');
+              metaDiv.className = "excel-metadata mb-4 p-3.5 rounded-xl bg-slate-900/80 border border-white/5 flex flex-col gap-1.5 text-[10.5px] text-gray-400 font-sans";
+              metadataLines.forEach(meta => {
+                const p = document.createElement('p');
+                p.className = "leading-relaxed flex items-center gap-1.5";
+                p.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>${meta}`;
+                metaDiv.appendChild(p);
+              });
+              viewExcel.insertBefore(metaDiv, viewExcel.firstChild);
+            }
+            
+            // Build Dynamic Table Headers
+            const headers = parsedLines[tableHeaderIndex];
+            const trHead = document.createElement('tr');
+            headers.forEach(col => {
+              const th = document.createElement('th');
+              th.className = "px-4 py-3 font-bold border-b border-white/10 text-[10px] uppercase tracking-wider text-sky-400 bg-slate-900/90 font-sans";
+              th.innerText = col || 'Column';
+              trHead.appendChild(th);
+            });
+            head.appendChild(trHead);
+            
+            // Build Dynamic Table Rows
+            let stripeCount = 0;
+            for (let i = tableHeaderIndex + 1; i < parsedLines.length; i++) {
+              const rowData = parsedLines[i];
+              if (rowData.length === 0 || rowData[0] === '') continue;
+              
+              const trRow = document.createElement('tr');
+              trRow.className = stripeCount % 2 === 0 ? "bg-white/[0.02] hover:bg-white/[0.05] transition-colors" : "bg-transparent hover:bg-white/[0.05] transition-colors";
+              stripeCount++;
+              
+              // Fill cells (pad if columns mismatch)
+              for (let j = 0; j < headers.length; j++) {
+                const td = document.createElement('td');
+                td.className = "px-4 py-2.5 border-b border-white/5 text-gray-300 break-all max-w-[250px]";
+                td.innerText = rowData[j] !== undefined ? rowData[j] : '';
+                trRow.appendChild(td);
+              }
+              body.appendChild(trRow);
+            }
+          }
+        }
+        
+        modal.querySelector('.relative').style.height = '85vh';
+        viewExcel.classList.replace('hidden', 'flex');
+      }
+      
+      // Fade-in Modal
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      setTimeout(() => {
+        modal.classList.remove('opacity-0');
+      }, 10);
+    };
+
+    window.closeDocModal = function() {
+      const modal = document.getElementById('docPreviewModal');
+      if (!modal) return;
+      
+      modal.classList.add('opacity-0');
+      setTimeout(() => {
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
+      }, 300);
+    };
+
+    // Dismiss PDF loading spinner when the iframe is completely loaded with a valid Drive URL
+    window.onPdfFrameLoad = function() {
+      const spinner = document.getElementById('pdfLoadingSpinner');
+      const pdfFrame = document.getElementById('pdfPreviewFrame');
+      
+      // Guard: Avoid firing on empty or about:blank reset sources (Strictly wait for Drive compilation)
+      if (pdfFrame && pdfFrame.src && pdfFrame.src.includes('drive.google.com')) {
+        if (spinner) spinner.classList.add('hidden');
+        pdfFrame.classList.remove('hidden');
+      }
+    };
+
+    window.downloadExternalPDF = function(index) {
       if (!currentData || !currentData.externalFiles || !currentData.externalFiles[index]) return;
       const file = currentData.externalFiles[index];
       
@@ -5358,9 +5632,59 @@
     }
   </script>
 
+  <!-- Universal Document Preview Modal (PDF / Excel / Image) -->
+  <div id="docPreviewModal" class="fixed inset-0 z-50 hidden items-center justify-center p-6 bg-black/85 backdrop-blur-sm transition-all duration-300 opacity-0" onclick="closeDocModal()">
+    <!-- Modal Card: Responsive max-w-5xl wide canvas for documents -->
+    <div class="relative max-w-5xl w-full h-[85vh] flex flex-col rounded-2xl overflow-hidden border border-white/10 bg-slate-950/95 shadow-2xl cursor-default" onclick="event.stopPropagation()">
+      <!-- Header -->
+      <div class="w-full p-4 flex items-center justify-between border-b border-white/5 bg-slate-950 z-10">
+        <div class="flex items-center gap-2.5">
+          <span id="docPreviewIcon" class="text-lg">📄</span>
+          <h4 id="docPreviewTitle" class="text-xs font-bold text-gray-300 font-mono break-all pr-4">document.pdf</h4>
+        </div>
+        <button onclick="closeDocModal()" aria-label="Close Preview" class="text-gray-400 hover:text-white focus:outline-none rounded-lg p-1 transition-colors hover:bg-white/5 border border-white/5 cursor-pointer">
+          <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      
+      <!-- Content Viewports -->
+      <div class="flex-1 w-full overflow-hidden relative flex flex-col">
+        <!-- 1. Image Viewport -->
+        <div id="previewContainerImage" class="hidden w-full h-full items-center justify-center bg-black/30">
+          <img id="imagePreviewSrc" src="" class="max-w-full max-h-[75vh] object-contain block" alt="Image Preview"/>
+        </div>
+        
+        <!-- 2. PDF Viewport (Embedded Interactive Chrome PDF Reader with robust dynamic spinner) -->
+        <div id="previewContainerPDF" class="hidden flex-1 w-full h-full p-3 bg-slate-900/40 relative flex flex-col items-center justify-center">
+          <!-- Dedicated PDF Loading Spinner (Visible during server-side generation and iframe loading) -->
+          <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 z-20 rounded-xl gap-3.5">
+            <div class="w-10 h-10 rounded-full border-4 border-sky-500/20 border-t-sky-500 spinner-loader"></div>
+            <span class="text-[10px] font-bold text-sky-400 uppercase tracking-widest animate-pulse">Generating High-Fidelity PDF... Please Wait</span>
+          </div>
+          <!-- PDF Frame: Calls window.onPdfFrameLoad() when rendering is fully complete -->
+          <iframe id="pdfPreviewFrame" src="" class="w-full h-full rounded-xl border border-white/10 hidden" style="background: #1e293b;" onload="window.onPdfFrameLoad()"></iframe>
+        </div>
+        
+        <!-- 3. Excel / CSV Viewport (Stylized High-Fidelity Data Table) -->
+        <div id="previewContainerExcel" class="hidden w-full h-full overflow-auto p-5 bg-slate-950/40">
+          <div class="overflow-x-auto rounded-xl border border-white/5 bg-slate-900/20 shadow-inner no-scrollbar">
+            <table id="excelPreviewTable" class="w-full border-collapse text-left text-[10.5px] font-mono text-gray-300">
+              <thead id="excelPreviewHead" class="bg-slate-900/80 sticky top-0 border-b border-white/10 text-gray-400 uppercase tracking-wider">
+                <!-- Headers injected here -->
+              </thead>
+              <tbody id="excelPreviewBody" class="divide-y divide-white/5">
+                <!-- Rows injected here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Feature Notification Modal -->
   <div id="featureNotifyModal">
-    <div class="glass max-w-lg w-full rounded-3xl p-7 border border-white/10 shadow-2xl fade-in relative">
+    <div class="glass max-w-2xl w-full rounded-3xl p-7 border border-white/10 shadow-2xl fade-in relative">
       <!-- Close Button -->
       <button onclick="closeFeatureNotify(false)" aria-label="Close" class="absolute top-5 right-5 text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 rounded-lg p-1 transition-colors z-10">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -5377,16 +5701,242 @@
         <p class="text-gray-400 text-xs">4 powerful capabilities to elevate your demos</p>
       </div>
 
-      <!-- Feature 1: Gemini 3.5 Flash -->
-      <div class="feature-card mb-3">
-        <div class="flex gap-3">
-          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/15 to-teal-500/15 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+      <!-- Feature 1: Agentic Workflow -->
+      <div class="feature-card mb-4">
+        <div class="flex gap-3 mb-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/15 flex items-center justify-center text-amber-400 border border-amber-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h4 class="text-sm font-bold text-white mb-0.5">Gemini 3.5 Flash Default</h4>
-            <p class="text-[11px] text-gray-400 leading-relaxed">Announced at Google I/O 2026, Gemini 3.5 Flash is now the default model powering all agent operations. <span class="text-emerald-400/80">Experience blazing-fast reasoning speed and advanced multi-step execution.</span></p>
+            <h4 class="text-sm font-bold text-white mb-0.5">Agentic Workflow</h4>
+            <p class="text-[11px] text-gray-200 leading-relaxed">Instantly generate highly tailored <span class="font-bold text-amber-400">agentic workflows</span> using unstructured documents (images/PDFs). The synthesized demo lets your agent read fuzzy documents, self-correct ambiguities against BigQuery master tables, and present smart A2UI dropdown recommendations for direct approval. <span class="text-amber-400/80">Win your customer pitches by demonstrating advanced Human-in-the-loop autonomous operations in minutes. Just describe your scenario — the generator builds the data, custom business documents, DB tables, and agent instructions instantly with zero coding.</span></p>
           </div>
+        </div>
+        <!-- Agentic Workflow Inline Dynamic SVG Animation (ULTRA ENLARGED VERTICAL STACK - width 100% to fill 672px modal) -->
+        <div class="mt-3 rounded-xl overflow-hidden relative group">
+          <svg viewBox="0 0 600 260" class="w-full h-auto bg-slate-950/70 rounded-xl border border-amber-500/20 p-4" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <!-- Colors and Gradients -->
+              <linearGradient id="sparkleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#f59e0b" />
+                <stop offset="100%" stop-color="#d97706" />
+              </linearGradient>
+              <linearGradient id="dbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#38bdf8" />
+                <stop offset="100%" stop-color="#0284c7" />
+              </linearGradient>
+              <linearGradient id="activeHeaderGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.02"/>
+                <stop offset="50%" stop-color="#fbbf24" stop-opacity="0.15"/>
+                <stop offset="100%" stop-color="#fbbf24" stop-opacity="0.02"/>
+              </linearGradient>
+              
+              <!-- CSS Animation -->
+              <style>
+                @keyframes flowDot {
+                  0% { stroke-dashoffset: 40; }
+                  100% { stroke-dashoffset: 0; }
+                }
+                @keyframes dbPulse {
+                  0%, 76%, 91%, 100% { fill-opacity: 0.15; stroke: #475569; filter: none; }
+                  77%, 90% { fill-opacity: 0.4; stroke: #38bdf8; filter: drop-shadow(0 0 6px #38bdf8); }
+                }
+                @keyframes highlightFocus {
+                  0%, 100% { stroke: #334155; }
+                  50% { stroke: #fbbf24; filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.35)); }
+                }
+                
+                /* Mega Timeline: Cursor path movement & clicking (10s loop) */
+                @keyframes cursorMove {
+                  0%, 10%, 100% { transform: translate(300px, 170px) scale(1); }
+                  18% { transform: translate(90px, 100px) scale(1); }
+                  20% { transform: translate(90px, 100px) scale(0.82); } /* Click Chip A */
+                  22%, 28% { transform: translate(90px, 100px) scale(1); }
+                  35% { transform: translate(165px, 144px) scale(1); }
+                  37% { transform: translate(165px, 144px) scale(0.82); } /* Click Qty TextField */
+                  40%, 48% { transform: translate(165px, 144px) scale(1); }
+                  56% { transform: translate(240px, 100px) scale(1); }
+                  58% { transform: translate(240px, 100px) scale(0.82); } /* Click Chip B */
+                  60%, 68% { transform: translate(240px, 100px) scale(1); }
+                  76% { transform: translate(170px, 184px) scale(1); }
+                  78% { transform: translate(170px, 184px) scale(0.82); } /* Click Approve Button */
+                  82%, 90% { transform: translate(170px, 184px) scale(1); }
+                }
+
+                /* Button A (Standard SKU) States */
+                @keyframes buttonAState {
+                  0%, 19%, 58%, 100% { fill: #1e293b; stroke: #475569; stroke-width: 1; filter: none; }
+                  20%, 57% { fill: rgba(251, 191, 36, 0.12); stroke: #fbbf24; stroke-width: 1.5; filter: drop-shadow(0 2px 6px rgba(251,191,36,0.15)); }
+                }
+                @keyframes textAState {
+                  0%, 19%, 58%, 100% { fill: #64748b; font-weight: normal; }
+                  20%, 57% { fill: #fbbf24; font-weight: bold; }
+                }
+                @keyframes checkAState {
+                  0%, 19%, 58%, 100% { opacity: 0; }
+                  20%, 57% { opacity: 1; }
+                }
+
+                /* Button B (Premium SKU) States */
+                @keyframes buttonBState {
+                  0%, 19%, 58%, 100% { fill: rgba(251, 191, 36, 0.12); stroke: #fbbf24; stroke-width: 1.5; filter: drop-shadow(0 2px 6px rgba(251,191,36,0.15)); }
+                  20%, 57% { fill: #1e293b; stroke: #475569; stroke-width: 1; filter: none; }
+                }
+                @keyframes textBState {
+                  0%, 19%, 58%, 100% { fill: #fbbf24; font-weight: bold; }
+                  20%, 57% { fill: #64748b; font-weight: normal; }
+                }
+                @keyframes checkBState {
+                  0%, 19%, 58%, 100% { opacity: 1; }
+                  20%, 57% { opacity: 0; }
+                }
+
+                /* Qty Value Text States: AI Mismatched Qty (720) vs Human Corrected Qty (120) */
+                @keyframes qtyErrState {
+                  0%, 36% { opacity: 1; }
+                  37%, 100% { opacity: 0; }
+                }
+                @keyframes qtyOkState {
+                  0%, 36% { opacity: 0; }
+                  37%, 100% { opacity: 1; }
+                }
+
+                /* Approve Button Clicking State */
+                @keyframes approveBtnState {
+                  0%, 77%, 82%, 100% { fill: #1e3a8a; stroke: #3b82f6; }
+                  78%, 81% { fill: #1d4ed8; stroke: #60a5fa; filter: drop-shadow(0 0 4px #3b82f6); }
+                }
+
+                .anim-cursor {
+                  animation: cursorMove 8s infinite ease-in-out;
+                  transform-origin: 0 0;
+                }
+                .anim-btn-a { animation: buttonAState 8s infinite ease-in-out; }
+                .anim-txt-a { animation: textAState 8s infinite ease-in-out; }
+                .anim-chk-a { animation: checkAState 8s infinite ease-in-out; }
+                
+                .anim-btn-b { animation: buttonBState 8s infinite ease-in-out; }
+                .anim-txt-b { animation: textBState 8s infinite ease-in-out; }
+                .anim-chk-b { animation: checkBState 8s infinite ease-in-out; }
+
+                .anim-qty-err { animation: qtyErrState 8s infinite ease-in-out; }
+                .anim-qty-ok { animation: qtyOkState 8s infinite ease-in-out; }
+                .anim-btn-approve { animation: approveBtnState 8s infinite ease-in-out; }
+
+                .anim-flow {
+                  stroke-dasharray: 8, 8;
+                  animation: flowDot 2s infinite linear;
+                }
+                .anim-db {
+                  animation: dbPulse 8s infinite ease-in-out;
+                }
+                .anim-card-focus {
+                  animation: highlightFocus 4s infinite ease-in-out;
+                }
+              </style>
+            </defs>
+
+            <!-- Background Grid Patterns (Tech Vibe) -->
+            <g opacity="0.02">
+              <path d="M0 40 H600 M0 80 H600 M0 120 H600 M0 160 H600 M0 200 H600 M0 240 H600" stroke="#fff" stroke-width="1"/>
+              <path d="M100 0 V280 M200 0 V280 M300 0 V280 M400 0 V280 M500 0 V280" stroke="#fff" stroke-width="1"/>
+            </g>
+
+            <!-- ================= LEFT: UNSTRUCTURED INPUT (Highly Minimized - Centered on Y=125) ================= -->
+            <g transform="translate(15, 65)" opacity="0.35">
+              <rect x="0" y="0" width="70" height="110" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+              <path d="M12 20 H58 M12 35 H45 M12 50 H52" stroke="#64748b" stroke-width="3" stroke-linecap="round"/>
+              <!-- handwritten qty in document -->
+              <path d="M12 70 Q25 65, 35 72 T58 68" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+              <!-- Original Quantity Label -->
+              <text x="35" y="92" text-anchor="middle" fill="#f59e0b" font-size="9" font-family="monospace" font-weight="bold">"Qty: 120"</text>
+              <rect x="40" y="98" width="20" height="20" rx="3" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+              <path d="M45 108 L48 112 L54 104" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="35" y="123" text-anchor="middle" fill="#64748b" font-size="9" font-weight="bold" font-family="sans-serif">RAW DOC</text>
+            </g>
+
+            <!-- ================= MIDDLE: AGENTIC INTERACTION (MEGA ENLARGED CARD & CENTER-ALIGNED) ================= -->
+            <g transform="translate(130, 20)">
+              <!-- Card Container with breathing focus border -->
+              <rect class="anim-card-focus" x="0" y="0" width="340" height="215" rx="16" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+              
+              <!-- Center-Aligned Header -->
+              <rect x="1" y="1" width="338" height="30" rx="15" fill="url(#activeHeaderGrad)"/>
+              <text x="170" y="19" text-anchor="middle" fill="#fbbf24" font-size="9" font-weight="bold" font-family="sans-serif" letter-spacing="0.8">AI PROPOSED SKU (A2UI)</text>
+              <line x1="0" y1="31" x2="340" y2="31" stroke="#334155" stroke-width="1"/>
+              
+              <!-- 1. Raw Text Box (Centered) -->
+              <text x="170" y="48" text-anchor="middle" fill="#94a3b8" font-size="8.5" font-family="sans-serif">Original Handwritten Value</text>
+              <text x="170" y="61" text-anchor="middle" fill="#cbd5e1" font-size="11" font-weight="bold" font-family="monospace">"Prod-B / Qty: 120"</text>
+              
+              <!-- Process Flow Downward Arrow (Perfect Center Align) -->
+              <path d="M170 68 V78" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M166 74 L170 78 L174 74" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+              <!-- 2. Single-Select Multi-Button Chips (AI Proposals - Large & Center-Aligned) -->
+              <g transform="translate(0, 84)">
+                <!-- Unselected Option (Standard SKU) -->
+                <g transform="translate(25, 0)">
+                  <rect class="anim-btn-a" x="0" y="0" width="140" height="32" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+                  <text class="anim-txt-a" x="70" y="19" text-anchor="middle" fill="#64748b" font-size="8.5" font-family="sans-serif"><tspan class="anim-chk-a" fill="#fbbf24" font-weight="bold">✓ </tspan>PRD-A: Standard (350ml)</text>
+                </g>
+                
+                <!-- Selected Active Option (AI Recommended Premium SKU - Highlighted & Checked) -->
+                <g transform="translate(175, 0)">
+                  <rect class="anim-btn-b" x="0" y="0" width="140" height="32" rx="8" fill="#fbbf24" fill-opacity="0.15" stroke="#fbbf24" stroke-width="1.5" filter="drop-shadow(0 2px 6px rgba(251,191,36,0.15))"/>
+                  <text class="anim-txt-b" x="70" y="19" text-anchor="middle" fill="#fbbf24" font-size="8.5" font-weight="bold" font-family="sans-serif"><tspan class="anim-chk-b" fill="#fbbf24" font-weight="bold">✓ </tspan>PRD-B: Premium (500ml)</text>
+                </g>
+              </g>
+
+              <!-- 3. Editable Qty Field (Centered with AI Mismatch [720] → Human Corrected [120] Story) -->
+              <g transform="translate(0, 128)">
+                <!-- Label & Input Box centered together -->
+                <text x="115" y="18" text-anchor="end" fill="#94a3b8" font-size="9" font-family="sans-serif">AI Recognized Qty:</text>
+                <rect x="125" y="4" width="50" height="20" rx="5" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+                
+                <!-- Dynamic Qty value switching (720 in Red → 120 in Blue) -->
+                <text class="anim-qty-err" x="150" y="18" text-anchor="middle" fill="#f87171" font-size="11" font-weight="bold" font-family="monospace">720</text>
+                <text class="anim-qty-ok" x="150" y="18" text-anchor="middle" fill="#38bdf8" font-size="11" font-weight="bold" font-family="monospace">120</text>
+                
+                <text x="182" y="18" fill="#64748b" font-size="8" font-family="sans-serif">(AI Mismatch → Click to Edit)</text>
+              </g>
+
+              <!-- 4. Giant Approve Button (Centered) -->
+              <g transform="translate(20, 168)">
+                <rect class="anim-btn-approve" x="0" y="0" width="300" height="32" rx="8" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.2))"/>
+                <text x="150" y="20" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold" font-family="sans-serif" letter-spacing="0.5">⚡ APPROVE &amp; EXECUTE ACTION</text>
+              </g>
+              
+              <!-- Dynamic Mouse Cursor Overlay -->
+              <g class="anim-cursor">
+                <path d="M0 0 L0 16 L4.5 12 L8.5 19 L10 18 L6.5 11.5 L11 11 Z" fill="white" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+              </g>
+            </g>
+
+            <!-- ================= RIGHT: ENTERPRISE DATABASE (Minimized - Centered on Y=125) ================= -->
+            <g transform="translate(515, 65)" opacity="0.35">
+              <g class="anim-db">
+                <ellipse cx="30" cy="20" rx="18" ry="6" fill="#0284c7" stroke="#38bdf8" stroke-width="1"/>
+                <path d="M12 20 V65 A 18 6 0 0 0 48 65 V20" fill="#0284c7" fill-opacity="0.15" stroke="#38bdf8" stroke-width="1"/>
+                <ellipse cx="30" cy="38" rx="18" ry="6" stroke="#38bdf8" stroke-dasharray="2,2" stroke-width="0.8"/>
+                <ellipse cx="30" cy="52" rx="18" ry="6" stroke="#38bdf8" stroke-dasharray="2,2" stroke-width="0.8"/>
+                <text x="30" y="95" text-anchor="middle" fill="#38bdf8" font-size="9" font-family="monospace" font-weight="bold">Enterprise DB</text>
+              </g>
+            </g>
+
+            <!-- ================= COMPACT FLOW CONNECTORS (Aligned on Y=120) ================= -->
+            <path d="M90 120 H120" stroke="#475569" stroke-dasharray="3,3" stroke-width="1.2"/>
+            <path class="anim-flow" d="M90 120 H120" stroke="#f59e0b" stroke-width="2" opacity="0.8"/>
+
+            <path d="M480 120 H510" stroke="#475569" stroke-dasharray="3,3" stroke-width="1.2"/>
+            <path class="anim-flow" d="M480 120 H510" stroke="#38bdf8" stroke-width="2" opacity="0.8"/>
+
+            <rect x="88" y="98" width="36" height="13" rx="3" fill="#1e293b" stroke="#f59e0b" stroke-opacity="0.3" stroke-width="1"/>
+            <text x="106" y="107" text-anchor="middle" fill="#f59e0b" font-size="7" font-weight="bold" font-family="sans-serif">1. Input</text>
+
+            <rect x="476" y="98" width="36" height="13" rx="3" fill="#1e293b" stroke="#38bdf8" stroke-opacity="0.3" stroke-width="1"/>
+            <text x="494" y="107" text-anchor="middle" fill="#38bdf8" font-size="7" font-weight="bold" font-family="sans-serif">2. Commit</text>
+          </svg>
         </div>
       </div>
 

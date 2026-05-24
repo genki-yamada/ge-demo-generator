@@ -93,7 +93,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v9.87-public',
+  APP_VERSION: 'v9.9-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -627,7 +627,27 @@ function planAndGenerateData(userGoal, options) {
       }
     }
   }
-  
+  // Generate in-memory simulated images using Vertex AI gemini-3-pro-image-preview
+  if (parsed.externalFiles && parsed.externalFiles.length > 0) {
+    console.log('[ImageGen-Pipeline] Scanning externalFiles for dynamic images...');
+    for (let i = 0; i < parsed.externalFiles.length; i++) {
+      const file = parsed.externalFiles[i];
+      if (file.mimeType && file.mimeType.startsWith('image/') && file.imagePrompt) {
+        try {
+          console.log(`[ImageGen-Pipeline] Generating simulated image for [${file.fileName}]...`);
+          const genResult = generateImageBase64WithRetry(file.imagePrompt);
+          
+          file.base64Data = genResult.base64Data;
+          file.mimeType = genResult.mimeType || file.mimeType;
+          
+          console.log(`[ImageGen-Pipeline] SUCCESS! Bound base64 image data to file: ${file.fileName}`);
+        } catch (imgErr) {
+          console.error(`[ImageGen-Pipeline] FAILED to generate image for ${file.fileName}: ${imgErr.message}`);
+        }
+      }
+    }
+  }
+
   // Validation and Clean-up
   validateGeneratedData(parsed, options.rowCount, options.dataProfile);
 
@@ -657,7 +677,7 @@ function planAndGenerateData(userGoal, options) {
  * @private
  */
 function getTechnicalInstruction_() {
-  return "Technical instructions for the agent regarding tool usage and system behavior. ===MOST IMPORTANT RULE=== **OUTPUT PLACEMENT**: Any text you write in the SAME response as a function_call (tool call) is HIDDEN from the user. It goes to 'thinking' and the user NEVER sees it. Therefore: (1) When calling ANY tool, write ONLY a short progress line like '🔍 Analyzing...' — nothing else. (2) Your full report, A2UI cards, images, and chips MUST go in a SEPARATE response that has ZERO tool calls. **BAD EXAMPLE (report hidden)**: Response contains BOTH text='Analysis: The Maeda account shows...[full report]' AND function_call=generate_image(...) → The full report is HIDDEN in thinking. User sees nothing. **GOOD EXAMPLE (report visible)**: Step 1 response: text='📊 Generating image...' + function_call=generate_image(...) → Only progress shown in thinking. Step 2 response (after image result): text='Analysis: The Maeda account shows...[full report]' + <a2ui-json>...</a2ui-json> → User sees everything. NEVER combine analytical text with function calls. ===END MOST IMPORTANT RULE=== 4. **VISUALIZATION**: Instruct the agent to use the 'generate_image' tool to create a visual representation of its findings. **This visual MUST be in the style of a professional business document or slide (e.g., an Executive Summary card, a high-level business infographic) that summarizes the insights. The agent MUST use the following style elements by default: 'Professional business presentation slide', 'Clean layout', 'Structured design', 'Executive summary at the top', 'Data visualization', 'Infographic charts', 'Bullet points', 'Flowchart', 'Corporate blue and gray palette', 'Minimalist color scheme', 'High resolution', 'Crisp text placeholders', and 'Modern typography'. The agent MUST NOT include any mention of specific names of consulting firms or the phrase 'consulting firm' in the prompt for the image unless the user explicitly specifies it. The agent MUST include specific KPIs, key metrics, and structured data summaries (like a mini-table or chart layout) in the prompt for the image to ensure high information density. The agent MUST NOT generate simple photos or renders of the products themselves.** **CRITICAL**: The agent MUST ONLY generate these visuals for actual result outputs that answer the inquiry, and NOT for follow-up questions, clarifications, or intermediate responses. **ANTI-HALLUCINATION (CRITICAL)**: The prompt for the generated image MUST ONLY contain factual data, metrics, and insights derived directly from the analyzed data. It MUST NOT contain any hallucinated information, fabricated numbers, or speculative content. **LANGUAGE CONSISTENCY**: The agent MUST ensure that all text elements within the generated image (such as titles, labels, and metrics) are rendered in the same language the user uses for interaction (e.g., if the user interacts in Japanese, the text in the image must be in Japanese). 5. Instruct to wait for user input before acting, but be persistent in error recovery. 6. **TRANSPARENCY & GROUNDING (CRITICAL)**: Instruct the agent to be highly transparent about its reasoning, explicitly mentioning which tables and files it is consulting and what specific values it found, to ensure the user can trace its logic back to the source data and avoid the perception of hallucination. 7. **FIRESTORE INTEGRATION (CRITICAL)**: Explicitly instruct the agent that it has access to a live operational database via MCP and that it should proactively write updates back to resolve issues. 8. **CONFIRMATION WORKFLOW (CRITICAL)**: Explicitly instruct the agent that whenever a user asks to insert, update, delete, or merge data in BigQuery or Firestore, the agent MUST NEVER execute the operation immediately. Instead, the agent MUST ALWAYS present a clear summary of the proposed database action and ask the human user for explicit confirmation. NEVER ask for confirmation using plain text — you MUST ALWAYS use an A2UI interactive card with <a2ui-json> tags for ALL confirmation requests, without exception. The card MUST contain a preview of the data before and after the update. When asking for confirmation, the agent MUST include an A2UI interactive card in its response. Whenever you output ANY A2UI JSON payload (including confirmation cards with \"beginRendering\" or cleanup commands with \"deleteSurface\"), you MUST wrap the JSON payload in <a2ui-json> and </a2ui-json> tags. Example: Conversational text... \\n<a2ui-json>\\n[\\n  { \\n    \"beginRendering\": { \\n      \"surfaceId\": \"confirmation-surface\", \\n      \"root\": \"root\" \\n    } \\n  },\\n  { \\n    \"surfaceUpdate\": {\\n      \"surfaceId\": \"confirmation-surface\",\\n      \"components\": [\\n        {\\n          \"id\": \"root\",\\n          \"component\": {\\n            \"Card\": {\\n              \"child\": \"mainColumn\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"mainColumn\",\\n          \"component\": {\\n            \"Column\": {\\n              \"children\": {\\n                \"explicitList\": [\\n                  \"titleText\",\\n                  \"beforeText\",\\n                  \"afterText\",\\n                  \"actionRow\"\\n                ]\\n              },\\n              \"distribution\": \"spaceAround\",\\n              \"alignment\": \"center\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"titleText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"Confirm Data Update\"\\n              },\\n              \"usageHint\": \"h2\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"beforeText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"Before: [Previous Data Summary]\"\\n              },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"afterText\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": {\\n                \"literalString\": \"After: [New Data Summary]\"\\n              },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"actionRow\",\\n          \"component\": {\\n            \"Row\": {\\n              \"children\": {\\n                \"explicitList\": [\\n                  \"btnApprove\",\\n                  \"btnReject\"\\n                ]\\n              },\\n              \"distribution\": \"spaceEvenly\",\\n              \"alignment\": \"center\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"btnApprove\",\\n          \"component\": {\\n            \"Button\": {\\n              \"child\": \"lblApprove\",\\n              \"action\": {\\n                \"name\": \"sendText\",\\n                \"context\": [\\n                  { \"key\": \"text\", \"value\": { \"literalString\": \"Approved\" } }\\n                ]\\n              }\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"lblApprove\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": { \"literalString\": \"Approve & Execute\" },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"btnReject\",\\n          \"component\": {\\n            \"Button\": {\\n              \"child\": \"lblReject\",\\n              \"action\": {\\n                \"name\": \"sendText\",\\n                \"context\": [\\n                  { \"key\": \"text\", \"value\": { \"literalString\": \"Rejected\" } }\\n                ]\\n              }\\n            }\\n          }\\n        },\\n        {\\n          \"id\": \"lblReject\",\\n          \"component\": {\\n            \"Text\": {\\n              \"text\": { \"literalString\": \"Reject\" },\\n              \"usageHint\": \"body\"\\n            }\\n          }\\n        }\\n      ]\\n    }\\n  }\\n]</a2ui-json> so that the user can approve the operation with a single click. After the user approves and the database operation is executed successfully, you MUST issue a deleteSurface command to remove the confirmation card from the UI. Example: <a2ui-json>[{ \"deleteSurface\": { \"surfaceId\": \"confirmation-surface\" } }]</a2ui-json> 9. **OUTPUT PLACEMENT (HIGHEST PRIORITY — RULE #0)**: When you call a tool (e.g., execute_sql, generate_image), any text you include in the SAME response as the tool call will be hidden from the user (shown only in the thinking/reasoning section). Therefore, you MUST follow these rules strictly: (a) When calling tools, include ONLY brief progress indicators (e.g., \"🔍 Analyzing data...\") — NEVER include analytical reports, data summaries, or A2UI JSON in the same response as a tool call. (b) ALL substantive content — full analytical reports, data summaries, insights, A2UI dashboard cards, A2UI suggestion chips, and image references — MUST appear in your FINAL response that contains NO tool calls. (c) After receiving the last tool result (e.g., image generation result), your final response MUST contain the COMPLETE analysis report, A2UI interactive dashboards, and A2UI suggestion chips. Do NOT assume the user has seen any text from your earlier tool-calling responses. (d) If you violate this rule, the user will only see a brief summary instead of your full analysis. 10. **A2UI INTERACTIVE UI PATTERNS (CRITICAL)**: You MUST proactively use A2UI interactive components whenever presenting analytical results, entity profiles, or structured data. Plain text is NOT acceptable for these outputs. **PATTERN SELECTION — DECISION TABLE**: Match the data you are presenting to the correct pattern below. ALWAYS check this table before generating A2UI. --- TRIGGER → PATTERN → REQUIRED COMPONENTS --- (A) Single entity analysis (person, company, facility, product) → **Dashboard Card**: Card with title (entity name), subtitle (key attributes), Divider, KPI Row (3-4 metrics as Column pairs of title+caption), Divider, insights section with emoji indicators, Divider, action Row with 2-3 Buttons (sendText). Use Icon for status indicators, List for timeline/history. → MUST USE: Icon, List or Tabs (B) Ranked or scored data (Top N, leaderboard, performance ranking) → **Ranking / Leaderboard**: Card with numbered items using emoji medals (🥇🥈🥉), scores, key metrics per item, Divider between items, and drill-down action buttons per item. → MUST USE: Icon (C) Multiple entities side-by-side (departments, products, candidates) → **Comparison Matrix**: Row of Columns with matching KPIs for side-by-side visual comparison. Each Column represents one entity. End with an insight summary and action buttons. → MUST USE: Row of Columns (D) Before/After or multi-view data (data modification preview, scenario comparison, period comparison) → **Tabbed Comparison**: Use Tabs component with tabItems containing title (object with literalString) and child. IMPORTANT: Each tab child MUST be a Column whose FIRST element is a Divider to create visual spacing. Include at least Before/After or Period1/Period2 tabs. → MUST USE: Tabs (E) Multi-step recommendations (action plan, strategy, remediation steps) → **Action Plan**: Card with numbered steps using timeline markers (1️⃣2️⃣3️⃣), expected outcomes per step, responsible party or resource, and action buttons to execute each step. Use Icon + List for step items. → MUST USE: List, Icon (F) Location or map search results → **Location Card**: Card listing each place with name, rating stars (⭐), address, key details. Include action buttons for route calculation or detail lookup. → MUST USE: Icon (G) User input needed (edit, create, configure data) → **Interactive Form**: Card with TextField (label as object with literalString), MultipleChoice (variant: chips or dropdown), Slider, DateTimeInput, CheckBox. **DATA BINDING (CRITICAL)**: You MUST send a separate dataModelUpdate message (immediately after beginRendering and before surfaceUpdate) to set initial values for all form fields under a /form/ namespace. The beginRendering message MUST contain ONLY surfaceId and root — do NOT put dataModel inside beginRendering. All input components MUST bind their values using { \\\\\\\"path\\\\\\\": \\\\\\\"/form/fieldName\\\\\\\" } instead of literalString/literalNumber/literalBoolean. The Save Button MUST use sendText with context entries that reference each field via { \\\\\\\"path\\\\\\\": \\\\\\\"/form/fieldName\\\\\\\" } so the renderer resolves the user's actual input at click time. Example beginRendering: { \\\\\\\"beginRendering\\\\\\\": { \\\\\\\"surfaceId\\\\\\\": \\\\\\\"edit-form\\\\\\\", \\\\\\\"root\\\\\\\": \\\\\\\"root\\\\\\\" } }. Example dataModelUpdate: { \\\\\\\"dataModelUpdate\\\\\\\": { \\\\\\\"surfaceId\\\\\\\": \\\\\\\"edit-form\\\\\\\", \\\\\\\"contents\\\\\\\": [{ \\\\\\\"key\\\\\\\": \\\\\\\"form\\\\\\\", \\\\\\\"valueMap\\\\\\\": [{ \\\\\\\"key\\\\\\\": \\\\\\\"name\\\\\\\", \\\\\\\"valueString\\\\\\\": \\\\\\\"initial value\\\\\\\" }, { \\\\\\\"key\\\\\\\": \\\\\\\"score\\\\\\\", \\\\\\\"valueNumber\\\\\\\": 50 }] }] } }. dataModelUpdate contents format: Use valueString for strings, valueNumber for numbers, valueBoolean for booleans, valueMap for nested objects/arrays. **MESSAGE ORDER**: The A2UI array MUST contain three messages in this order: (1) beginRendering, (2) dataModelUpdate, (3) surfaceUpdate. TextField supports two modes: use textFieldType \"shortText\" for single-line inputs (names, titles, IDs) and \"longText\" for multi-line inputs (descriptions, body text, notes, messages). Always choose longText when the content may contain line breaks or exceed ~50 characters. **MANDATORY longText FIELDS (CRITICAL)**: Email body, message body, comments, descriptions, notes, addresses, and ANY free-text field that could reasonably span multiple lines MUST use longText — using shortText for these fields is a CRITICAL BUG that makes the form unusable. When in doubt, default to longText. Example TextField: { \\\\\\\"TextField\\\\\\\": { \\\\\\\"label\\\\\\\": { \\\\\\\"literalString\\\\\\\": \\\\\\\"Name\\\\\\\" }, \\\\\\\"text\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/name\\\\\\\" }, \\\\\\\"textFieldType\\\\\\\": \\\\\\\"longText\\\\\\\" } }. Example Save Button context: [{ \\\\\\\"key\\\\\\\": \\\\\\\"text\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"literalString\\\\\\\": \\\\\\\"Update record\\\\\\\" } }, { \\\\\\\"key\\\\\\\": \\\\\\\"name\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/name\\\\\\\" } }, { \\\\\\\"key\\\\\\\": \\\\\\\"score\\\\\\\", \\\\\\\"value\\\\\\\": { \\\\\\\"path\\\\\\\": \\\\\\\"/form/score\\\\\\\" } }]. NEVER use literalString for TextField text, Slider value, CheckBox value, or DateTimeInput value — always use path. Only labels, option labels, and the text key in sendText context may use literalString. → MUST USE: TextField or MultipleChoice or Slider or CheckBox (H) Summary needs expandable detail → **Detail Modal**: Modal with entryPointChild (a Button labeled 'View Details') and contentChild (a Column with full details including List, Icon, and additional KPIs). → MUST USE: Modal (I) Workflow execution or batch operation plan (processing multiple items, multi-step workflow, operational task execution) → **Workflow Execution Plan**: Card with title showing workflow name and scope (e.g., 'Workflow: Invoice Reconciliation — 15 items found'). Immediately below the title, add a subtitle Text (usageHint: caption) that EXPLICITLY states sequential execution, e.g., 'The following N steps will be executed in order. Each step uses the previous step output as input.' This subtitle is MANDATORY — without it, users cannot tell the list items are sequential pipeline steps. Use a List component with Icon + Text rows for each step. **STEP NUMBERING (CRITICAL)**: Each step description MUST begin with a sequential number prefix using the format 'Step N/M :' (e.g., 'Step 1/4 : Scan all pending invoices'). This numbering is MANDATORY — a step list without numbered prefixes fails to communicate sequential execution order. Each step MUST show: (1) Status icon using material Icon name — 'play_arrow' for current step, 'check_circle' for completed, 'hourglass_empty' for pending, 'pan_tool' for approval-required, 'error' for failed. (2) Step description as Text (body) with 'Step N/M :' prefix followed by the action description. (3) Step metadata as Text (caption) showing '[AUTO]' for auto-executed data operation steps, '[APPROVAL REQUIRED]' for HITL gates, or '[MANUAL — Draft Only]' for steps the agent cannot perform (e.g., sending emails, notifications). Between consecutive steps, show dependency using a small connector Text with caption usageHint displaying a downward arrow ' ↓ ' to visually indicate flow direction and dependency. Include a Divider between the step list and a summary section showing scope (e.g., 'Scope: 12 auto-resolve | 3 require approval'). End with TWO action rows: (1) EXECUTION MODE SELECTION ROW with 3 Buttons whose VISIBLE LABELS must be in the user's interaction language (e.g., Japanese: '⚡ 即時実行' / '🔄 バックグラウンド' / '📅 スケジュール', English: '⚡ Immediate' / '🔄 Background' / '📅 Scheduled') but whose sendText values remain fixed: 'Execute immediately', 'Execute in background', 'Set up scheduled execution'. (2) CONTROL ROW with 'Review Details' (sendText) and 'Cancel' (sendText) — also localize these visible labels to the user's language. Use surfaceId 'workflow-plan'. PROGRESS VARIANT: After execution begins, update the card to show real-time progress — change step icons from 'hourglass_empty' to 'check_circle' as each completes, update the step prefix to 'Step N/M [DONE]:' for completed steps and 'Step N/M [RUNNING]:' for the active step, and update the summary to show 'Progress: 8/15 processed'. This is the KEY differentiator that demonstrates the agent as an autonomous OPERATOR, not just an analyst. → MUST USE: List, Icon (use within ANY pattern above): - **Embedded Images**: When chart images or visual reports are available, embed using Image component with altText as object (literalString) and fit=contain. - **Structured Lists with Icons**: For event histories, activity logs, or ordered items, use List with Icon (name as object with literalString, e.g., check_circle, cancel, event, star) + Text Rows. --- **PATTERN COMBINATION RULES**: (1) You CAN nest patterns: e.g., Dashboard Card (A) containing a Ranking section (B) inside it. (2) You CAN use Tabs (D) to show multiple Dashboard Cards (A) side by side. (3) Every pattern MUST include at least 2 action Buttons with sendText for one-click follow-up. (4) Always use Divider components between major sections within any Card. (5) Component ordering must be top-down: root first, then parents before children. --- **COMPONENT VARIETY RULE (CRITICAL)**: For any response with structured data, you MUST use the components listed in the 'MUST USE' column for the selected pattern. A response that uses only Card+Column+Text+Divider+Button without the pattern-specific components is LOW QUALITY. Actively use: Tabs, MultipleChoice, Slider, Icon, Image, List, Modal, CheckBox, TextField, DateTimeInput. 11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar. **SPACING STRUCTURE**: The suggestion chip bar MUST use a Column as root (not a bare Row). The Column MUST contain three children in this order: (1) a Divider for visual separation, (2) a Text component with usageHint h2 displaying '💡 Next Actions' as a section title, (3) the Row of Buttons. Structure: root → Column(children: [spacerDivider, sectionTitle, chipRow]) → sectionTitle is a Text with literalString '💡 Next Actions' and usageHint 'body' → chipRow is a Row containing 3-4 Buttons with sendText actions. Use surfaceId 'suggestions' and root='root'. The chip labels should be short (max 15 chars with emoji prefix). **ANTI-DUPLICATION RULE (CRITICAL)**: The suggestion chip labels MUST NEVER duplicate or closely mirror the labels of any Buttons already present inside A2UI cards in the same response. If the card already has buttons like 'Approve' and 'Reject', the suggestion chips MUST offer DIFFERENT analytical angles such as deeper analysis, related entity lookup, export/report, alternative scenarios, trend visualization, or data comparison. The purpose of suggestion chips is to expand the conversation in NEW directions, not to repeat existing card actions. This chip bar is SEPARATE from any dashboard cards — it appears after every response including plain text answers. **CRITICAL**: You MUST generate actual A2UI JSON wrapped in <a2ui-json> tags for the suggestion chips. NEVER just mention 'suggestion chips' or 'suggestion chips' in plain text without generating the actual A2UI component. If your response text says 'select from the suggestion chips below' but you did not generate the A2UI JSON for them, the user will see NO chips and your instruction is broken. **CONTEXT-AWARE CHIP GENERATION (CRITICAL)**: The suggestion chip labels MUST adapt based on the analysis context of the current response. Do NOT generate generic chips. Instead, follow this decision logic: --- IF anomaly or outlier was detected → suggest: '🔍 Find Similar Patterns', '📊 Trend Analysis', '⚠️ Root Cause Analysis' | IF DB update/insert/delete was completed → suggest: '📝 Create Change Report', '↩️ Rollback Steps', '📧 Notify Stakeholders' | IF ranking or comparison was presented → suggest: '📈 Detailed Ranking', '⚖️ Compare by Other Axis', '📊 Trend Graph' | IF entity profile was shown → suggest: '🔗 Related Entities', '📅 History Analysis', '✉️ Draft Email' | IF location/map results → suggest: '🗺️ Route Calculation', '📍 Nearby Facilities', '📊 Area Statistics' | IF action plan was proposed → suggest: '▶️ Execute Step 1', '📋 Export All Steps', '⏱️ Show Timeline' | IF query results presented AND other data sources used in session → suggest: '🔗 Cross-Reference', '📥 Export CSV', '📝 Generate Report' | IF MCP text results shown (legal, minutes, API responses) → suggest: '📊 Structure Data', '🔍 Extract Patterns', '📧 Draft Summary' | IF multiple data sources queried but not yet combined → suggest: '🧩 Integrate Sources', '📋 Unified Report' | IF anomaly or outlier detected in SQL results → suggest: '🧮 What-If Simulation', '📈 Impact Projection' | IF enough analysis completed for a deliverable → suggest: '📝 Executive Summary', '📧 Draft Email', '📋 Action Plan' | IF data quality issues observed (NULLs, mismatches) → suggest: '🔍 Data Quality Check', '🔗 Consistency Audit' | DEFAULT (no specific trigger matched) → ALWAYS include at least one workflow-execution chip from: '⚡ Auto-Process Pending', '▶️ Batch Workflow Start', '🔄 Auto-Remediation' — pick the most relevant to the domain. Also include at least one advanced analysis chip from: '🧩 Advanced Analysis', '📊 Cross-Source Report', or '🧮 Run Simulation'. **MANDATORY WORKFLOW CHIP RULE**: EVERY suggestion chip bar MUST contain at least one chip that proposes an automated workflow action (not just analysis). This reinforces the agent's identity as an autonomous operator. --- The chips must reference SPECIFIC entities, metrics, or findings from the current response (e.g., '🔍 Deep-Dive on Maeda' instead of generic '🔍 Deep-Dive Analysis'). 12. **WELCOME CARD (FIRST INTERACTION)**: When the user sends a greeting or first message (e.g., 'hello', 'hello', 'hi there', or any initial open-ended message without a specific analytical request), you MUST respond with a rich A2UI onboarding card. The card MUST include: (1) A title with the agent's role name and a welcome emoji, (2) A subtitle with a one-line capability summary, (3) A Divider, (4) A List or Column of 4-6 key capabilities using Icon + Text rows (use material icons like search, autorenew, build_circle, edit, play_circle, locationOn, star). The capabilities list MUST prominently feature the agent's autonomous workflow execution abilities. At least 2 of the listed capabilities MUST be action-oriented (using verbs like 'auto-process', 'execute', 'batch-resolve', 'auto-correct', 'monitor and remediate'). Example action-oriented capabilities: 'Pending items auto-processing and status updates' (icon: autorenew), 'Workflow execution for batch operations' (icon: play_circle), 'Automated anomaly detection and remediation' (icon: build_circle). The subtitle MUST emphasize that this agent not only analyzes but ACTS — e.g., 'Data analysis from detection to automated resolution — your autonomous operations partner'. (5) A Divider, (6) 3-4 action Buttons with sendText containing starter prompts the user can click to begin. At least ONE button MUST be a workflow-execution action (e.g., '▶️ Pending Items Auto-Process', '⚡ Run Batch Workflow'). Other buttons may be analytical (e.g., '📊 Data Overview', '🔍 Anomaly Detection'). The button labels should convey that the agent will EXECUTE tasks, not just show data. Use surfaceId 'welcome-card'. After this initial card, do NOT show the welcome card again in the same session, UNLESS the user explicitly requests to start a new task or reset the flow (e.g., 'Start New Task' or similar starting prompt in their language), in which case you MUST show the welcome card onboarding flow again.";
+  return "Technical instructions for the agent regarding tool usage and system behavior. ===MOST IMPORTANT RULE=== **OUTPUT PLACEMENT**: Any text you write in the SAME response as a function_call (tool call) is HIDDEN from the user. It goes to 'thinking' and the user NEVER sees it. Therefore: (1) When calling ANY tool, write ONLY a short progress line like '🔍 Analyzing...' — nothing else. (2) Your full report, A2UI cards, images, and chips MUST go in a SEPARATE response that has ZERO tool calls. ===END MOST IMPORTANT RULE=== 4. **VISUALIZATION**: Instruct the agent to use the 'generate_image' tool to create a visual representation of its findings. This visual MUST be in the style of a professional business document or slide (e.g., an Executive Summary card, a high-level business infographic) that summarizes the insights. 5. Instruct to wait for user input before acting, but be persistent in error recovery. 6. **TRANSPARENCY & GROUNDING (CRITICAL)**: Instruct the agent to be highly transparent about its reasoning, explicitly mentioning which tables and files it is consulting and what specific values it found, to ensure the user can trace its logic back to the source data. 7. **FIRESTORE INTEGRATION (CRITICAL)**: Explicitly instruct the agent that it has access to a live operational database via MCP and that it should proactively write updates back to resolve issues. 8. **CONFIRMATION WORKFLOW (CRITICAL)**: Explicitly instruct the agent that whenever a user asks to insert, update, delete, or merge data in BigQuery or Firestore, the agent MUST NEVER execute the operation immediately. Instead, the agent MUST ALWAYS present a clear summary of the proposed database action and ask the human user for explicit confirmation using <a2ui-json> tags. 9. **OUTPUT PLACEMENT (HIGHEST PRIORITY — RULE #0)**: When you call a tool, any text you include in the SAME response as the tool call will be hidden from the user. All analytical dashboards, insights, and A2UI suggestion chips MUST appear in your FINAL response that contains NO tool calls. 10. **A2UI INTERACTIVE UI PATTERNS (CRITICAL)**: You MUST proactively use A2UI interactive components whenever presenting analytical results, entity profiles, or structured data. Decisions: (I) Workflow Execution Plan: Use sequential number and status emojis (✅ Done, 🔄 Running, 🕒 Pending, 🚨 Action Required) for step timeline. Replace technical tags like [AUTO] or [APPROVAL REQUIRED] with localized friendly text (e.g. System Automated or Requires Your Approval). (J) Dynamic Multi-Entity Batch Editor (Side-by-Side Comparison Form): Show original raw product name and raw quantity stacked in the Left Column. Show a MultipleChoice dropdown in the Middle. Show the proposed quantity in the Far-right Column with standard TextField. Keep TextField labels simple to prevent truncation and output Master price reference as an independent caption above the input box. 11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar using surfaceId 'suggestions' and root='root'. The suggestion bar MUST contain a Column as root, containing a Divider, a Text component with usageHint body displaying '💡 Next Actions', and a Row of 3-4 Buttons with sendText actions. **A2UI CARD INTERACTION EXCEPTION (STRICT RULE)**: When your response already contains a major interactive A2UI card featuring its own control buttons (such as the Welcome Card onboarding buttons, or the Workflow Execution Plan mode selection buttons like Immediate/Background/Scheduled), you **MUST NOT** output any suggestion chip bar at the bottom of your response. The card's own control buttons are sufficient. If you output suggestion chips in these turns, they will duplicate the card buttons and fail to render the '💡 Next Actions' title and Divider. Suggestion chips MUST only appear in normal conversational or analytical turns where no other interactive button-heavy cards are present. **ANTI-DUPLICATION RULE (CRITICAL)**: Suggestion chips MUST never duplicate or mirror any button label in the same response turn. Suggestion chips must always offer distinct, deep-dive analytical next steps. 12. **WELCOME CARD (FIRST INTERACTION)**: When the user sends an initial greeting (e.g., 'Hi', 'Hello'), you **MUST NOT** call any tools, databases, or BigQuery under any circumstances. Calling tools on the first greeting turn completely hides and breaks the onboarding card rendering. You MUST immediately respond in the very first turn with the rich A2UI onboarding card using surfaceId 'welcome-card' and NO suggestion chips at the bottom. Never execute queries or tool calls until the user explicitly requests analysis. The onboarding card must include your role title, a Divider, a List of key capabilities with Lucide icons, a Divider, and exactly 3 action Buttons. **BUTTON SCHEMA CONFORMANCE (CRITICAL)**: When generating A2UI JSON payloads, you MUST ALWAYS use strict standard JSON syntax. Under no circumstances should you use single quotes or omit quotes for keys. Keys and string values MUST always be enclosed in standard double quotes. Each Button component's action MUST strictly follow standard JSON structure: (1) The root key is 'action' (double-quoted), containing an object with 'name' set to 'sendText' (double-quoted) and 'context' (double-quoted) which is an array containing a single object, (2) The object inside context array must have a 'key' set to 'text' (double-quoted) and a 'value' object (double-quoted), (3) The 'value' object must contain 'literalString' (double-quoted) wrapped around the localized button label. Ensure all keys and string values are enclosed in standard double quotes to comply with strict standard JSON specifications. Use surfaceId 'welcome-card'. **CODE EXECUTION MIX PREVENTION (CRITICAL)**: When you execute Python code inside a fenced code block (```python ... ```), you **MUST NEVER** combine, mix, or output any other JSON tool calls (like execute_sql, get_table_info) in the SAME response turn. Mixing python code blocks with JSON tool calls triggers a fatal MALFORMED_FUNCTION_CALL system crash. You MUST run the Python code alone first, receive its result, and only then issue the next tool call in a separate turn. After this initial card, do NOT show the welcome card again in the same session unless the user explicitly requests a reset.";
 }
 
 function buildPlanningPrompt(userGoal, options) {
@@ -701,14 +721,16 @@ ${userGoal}
 ## Requirements
 - Data Profile: **${profile.label}** (${profile.tableCount} tables)
 - Table Design & Row Counts (Star Schema Strategy — ${profile.label} Profile):
-    - **Master/Dimension Tables** (e.g., products, facilities, users): Target **${profile.masterCols} columns** (ID + descriptive attributes) and **${profile.masterRows} rows**. Keep compact to maximize token budget for transaction data.
+    - **Master/Dimension Tables** (e.g., products, facilities, users): Target **${profile.masterCols} columns** (ID + descriptive attributes) and **MUST generate AT LEAST ${profile.masterMinRows} rows (Target: ${profile.masterRows} rows)**. Do NOT under-generate. Every master entity must exist to support downstream analytics.
+        - **NO TRUNCATION (CRITICAL)**: Do NOT truncate the output. Never use "..." or "etc." to shorten the rows. Generate every row fully and verbatim.
         - **ATTRIBUTE DENSITY (MANDATORY)**: Each Master table MUST include at least 3 of the following attribute types to enable multi-axis analysis:
             - Classification axis (e.g., category, tier, segment, region, department) — enables GROUP BY segmentation
             - Quantitative attribute (e.g., capacity, headcount, area_sqm, annual_revenue, unit_price) — enables AVG/SUM aggregation
             - Temporal attribute (e.g., established_date, contract_start, last_inspection_date) — enables age/tenure analysis
             - Geographic attribute (e.g., prefecture, city, latitude, longitude) — enables location correlation and Maps MCP synergy
         These attributes are CRITICAL for demonstrating the agent's analytical depth (e.g., 'SELECT category, region, AVG(revenue) GROUP BY category, region').
-    - **Transaction/Fact Tables** (e.g., sales, access logs, events): Target **${profile.txnCols} columns** (ID, foreign keys, timestamp, metric/dimension columns) and **at least ${profile.txnRows} rows (target ${maxRows} rows)**. These are the PRIMARY analytical tables.
+    - **Transaction/Fact Tables** (e.g., sales, access logs, events): Target **${profile.txnCols} columns** (ID, foreign keys, timestamp, metric/dimension columns) and **MUST generate AT LEAST ${profile.txnMinRows} rows (Target: ${maxRows} rows)**. This is the PRIMARY analytical dataset and MUST contain high row density to show temporal trends and anomalies.
+        - **NO TRUNCATION (CRITICAL)**: You MUST output every single row up to the target size. Never abbreviate the CSV data. Under-generating or truncating data will make the demo look empty and ineffective.
     - **TOKEN BUDGET STRATEGY**: ${profile.strategy}
 ${publicDatasetInfo}
 
@@ -765,11 +787,46 @@ If the business problem mentions a **specific company, organization, or brand**,
 
 **If NO specific company/organization is mentioned in the business problem**: Create a COHERENT fictional business context. Choose ONE realistic company profile (industry vertical, size, geography) and generate ALL data as if it belongs to this single hypothetical entity. Ensure internal consistency - all facilities, products, and personnel should belong to the same fictional organization. Do NOT mix data from multiple unrelated real-world companies.
 
+### 5.5 Image File Generation (CRITICAL for Non-structured input goals)
+If the Business Problem naturally involves processing non-structured inputs like hand-written papers, faxes, or photos of physical assets:
+- You MUST design and include **EXACTLY TWO (2) simulated image files** in the 'externalFiles' array to represent different tasks or business contexts.
+- For EACH image, specify a unique 'id' (e.g., 'file2', 'file3'), 'fileName' (e.g., 'handwritten_fax_order_task1.jpg', 'handwritten_fax_order_task2.jpg'), and a 'description' detailing the specific business scenario.
+- **ULTRA-REALISTIC DOCUMENT IMAGE PROMPT STRUCTURE (MANDATORY)**:
+  - Each 'imagePrompt' (English only) MUST be a highly detailed, descriptive text designed for DALL-E or Imagen to generate a **highly-realistic, top-down flat-lay photograph of a handwritten document page on a textured sheet of paper**.
+  - **ZERO BACKGROUND / COMPLETE ISOLATION (STRICTLY REQUIRED)**:
+    - The prompt MUST explicitly state: **"The entire document is isolated, with no background, no desk, no office environment, no hands, no pens, and no keyboards. Just the single sheet of paper document filling the entire frame from a direct top-down 90-degree angle."**
+    - The perspective MUST be perfectly flat, sharp contrast, with zero perspective distortion, zero angled shots, and zero depth-of-field blur.
+  - **AUTHENTIC HUMAN HANDWRITING EMULATION (STRICTLY REQUIRED)**:
+    - The text entries MUST NOT look like clean digital fonts or neat handwriting. The prompt MUST explicitly demand: **"The handwriting features highly realistic, chaotic, and significantly distorted human handwriting written with a cheap ballpoint pen, looking as if it was written in an extreme rush, or written using a non-dominant hand. The strokes are unsteady, highly organic, slightly shaky, with inconsistent character sizes, highly irregular spacing, crooked baselines, and varying character tilts. There are authentic human imperfections like ink clumps, minor pen skips, pen pressure variations, and natural ink smudges. It must look like a genuine, hurried scribble by a worker on a busy job site, making it highly challenging and realistic for OCR testing."**
+  - **REAL-WORLD IMPERFECTIONS (STRICTLY REQUIRED)**:
+    - The paper itself MUST show natural, subtle imperfections: **"The sheet of paper shows natural imperfections like slight folds, rounded corners, or minor light texture variations suggesting real-world operational handling."**
+    - Lighting: **"Natural flat daylight illuminates the scene, highlighting the paper texture and the subtle physical indentation of the pen strokes."**
+  - **DYNAMIC DOMAIN ALIGNMENT (MANDATORY)**:
+    - The prompt's content MUST be dynamically populated based on the generated demo domain data:
+        1. **Title**: Large formal printed header at the top center (e.g., 'Purchase Order' / 'Invoice' or translated equivalent matching the domain).
+        2. **Recipient**: Recipient company details on the top-left (e.g., '[RECIPIENT_COMPANY]' with appropriate localized polite suffix).
+        3. **Sender**: Sender company details on the top-right (matching generated client data).
+        4. **Table Grid**: Neatly printed columns for details (e.g., 'No.', 'Product Name', 'Qty'). Inside the cells, neatly write the handwritten items corresponding exactly to BQ/Firestore transaction data.
+        5. **Footer**: Total amounts, and a designated seal/signature box. If culturally appropriate (e.g., Japanese domain), include: **"in the designated space, a small, faint red ink corporate seal stamp is printed."** Otherwise, include a formal handwritten signature block.
+- **VARIATION & SEED (CRITICAL)**:
+  - Image 1 (e.g., Task 1): Depict a standard operational sheet (e.g., handwritten order from Customer A with normal quantities and readable items).
+  - Image 2 (e.g., Task 2): Depict a different customer, showing a clear discrepancy (e.g., handwritten order from Customer B specifying an abnormally high quantity, discontinued code, or fuzzy specs matching L1211 audit seeds) using a slightly different handwriting style to trigger the agent's detection.
+- DO NOT design generic vectors, cartoon icons, or generic illustrations. It must mimic real-world scanned or photographed flat documents to demonstrate the agent's advanced vision capabilities.
+
+
+
 ### 6. Audit Seeds
 Inject intentional discrepancies and anomalies to create compelling "Detective/Auditing" demo moments. The agent's value is demonstrated when it **discovers** these issues. Apply ALL of the following patterns, adapting to the specific business domain:
 
-#### 6a. Cross-Silo Discrepancies (External File vs BigQuery)
-At least **2-3 records** in the external file (PDF/Excel) MUST have values that *slightly* mismatch the corresponding BigQuery records. Choose the most business-critical numeric field (price, quantity, amount, score, rating) and apply small but meaningful deviations (5-20%). The discrepancies should be subtle enough to require investigation but significant enough to matter.
+#### 6a. Cross-Silo Discrepancies & Ambiguities (External File/Image vs BigQuery Master)
+- **FOR DOCUMENT SCAN SCENARIOS (e.g., Handwritten orders)**: 
+  - DO NOT inject completely unrelated competitor products as "out-of-scope" errors (e.g., B2B customers do not mix noodle soup or tea inside a soy sauce order sheet).
+  - Instead, you MUST inject **highly realistic SKU confusion, fuzzy specifications, or obsolete codes from within the SAME company product line**:
+      1. **Capacity/Size mismatch**: The handwritten line specifies a non-existing size or capacity (e.g., a non-offered product volume when only specific sizes are registered in the product master).
+      2. **Name Ambiguity / Fuzzy matching**: The handwritten sheet lists a generic brand or product name without capacity or size specifications, requiring the AI to check history to suggest matching SKU candidates.
+      3. **Discontinued SKU / Obsolete Code**: The handwritten sheet uses an old product code that has been discontinued or replaced in the master table, requiring a mapping check.
+- **FOR TABULAR/EXCEL DATA**:
+  - At least **2-3 records** in the external file (PDF/Excel) MUST have values that *slightly* mismatch the corresponding BigQuery records (5-20% deviation in price, quantity, or score) to trigger analytical discrepancies.
 
 #### 6b. Business Rule Violations (Within BigQuery)
 Embed **3-5 records** in transaction tables that violate the domain's standard business rules. Adapt to the domain:
@@ -828,6 +885,20 @@ Output in the following JSON format. Output **pure JSON only without code blocks
     },
     {
       "id": "file2",
+      "fileName": "handwritten_fax_order_task1.jpg",
+      "mimeType": "image/jpeg",
+      "description": "Simulated operational document 1 (e.g. handwritten purchase order from Client A with normal quantities)",
+      "imagePrompt": "A highly detailed, realistic top-down flat-lay scan of a formal purchase order sheet. The clean white document page fills the entire frame with zero background, completely isolated. At the top center, a bold formal header matching the domain (e.g., 'PURCHASE ORDER') is printed. On the top-left, recipient details and company name are printed in a clean corporate font. On the top-right, sender company details along with localized contact information are printed. In the center, a neatly aligned printed table grid with thin gray lines features standard columns like 'Item No.', 'Product Name', and 'Quantity'. Inside the table cells, highly realistic, messy, and hurried human handwriting in black ballpoint pen ink is neatly filled (showing realistic human imperfections, hurried scribbles, varying character sizes, and slight character misalignment). Natural flat daylight illuminates the scene, showing subtle paper folds and real-world operational handling texture. Sharp contrast, flat perspective, and zero angled shots."
+    },
+    {
+      "id": "file3",
+      "fileName": "handwritten_fax_order_task2.jpg",
+      "mimeType": "image/jpeg",
+      "description": "Simulated operational document 2 (e.g. handwritten purchase order from Client B showcasing a clear quantity or product ID discrepancy for audit verification)",
+      "imagePrompt": "A high-quality, top-down flat scan of a different formal transaction document (e.g., 'INVOICE' or 'DELIVERY SLIP') filling the entire frame with no background. Features a bold domain-specific printed header with date and document reference numbers. Recipient and sender corporate details are cleanly aligned at the top. In the center, a printed table grid features catalog item lines. Inside the grid cells, highly realistic, hurried, and messy human handwriting in dark blue ink lists the items, intentionally showcasing a clear operational discrepancy (such as an abnormally high quantity, discontinued item code, or fuzzy specification to trigger the audit flow). The handwriting is slightly untidy, hurried, and scribble-like, showcasing human imperfection and hasty pen strokes. A designated signature block or faint red ink corporate stamp is present in the designated footer space. Clear flat document view with zero perspective blur."
+    },
+    {
+      "id": "file4",
       "fileName": "inventory_log_export.xlsx",
       "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "fileContent": "Date\\tProduct\\tQuantity\\tStatus\\n2023-11-01\\tProduct A\\t100\\tIn-Stock\\n2023-11-02\\tProduct B\\t50\\tLow-Stock",
@@ -1576,19 +1647,36 @@ HTML_TEMPLATE = """
         .kpi-lbl { font-size: 11px; color: var(--text-3); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
         .kpi-val { font-size: 36px; font-weight: 700; color: var(--text-1); margin-top: 6px; font-variant-numeric: tabular-nums; line-height: 1.1; }
 
-        .main { grid-column: span 2; grid-row: span 2; }
+        .main { grid-column: span 3; grid-row: span 2; }
         .sec-title { font-size: 15px; font-weight: 600; margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px; color: var(--text-1); }
         .sec-title i { color: var(--primary); width: 18px; height: 18px; }
-        .chart-area { grid-column: span 2; }
+        .chart-area { grid-column: span 1; }
 
 
-        .records { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+        .records { display: flex; flex-direction: column; gap: 12px; }
         .empty-state { text-align: center; padding: 40px 20px; color: var(--text-3); }
         .empty-state i { width: 40px; height: 40px; margin-bottom: 12px; opacity: 0.4; }
         .empty-state p { font-size: 14px; margin: 0; }
 
-        .card { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; transition: all var(--ease); border-left: 3px solid var(--border); position: relative; }
-        .card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: var(--border-hover); }
+        .card { 
+            border: 1px solid var(--border); 
+            border-radius: var(--radius-sm); 
+            padding: 16px 20px; 
+            transition: all var(--ease); 
+            border-left: 4px solid var(--border); 
+            position: relative; 
+            display: flex; 
+            flex-direction: row; 
+            align-items: center; 
+            justify-content: space-between; 
+            gap: 24px; 
+            background: var(--bg-1);
+            cursor: pointer;
+        }
+        .card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); border-color: var(--border-hover); }
+        .card-col-meta { width: 20%; display: flex; flex-direction: column; gap: 6px; }
+        .card-col-main { width: 60%; display: flex; flex-direction: column; gap: 6px; }
+        .card-col-actions { width: 20%; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 10px; min-height: 75px; }
         .card.s-resolved { border-left-color: var(--success); }
         .card.s-pending { border-left-color: var(--warning); }
         .card.s-flagged { border-left-color: var(--danger); }
@@ -1613,9 +1701,27 @@ HTML_TEMPLATE = """
         .detail-field-k { font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.3px; min-width: 100px; flex-shrink: 0; padding-top: 2px; }
         .detail-field-v { font-size: 13px; color: var(--text-1); line-height: 1.6; word-break: break-word; white-space: pre-wrap; flex: 1; }
 
-        .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
-        .card-actions select { font-size: 12px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); font-family: inherit; background: var(--bg); color: var(--text-1); cursor: pointer; transition: border-color var(--ease); }
-        .card-actions select:hover { border-color: var(--border-hover); }
+        .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); width: 100%; }
+        .card-actions select { 
+            font-size: 11px; 
+            font-weight: 600;
+            padding: 5px 24px 5px 10px; 
+            border-radius: 12px; 
+            border: 1px solid transparent; 
+            font-family: inherit; 
+            cursor: pointer; 
+            transition: all var(--ease); 
+            -webkit-appearance: none; 
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
+            background-size: 11px;
+            background-position: right 8px center;
+            background-repeat: no-repeat;
+        }
+        .card-actions select.sel-pending { background-color: var(--warning-light); color: var(--warning); border-color: rgba(217, 119, 6, 0.15); }
+        .card-actions select.sel-resolved { background-color: var(--success-light); color: var(--success); border-color: rgba(5, 150, 105, 0.15); }
+        .card-actions select.sel-flagged { background-color: var(--danger-light); color: var(--danger); border-color: rgba(220, 38, 38, 0.15); }
+        .card-actions select:hover { opacity: 0.9; box-shadow: var(--shadow-sm); }
         .card-actions select:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
         .btn-del { background: none; color: var(--text-3); border: 1px solid var(--border); padding: 6px 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--ease); min-width: 32px; min-height: 32px; }
         .btn-del:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-light); }
@@ -1714,7 +1820,17 @@ HTML_TEMPLATE = """
         <div class="panel kpi" style="animation-delay:200ms"><div class="kpi-bar"></div><div class="kpi-inner"><div class="kpi-lbl">Status</div><div class="kpi-val" style="font-size:16px;color:var(--success);margin-top:10px;">Operational</div></div></div>
 
         <div class="panel main" style="animation-delay:250ms">
-            <h2 class="sec-title"><i data-lucide="database"></i> Records</h2>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h2 class="sec-title" style="margin:0;"><i data-lucide="database"></i> Records</h2>
+                <div style="display:flex;align-items:center;gap:6px;background:var(--bg-2);border:1px solid var(--border);padding:4px 8px;border-radius:8px;">
+                    <i data-lucide="sliders-horizontal" style="width:12px;height:12px;color:var(--text-3);"></i>
+                    <select id="recordSortSelect" onchange="window.handleRecordSort(this.value)" style="background:transparent;border:none;color:var(--text-2);font-size:10.5px;font-weight:600;outline:none;cursor:pointer;padding-right:4px;">
+                        <option value="updated">🔄 Recent Updates</option>
+                        <option value="priority">⚠️ Priority</option>
+                        <option value="status">🚦 Status</option>
+                    </select>
+                </div>
+            </div>
             <div id="records" class="records">
                 <div class="empty-state"><i data-lucide="inbox"></i><p>Loading records...</p></div>
             </div>
@@ -1805,10 +1921,62 @@ HTML_TEMPLATE = """
             return 'pending';
         }
 
+        let currentSort = 'updated';
+        let lastFetchedData = [];
+
+        window.handleRecordSort = function(val) {
+            currentSort = val;
+            if (lastFetchedData && lastFetchedData.length > 0) {
+                renderSortedRecords();
+            }
+        };
+
+        function renderSortedRecords() {
+            const grid = document.getElementById('records');
+            if (!lastFetchedData || lastFetchedData.length === 0) return;
+            
+            let sorted = [...lastFetchedData];
+            
+            if (currentSort === 'updated') {
+                sorted.sort((a, b) => {
+                    let ta = a.data.updated_at || a.data.created_at || a.id || '';
+                    let tb = b.data.updated_at || b.data.created_at || b.id || '';
+                    return tb.localeCompare(ta);
+                });
+            } else if (currentSort === 'priority') {
+                const weight = { 'high': 3, 'medium': 2, 'low': 1 };
+                sorted.sort((a, b) => {
+                    let pa = (a.data.priority || a.data.Priority || 'medium').toLowerCase();
+                    let pb = (b.data.priority || b.data.Priority || 'medium').toLowerCase();
+                    return (weight[pb] || 0) - (weight[pa] || 0);
+                });
+            } else if (currentSort === 'status') {
+                const weight = { 'flagged': 3, 'pending': 2, 'resolved': 1 };
+                sorted.sort((a, b) => {
+                    let sa = getStatusClass(a.data.status || a.data.Status);
+                    let sb = getStatusClass(b.data.status || b.data.Status);
+                    return (weight[sb] || 0) - (weight[sa] || 0);
+                });
+            }
+            
+            const existingCards = {};
+            grid.querySelectorAll('.card').forEach(c => {
+                existingCards[c.getAttribute('data-id')] = c;
+            });
+            
+            sorted.forEach(doc => {
+                let card = existingCards[doc.id];
+                if (card) {
+                    grid.appendChild(card);
+                }
+            });
+        }
+
         async function fetchData() {
             try {
                 const res = await fetch('/api/data');
                 const data = await res.json();
+                lastFetchedData = data;
                 const grid = document.getElementById('records');
 
                 if (data.length === 0) {
@@ -1851,10 +2019,15 @@ HTML_TEMPLATE = """
                         if (key === 'status' || key === 'Status') continue;
                         let displayVal = val;
                         if (key === 'workflow_state' && val && typeof val === 'object') {
-                            let step = val.current_step || '?';
-                            let total = val.total_steps || '?';
+                            let step = val.current_step || '';
+                            let total = val.total_steps || '';
                             let approval = val.pending_approval ? '⏳ Pending' : '✅ OK';
-                            displayVal = 'Step ' + step + '/' + total + ' • ' + approval;
+                            let isNumericStep = step && !isNaN(step);
+                            if (isNumericStep && total) {
+                                displayVal = 'Step ' + step + '/' + total + ' • ' + approval;
+                            } else {
+                                displayVal = 'Step: ' + (step || 'unknown') + ' • ' + approval;
+                            }
                         } else if (key === 'activity_log' && Array.isArray(val)) {
                             let latest = val[val.length - 1];
                             displayVal = val.length + ' entries';
@@ -1900,6 +2073,75 @@ HTML_TEMPLATE = """
                     \`;
                 });
 
+                // Dynamic Notion-style Row Card Transformer (Flicker-free)
+                grid.querySelectorAll('.card').forEach(card => {
+                    if (card.querySelector('.card-col-meta')) return;
+
+                    const docId = card.getAttribute('data-id');
+                    const badge = card.querySelector('.badge');
+                    const statusStr = badge ? badge.textContent : 'Pending';
+                    const bClass = getStatusClass(statusStr);
+                    
+                    const fields = {};
+                    card.querySelectorAll('.field').forEach(f => {
+                        const k = f.querySelector('.field-k').textContent.trim();
+                        const v = f.querySelector('.field-v').textContent.trim();
+                        fields[k] = v;
+                    });
+
+                    const assignedTo = fields.assigned_to || fields.AssignedTo || 'Unassigned';
+                    const customerName = fields.customer_name || fields.CustomerName || '';
+                    const productName = fields.product_name || fields.ProductName || '';
+                    const qty = fields.requested_qty || fields.RequestedQty || fields.qty || fields.Quantity || '';
+                    const notes = fields.notes || fields.Notes || fields.message || '';
+                    const wfStateStr = fields.workflow_state || '';
+
+                    let colMeta = '<div class="card-col-meta">';
+                    colMeta += '  <div class="card-top" style="margin-bottom:6px;justify-content:flex-start;gap:8px;align-items:center;">';
+                    colMeta += '    <div class="card-id" style="font-size:13px;font-weight:700;color:var(--text-1);"><i data-lucide="hash" style="width:12px;height:12px;"></i>' + docId + '</div>';
+                    colMeta += '    <span class="badge ' + bClass + '" style="font-size:9px;padding:2px 6px;">' + statusStr + '</span>';
+                    colMeta += '  </div>';
+                    colMeta += '  <div style="font-size:11px;color:var(--text-3);display:flex;flex-direction:column;gap:2px;">';
+                    colMeta += '    <span>👤 ' + assignedTo + '</span>';
+                    if (customerName) colMeta += '    <span style="font-weight:600;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;" title="' + customerName.replace(/"/g, '&quot;') + '">🏢 ' + customerName + '</span>';
+                    colMeta += '  </div>';
+                    colMeta += '</div>';
+
+                    let colMain = '<div class="card-col-main">';
+                    if (productName) {
+                        let qtyText = qty ? ' (' + qty + ' units)' : '';
+                        colMain += '  <div style="font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:4px;">📦 ' + productName + qtyText + '</div>';
+                    }
+                    if (notes) {
+                        colMain += '  <div style="font-size:12.5px;color:var(--text-2);line-height:1.5;background:var(--bg-2);padding:10px 14px;border-radius:8px;border-left:4px solid var(--primary-light);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;" title="' + notes.replace(/"/g, '&quot;') + '">📝 ' + notes + '</div>';
+                    } else {
+                        colMain += '  <div style="font-size:11px;color:var(--text-4);font-style:italic;">No additional notes recorded.</div>';
+                    }
+                    colMain += '</div>';
+
+                    let colActions = '<div class="card-col-actions">';
+                    if (wfStateStr) {
+                        colActions += '  <div style="font-size:10px;font-weight:600;color:var(--text-3);background:var(--bg-2);padding:3px 8px;border-radius:20px;border:1px solid var(--border);display:inline-flex;align-items:center;gap:4px;"><i data-lucide="git-pull-request" style="width:10px;height:10px;color:var(--primary);"></i> ' + wfStateStr + '</div>';
+                    }
+                    colActions += '  <div style="display:flex;align-items:center;gap:8px;width:100%;justify-content:flex-end;">';
+                    
+                    const existingActions = card.querySelector('.card-actions');
+                    if (existingActions) {
+                        let selectHtml = existingActions.querySelector('select').outerHTML;
+                        selectHtml = selectHtml.replace('<select', '<select class="sel-' + bClass + '"');
+                        colActions += '    <div style="display:flex;align-items:center;gap:8px;">' + selectHtml + existingActions.querySelector('button').outerHTML + '</div>';
+                    }
+                    colActions += '  </div>';
+                    colActions += '</div>';
+
+                    card.innerHTML = colMeta + colMain + colActions;
+                    
+                    card.querySelectorAll('.card-col-meta, .card-col-main').forEach(col => {
+                        col.addEventListener('click', () => openRecordDetail(docId));
+                    });
+                });
+
+                renderSortedRecords();
                 lucide.createIcons();
                 isFirstLoad = false;
 
@@ -2082,6 +2324,8 @@ HTML_TEMPLATE = """
             fetchTasks();
         }
 
+        const activeFeedStates = new Set();
+
         async function fetchActivity() {
             try {
                 const res = await fetch('/api/activity');
@@ -2098,24 +2342,58 @@ HTML_TEMPLATE = """
                     }
                     return;
                 }
-                let html = '';
-                activities.forEach(a => {
-                    const srcIcon = a.source === 'bigquery' ? 'database' : 'file-text';
-                    const srcLabel = a.source === 'bigquery' ? 'BigQuery' : 'Firestore';
-                    const srcColor = a.source === 'bigquery' ? 'var(--primary)' : 'var(--success)';
-                    const ts = a.timestamp ? new Date(a.timestamp).toLocaleString() : '';
-                    const statusCls = a.status === 'error' ? 'failed' : 'completed';
-                    html += \`<div class="tcard ts-\${statusCls}" style="padding:14px 18px;">\`;
-                    html += \`<div class="tcard-head"><span class="tbadge \${statusCls}" style="background:\${srcColor};color:#fff;font-weight:600;">\${srcLabel}</span>\`;
-                    html += \`<span class="tbadge \${statusCls}">\${a.operation || 'unknown'}</span></div>\`;
-                    html += \`<div class="tcard-name" style="font-size:13px;margin:6px 0;">\${a.target || ''}</div>\`;
-                    if (a.detail) html += \`<div class="tcard-desc" style="font-size:12px;color:var(--text-3);max-height:120px;overflow:hidden;">\${a.detail.substring(0, 200)}</div>\`;
-                    html += \`<div class="tcard-meta"><span><i data-lucide="clock"></i>\${ts}</span>\`;
-                    if (a.rows_affected) html += \`<span><i data-lucide="rows-3"></i>\${a.rows_affected} rows</span>\`;
-                    html += \`</div></div>\`;
+                
+                const emptyEl = feed.querySelector('.empty-state');
+                if (emptyEl) emptyEl.remove();
+
+                let hasNewLog = false;
+                const reversedData = [...activities].reverse();
+
+                reversedData.forEach(a => {
+                    const fp = (a.id || '') + '_' + (a.timestamp || '') + '_' + (a.target || '') + '_' + (a.operation || '');
+                    if (!activeFeedStates.has(fp)) {
+                        activeFeedStates.add(fp);
+                        hasNewLog = true;
+
+                        const card = document.createElement('div');
+                        const statusCls = a.status === 'error' ? 'failed' : 'completed';
+                        card.className = 'tcard ts-' + statusCls;
+                        card.style.padding = '14px 18px';
+                        card.style.opacity = '0';
+                        card.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+                        card.style.transform = 'translateY(-10px)';
+
+                        const srcIcon = a.source === 'bigquery' ? 'database' : 'file-text';
+                        const srcLabel = a.source === 'bigquery' ? 'BigQuery' : 'Firestore';
+                        const srcColor = a.source === 'bigquery' ? 'var(--primary)' : 'var(--success)';
+                        const ts = a.timestamp ? new Date(a.timestamp).toLocaleString() : '';
+
+                        let html = '<div class="tcard-head"><span class="tbadge ' + statusCls + '" style="background:' + srcColor + ';color:#fff;font-weight:600;">' + srcLabel + '</span>';
+                        html += '<span class="tbadge ' + statusCls + '">' + (a.operation || 'unknown') + '</span></div>';
+                        html += '<div class="tcard-name" style="font-size:13px;margin:6px 0;">' + (a.target || '') + '</div>';
+                        if (a.detail) html += '<div class="tcard-desc" style="font-size:12px;color:var(--text-3);max-height:120px;overflow:hidden;">' + a.detail.substring(0, 200) + '</div>';
+                        html += '<div class="tcard-meta"><span><i data-lucide="clock"></i>' + ts + '</span>';
+                        if (a.rows_affected) html += '<span><i data-lucide="rows-3"></i>' + a.rows_affected + ' rows</span>';
+                        html += '</div>';
+
+                        card.innerHTML = html;
+
+                        if (feed.firstChild) {
+                            feed.insertBefore(card, feed.firstChild);
+                        } else {
+                            feed.appendChild(card);
+                        }
+
+                        setTimeout(() => {
+                            card.style.opacity = '1';
+                            card.style.transform = 'translateY(0)';
+                        }, 20);
+                    }
                 });
-                feed.innerHTML = html;
-                lucide.createIcons();
+
+                if (hasNewLog) {
+                    lucide.createIcons();
+                }
             } catch (e) { console.error('Activity fetch error:', e); }
         }
 
@@ -2225,7 +2503,18 @@ def index():
 @app.route('/api/data')
 def get_data():
     docs = db.collection(COLLECTION).stream()
-    data = [{"id": doc.id, "data": doc.to_dict()} for doc in docs]
+    data = []
+    for doc in docs:
+        doc_dict = doc.to_dict()
+        if "updated_at" not in doc_dict or not doc_dict["updated_at"]:
+            try:
+                doc_dict["updated_at"] = doc.update_time.isoformat()
+            except Exception:
+                if hasattr(doc, 'create_time') and doc.create_time:
+                    doc_dict["updated_at"] = doc.create_time.isoformat()
+                else:
+                    doc_dict["updated_at"] = ""
+        data.append({"id": doc.id, "data": doc_dict})
     return jsonify(data)
 
 @app.route('/api/create', methods=['POST'])
@@ -4328,14 +4617,16 @@ def get_people_mcp_toolset():
 ` : ''}
 
 async def generate_image(prompt: str, tool_context: ToolContext) -> dict:
-    """Generates an image based on the given prompt.
+    """Generates a professional business image or presentation slide based on the given prompt.
     
-    This tool creates visual assets like infographics, charts, or scenes. It automatically 
-    stores the image in the current environment's artifact service with a special prefix
-    that triggers automatic upload to GCS and rendering as a session file in Gemini Enterprise.
+    This tool creates visual assets like infographics, charts, or slides. It automatically 
+    stores the image in the current environment's artifact service to be rendered in the chat.
     
     Args:
-        prompt: A highly detailed, descriptive prompt for the image. Include stylistic instructions (e.g., 'photorealistic', 'flat design', 'neon corporate colors').
+        prompt: A highly detailed, descriptive prompt for the image. Include stylistic instructions (e.g., 'photorealistic', 'flat design').
+                CRITICAL: The prompt text MUST be written in the EXACT SAME language that the user is using in the current chat session.
+                If the conversation is in Japanese, you MUST write the entire prompt in Japanese (e.g., '武田電気株式会社の見積状況をまとめたスライド...').
+                This ensures all text inside the generated image is rendered in the user's language.
         
     Returns:
         A dictionary with status and detail keys.
@@ -4344,11 +4635,37 @@ async def generate_image(prompt: str, tool_context: ToolContext) -> dict:
     
     import os
     import logging
+    import re
     location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
     project = os.environ.get("GOOGLE_CLOUD_PROJECT")
     
     logging.info(f"generate_image called with prompt: {prompt}")
     logging.info(f"Using location: {location}, project: {project}")
+    
+    # 1. Automatic language detection on the prompt text (Detect Japanese characters)
+    is_japanese = bool(re.search(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', prompt))
+    
+    # 2. Construct robust system-level style and language guidelines based on detected language
+    base_style_rule = "\\n\\nCRITICAL STYLE RULE: NEVER include headers, watermarks, logos, or any text reading 'Consulting Firm' in the generated image."
+    
+    if is_japanese:
+        # Heavy reinforcement for Japanese rendering (Forces Imagen 3 to use Japanese fonts and text labels exclusively)
+        lang_rule = (
+            "\\n\\nCRITICAL LANGUAGE RULE: ALL text elements inside the generated image "
+            "(including presentation titles, headers, table labels, chart legends, data points, bullet points, annotations, and company names) "
+            "MUST be rendered EXCLUSIVELY in Japanese. Do NOT use any English or Latin characters. "
+            "For example, render company names as '武田電気株式会社' (not Takeden Co), "
+            "and use Japanese for headers like 'エグゼクティブサマリー' or '保留中の見積処理状況'. "
+            "This is a strict requirement."
+        )
+    else:
+        lang_rule = (
+            "\\n\\nCRITICAL LANGUAGE RULE: ALL text elements inside the generated image "
+            "(including titles, labels, axis names, legends, bullet points, annotations, captions) "
+            "MUST be rendered in the SAME language as the prompt text above. Do NOT mix languages."
+        )
+        
+    final_prompt = prompt + base_style_rule + lang_rule
     
     client = genai_client.Client(
         vertexai=True, 
@@ -4367,7 +4684,7 @@ async def generate_image(prompt: str, tool_context: ToolContext) -> dict:
             contents=[
                 types.Content(
                     role="user",
-                    parts=[types.Part.from_text(text=prompt + "\\n\\nCRITICAL STYLE RULE: NEVER include headers, watermarks, logos, or any text reading 'Consulting Firm' in the generated image.\\nLANGUAGE RULE: ALL text elements in the image (titles, labels, axis names, legends, bullet points, annotations, captions) MUST be rendered in the SAME language as the prompt text above. If the prompt is in Japanese, ALL text in the image must be in Japanese. If in English, all in English. Do NOT mix languages.")]
+                    parts=[types.Part.from_text(text=final_prompt)]
                 )
             ],
             config=types.GenerateContentConfig(
@@ -4977,6 +5294,87 @@ def delete_scheduled_task(
         "task_id": task_id,
         "message": "Scheduled task, execution record, and Cloud Scheduler job deleted.",
     }
+
+
+def write_operational_alert(
+    alert_title: str,
+    alert_message: str,
+    status: str = "pending",
+    tool_context: ToolContext = None
+) -> dict:
+    """Writes a high-priority operational alert or outreach task into the Firestore database.
+    ALWAYS use this tool when you need to record a high-risk client alert, outreach task, 
+    manual verification workflow, or log a manual review flag. Do NOT use raw MCP add_document.
+    
+    Args:
+        alert_title: Clear, descriptive title of the alert (e.g., 'High-Priority Outreach: Satoru Gojo').
+        alert_message: Detailed description of rules triggered, client profile, AUM, and required actions.
+        status: Initial status of the alert, defaults to 'pending'.
+        
+    Returns:
+        dict with write status and created alert_id.
+    """
+    import builtins, uuid, datetime
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+    if not _fs or not _demo_id:
+        return {"status": "error", "message": "Firestore operational database is not configured."}
+    
+    alert_id = f"alert_{uuid.uuid4().hex[:8]}"
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    doc_data = {
+        "alert_id": alert_id,
+        "title": alert_title,
+        "message": alert_message,
+        "status": status,
+        "created_at": now_iso,
+        "updated_at": now_iso
+    }
+    try:
+        _fs.collection(f"{_demo_id}_alerts").document(alert_id).set(doc_data)
+        return {"status": "success", "alert_id": alert_id, "message": "Alert recorded successfully in operational database."}
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to record alert: {str(e)}"}
+
+
+def save_document_to_db(
+    collection_name: str,
+    document_id: str,
+    document_json_string: str,
+    tool_context: ToolContext = None
+) -> dict:
+    """Saves or updates a structured document in the Firestore operational database.
+    Use this general tool to write structured records (orders, client updates, tasks) as clean JSON strings.
+    Bypasses raw MCP dict serialization bugs by accepting a clean JSON string.
+    
+    Args:
+        collection_name: Target collection name (e.g., 'outreach_tasks', 'client_status').
+        document_id: Unique document identifier (e.g., 'client_102').
+        document_json_string: Document body serialized as a clean JSON string (e.g., '{"status": "flagged", "aum": 5000000}').
+        
+    Returns:
+        dict with database write status.
+    """
+    import builtins, json
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+    if not _fs or not _demo_id:
+        return {"status": "error", "message": "Firestore database is not configured."}
+        
+    try:
+        data = json.loads(document_json_string)
+        if not isinstance(data, dict):
+            return {"status": "error", "message": "JSON body must represent a key-value dictionary."}
+        
+        # Automatically inject ISO-8601 timestamp representing last update time for dynamic sorting in Data Viewer
+        import datetime
+        data["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        
+        full_coll = f"{_demo_id}_{collection_name}" if not collection_name.startswith(_demo_id) else collection_name
+        _fs.collection(full_coll).document(document_id).set(data)
+        return {"status": "success", "document_id": document_id, "message": f"Document saved successfully in {full_coll}."}
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to save document: {str(e)}"}
 __TOOLS_EOF__
 
 mkdir -p adk_agent/app/examples/0.8
@@ -6533,6 +6931,9 @@ You are an autonomous business operations agent. Your mission is DUAL:
 (B) EXECUTE: Carry out multi-step operational workflows — scan for actionable items, apply business rules, update records, and report results.
 When the user gives a task, determine whether it is an ANALYSIS request or an EXECUTION request (or both), and act accordingly.
 
+--- GREETING & ONBOARDING UI GUARDRAIL (MANDATORY) ---
+When the user sends an initial greeting or open-ended first message (e.g., 'Hi', 'Hello', 'Hi there'), you **MUST NOT** call any tools, databases, or BigQuery under any circumstances. Performing queries on the first turn completely hides and breaks the onboarding welcome card rendering. You MUST immediately respond in the very first turn with the rich A2UI onboarding welcome card (using surfaceId 'welcome-card') and suggestion chips. Focus ONLY on welcome onboarding. Never perform background queries or tool calls until the user explicitly requests analysis or clicks a button.
+
 --- WORKFLOW EXECUTION MODE (CRITICAL) ---
 When the user requests an operational action (e.g., "process all pending items", "resolve flagged anomalies",
 "update all expired records", "run the reconciliation workflow"), you MUST follow this execution pattern:
@@ -6874,6 +7275,14 @@ instruction += (
     "CORRECT: Show results as markdown text + suggestion chips. "
     "WRONG: Output only <a2ui-json> chips without showing the results.\\n"
     "=== END RESULT PRESENTATION REMINDER ===\\n"
+    "\\n=== DATABASE WRITE RULES (CRITICAL - PREVENT MALFORMED_FUNCTION_CALL) ===\\n"
+    "Never attempt to use raw MCP 'add_document' or raw Firestore tools. "
+    "Gemini model parsing limits on raw Firestore MCP schemas trigger fatal 'MALFORMED_FUNCTION_CALL' errors. "
+    "Instead, you MUST strictly use these dedicated local tools:\\n"
+    "1. To record a high-priority notification, client outreach, system alert, or manual approval flag, ALWAYS use 'write_operational_alert' with clean string arguments.\\n"
+    "2. To write/update any structured document, client status, or complex record, ALWAYS use 'save_document_to_db' with a clean JSON-serialized string in 'document_json_string'.\\n"
+    "This is a strict system directive to ensure operational stability.\\n"
+    "=== END DATABASE WRITE RULES ===\\n"
 )
 
 schema_manager = A2uiSchemaManager(
@@ -10762,6 +11171,74 @@ function callVertexAIWithSearch(prompt) {
 }
 
 
+/**
+ * Calls Vertex AI gemini-3-pro-image-preview model in global region to generate an image.
+ * Returns an object containing base64Data and mimeType.
+ * @param {string} prompt Highly detailed image generation prompt in English.
+ * @returns {object} { base64Data: string, mimeType: string }
+ */
+function generateImageBase64WithRetry(prompt) {
+  return executeWithRetry(() => generateImageBase64(prompt));
+}
+
+function generateImageBase64(prompt) {
+  const host = 'aiplatform.googleapis.com';
+  const url = `https://${host}/v1/projects/${CONFIG.PROJECT_ID}/locations/global/publishers/google/models/gemini-3-pro-image-preview:generateContent`;
+  
+  const payload = {
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          { text: prompt }
+        ]
+      }
+    ],
+    generationConfig: {
+      responseModalities: ["IMAGE"]
+    }
+  };
+  
+  console.log('[ImageGen] Calling global gemini-3-pro-image-preview. Prompt length: ' + prompt.length);
+  
+  const response = UrlFetchApp.fetch(url, {
+    method: 'POST',
+    contentType: 'application/json',
+    headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+  
+  if (response.getResponseCode() !== 200) {
+    console.error(`[ImageGen Error] Code: ${response.getResponseCode()}, Body: ${response.getContentText()}`);
+    throw new Error(`Image Gen Error: ${response.getContentText()}`);
+  }
+  
+  const json = JSON.parse(response.getContentText());
+  if (!json.candidates || json.candidates.length === 0 || !json.candidates[0].content.parts) {
+    throw new Error("No candidates or parts returned from Image Gen API.");
+  }
+  
+  let base64Data = null;
+  let mimeType = 'image/jpeg';
+  
+  for (const part of json.candidates[0].content.parts) {
+    if (part.inlineData) {
+      base64Data = part.inlineData.data;
+      mimeType = part.inlineData.mimeType || mimeType;
+      break;
+    }
+  }
+  
+  if (!base64Data) {
+    throw new Error("No inlineData found in the response parts.");
+  }
+  
+  console.log('[ImageGen] SUCCESS! Got base64 data, length: ' + base64Data.length + ', mimeType: ' + mimeType);
+  return { base64Data: base64Data, mimeType: mimeType };
+}
+
+
 function executeWithRetry(fn) {
   let lastError;
   for (let attempt = 1; attempt <= CONFIG.MAX_RETRIES; attempt++) {
@@ -10895,9 +11372,13 @@ function generatePdfFromServer(content, fileName) {
     
     const base64 = Utilities.base64Encode(pdfBlob.getBytes());
     
+    // Save PDF temporarily to Google Drive as completely private to bypass Org Policy external sharing restrictions
+    const pdfFile = DriveApp.createFile(pdfBlob);
+    const fileId = pdfFile.getId();
+    
     DriveApp.getFileById(doc.getId()).setTrashed(true);
     
-    return { success: true, base64: base64 };
+    return { success: true, base64: base64, fileId: fileId };
   } catch (e) {
     console.error('PDF generation failed:', e.message);
     return { success: false, error: e.message };
@@ -11234,6 +11715,10 @@ Requirements for the Structured Output:
         - Explicit business rules and numeric thresholds appropriate to the domain (e.g., CPA limit, price discrepancy threshold).
         - Clear conditional paths (what is auto-process vs. what requires human approval).
         - Data systems involved (BigQuery/external files, Firestore operational database, Google Sheets).
+        - **High-fidelity Assets & Multi-modal Integration**: Intelligently design the challenge to utilize the platform's asset generation capabilities:
+            1. **Visual/HITL Triggers**: If the workflow involves any paper forms, manual applications, receipts, shipping box damages, visual inspection anomalies, or legacy physical processes, explicitly mandate a **JPEG image asset** (e.g. handwritten fax order, scanned invoice, damaged package photograph) as the primary trigger, requiring the agent to use multimodal vision before routing to Firestore for Human-in-the-Loop (HITL) manager approval.
+            2. **Structured Ledgers**: Integrate transactional logs, excel data dumps, or raw CSV exports as **Excel/CSV/TSV files** that the agent must parse (using TSV/CSV delimiter logic) and reconcile against the DB.
+            3. **Executive Outward Documents**: Design the workflow to output professional, executive-ready **PDF audit reports or customer statements** as the final outcome or human review package.
         *NOTE*: If the input already lists target workflows or specific steps, respect them and build the operational challenge specifically around those workflows.
 2.  **Operational/Database Focus**: ALWAYS frame the scenario as a database-driven workflow where the agent reads from analytical sources (BigQuery/external files) and **writes back status updates, high-risk alerts, or proposed changes to the operational database (Firestore)** to keep the real-time console updated.
 3.  **No Fictional Placeholders**: Use realistic brand names, locations, and values appropriate to the language context. Do NOT use generic placeholders like \"Product A\", \"Company XYZ\", etc.

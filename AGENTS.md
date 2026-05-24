@@ -136,6 +136,10 @@ Layer 4: Browser JavaScript execution
     `SyntaxError` if it contains emoji or other invalid syntax. **Use plain-text
     descriptions instead of literal escape sequences in comments.**
 
+13. **NEVER use unescaped single backticks (`` ` ``) inside JavaScript template literals in Code.gs.**
+    `Code.gs` contains huge JS template literals that act as code generators (e.g., `getTechnicalInstruction_()`). Using raw backticks inside these blocks (for example, to highlight a word in a text description like `` `context` ``) will prematurely close the template literal, leading to compilation/clasp push failure: `SyntaxError: Unexpected identifier`.
+    **Use plain text, quotes, or explicitly escape the backtick (`` \` ``) instead.**
+
 ### 2.2 Escaping by Heredoc Type
 
 #### Quoted Heredoc (`cat <<'EOF'`)
@@ -387,6 +391,20 @@ to substitute matches from session state. If the variable is not found, it raise
 # Path: projects/.../documents/collection/<document_id>
 ```
 
+#### Example K: Loop placeholders in A2UI instructions (system prompt)
+
+**WRONG** — `{i}` is matched by ADK's template engine, causing `KeyError: 'Context variable not found: i'` at runtime:
+```python
+# In getTechnicalInstruction_ (inside Code.gs):
+# "...bound to /form/item_{i}_name"
+```
+
+**RIGHT** — use plain `i` or brackets `[i]` to avoid engine matching:
+```python
+# In getTechnicalInstruction_:
+# "...bound to /form/item_i_name"
+```
+
 ### 2.5 Verification Checklist
 
 Before submitting any change that touches Python code inside heredocs:
@@ -396,7 +414,7 @@ Before submitting any change that touches Python code inside heredocs:
 - [ ] Search for `'\r'` or `"\r"` → replace with `chr(13)` if inside a heredoc
 - [ ] Confirm no f-strings use `{` that could conflict with JS `${}`
 - [ ] Confirm `$` usage: quoted heredoc = safe; unquoted heredoc = needs `\$`
-- [ ] Search for `{word}` patterns in agent `instruction` text → replace with `<word>` or `[WORD]`
+- [ ] Search for `{word}` or `{i}` loop placeholders in agent `instruction` text (including `getTechnicalInstruction_`) → replace with `<word>`, `[WORD]`, or plain `i` / `[i]`
 - [ ] Search for backtick triplets (` ``` `) → replace with `chr(96) * 3` in Python code
 - [ ] Check regex patterns in raw strings (`r'...'`): `\s`, `\n`, `\t` need `\\s`, `\\n`, `\\t` for JS layer
 - [ ] **Viewer template (`__VIEWER_MAIN__`)**: Any JS `\n` in string literals needs `\\\\n` (4 backslashes) due to the extra Python `"""` layer
