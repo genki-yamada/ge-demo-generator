@@ -806,7 +806,7 @@ If the Business Problem naturally involves processing non-structured inputs like
         1. **Title**: Large formal printed header at the top center (e.g., 'Purchase Order' / 'Invoice' or translated equivalent matching the domain).
         2. **Recipient**: Recipient company details on the top-left (e.g., '[RECIPIENT_COMPANY]' with appropriate localized polite suffix).
         3. **Sender**: Sender company details on the top-right (matching generated client data).
-        4. **Table Grid**: Neatly printed columns for details (e.g., 'No.', 'Product Name', 'Qty'). Inside the cells, neatly write the handwritten items corresponding exactly to BQ/Firestore transaction data.
+        4. **Table Grid**: Neatly printed columns for details (e.g., 'No.', 'Product Name', 'Qty'). Inside the cells, neatly write the handwritten items corresponding exactly to BQ/Firestore transaction data. **You MUST ensure the table contains AT LEAST TWO (2) OR MORE distinct row items (e.g., multiple different products or services ordered) to represent a realistic multi-line business document. Never generate a document with only a single item row.**
         5. **Footer**: Total amounts, and a designated seal/signature box. If culturally appropriate (e.g., Japanese domain), include: **"in the designated space, a small, faint red ink corporate seal stamp is printed."** Otherwise, include a formal handwritten signature block.
 - **VARIATION & SEED (CRITICAL)**:
   - Image 1 (e.g., Task 1): Depict a standard operational sheet (e.g., handwritten order from Customer A with normal quantities and readable items).
@@ -888,14 +888,14 @@ Output in the following JSON format. Output **pure JSON only without code blocks
       "fileName": "handwritten_fax_order_task1.jpg",
       "mimeType": "image/jpeg",
       "description": "Simulated operational document 1 (e.g. handwritten purchase order from Client A with normal quantities)",
-      "imagePrompt": "A highly detailed, realistic top-down flat-lay scan of a formal purchase order sheet. The clean white document page fills the entire frame with zero background, completely isolated. At the top center, a bold formal header matching the domain (e.g., 'PURCHASE ORDER') is printed. On the top-left, recipient details and company name are printed in a clean corporate font. On the top-right, sender company details along with localized contact information are printed. In the center, a neatly aligned printed table grid with thin gray lines features standard columns like 'Item No.', 'Product Name', and 'Quantity'. Inside the table cells, highly realistic, messy, and hurried human handwriting in black ballpoint pen ink is neatly filled (showing realistic human imperfections, hurried scribbles, varying character sizes, and slight character misalignment). Natural flat daylight illuminates the scene, showing subtle paper folds and real-world operational handling texture. Sharp contrast, flat perspective, and zero angled shots."
+      "imagePrompt": "A highly detailed, realistic top-down flat-lay scan of a formal purchase order sheet. The clean white document page fills the entire frame with zero background, completely isolated. At the top center, a bold formal header matching the domain (e.g., 'PURCHASE ORDER') is printed. On the top-left, recipient details and company name are printed in a clean corporate font. On the top-right, sender company details along with localized contact information are printed. In the center, a neatly aligned printed table grid with thin gray lines features standard columns like 'Item No.', 'Product Name', and 'Quantity'. Inside the table cells, highly realistic, messy, and hurried human handwriting in black ballpoint pen ink is neatly filled, showing AT LEAST TWO (2) OR THREE (3) distinct product rows with their respective quantities and codes (showing realistic human imperfections, hurried scribbles, varying character sizes, and slight character misalignment). Natural flat daylight illuminates the scene, showing subtle paper folds and real-world operational handling texture. Sharp contrast, flat perspective, and zero angled shots."
     },
     {
       "id": "file3",
       "fileName": "handwritten_fax_order_task2.jpg",
       "mimeType": "image/jpeg",
       "description": "Simulated operational document 2 (e.g. handwritten purchase order from Client B showcasing a clear quantity or product ID discrepancy for audit verification)",
-      "imagePrompt": "A high-quality, top-down flat scan of a different formal transaction document (e.g., 'INVOICE' or 'DELIVERY SLIP') filling the entire frame with no background. Features a bold domain-specific printed header with date and document reference numbers. Recipient and sender corporate details are cleanly aligned at the top. In the center, a printed table grid features catalog item lines. Inside the grid cells, highly realistic, hurried, and messy human handwriting in dark blue ink lists the items, intentionally showcasing a clear operational discrepancy (such as an abnormally high quantity, discontinued item code, or fuzzy specification to trigger the audit flow). The handwriting is slightly untidy, hurried, and scribble-like, showcasing human imperfection and hasty pen strokes. A designated signature block or faint red ink corporate stamp is present in the designated footer space. Clear flat document view with zero perspective blur."
+      "imagePrompt": "A high-quality, top-down flat scan of a different formal transaction document (e.g., 'INVOICE' or 'DELIVERY SLIP') filling the entire frame with no background. Features a bold domain-specific printed header with date and document reference numbers. Recipient and sender corporate details are cleanly aligned at the top. In the center, a printed table grid features AT LEAST TWO (2) OR THREE (3) distinct catalog item rows. Inside the grid cells, highly realistic, hurried, and messy human handwriting in dark blue ink lists these multiple items, with at least one of the rows intentionally showcasing a clear operational discrepancy (such as an abnormally high quantity, discontinued item code, or fuzzy specification to trigger the audit flow) while other rows represent normal transactions. The handwriting is slightly untidy, hurried, and scribble-like, showcasing human imperfection and hasty pen strokes. A designated signature block or faint red ink corporate stamp is present in the designated footer space. Clear flat document view with zero perspective blur."
     },
     {
       "id": "file4",
@@ -11372,13 +11372,9 @@ function generatePdfFromServer(content, fileName) {
     
     const base64 = Utilities.base64Encode(pdfBlob.getBytes());
     
-    // Save PDF temporarily to Google Drive as completely private to bypass Org Policy external sharing restrictions
-    const pdfFile = DriveApp.createFile(pdfBlob);
-    const fileId = pdfFile.getId();
-    
     DriveApp.getFileById(doc.getId()).setTrashed(true);
     
-    return { success: true, base64: base64, fileId: fileId };
+    return { success: true, base64: base64 };
   } catch (e) {
     console.error('PDF generation failed:', e.message);
     return { success: false, error: e.message };

@@ -2163,8 +2163,8 @@
                   class="text-[8px] font-normal lowercase opacity-60 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">Dynamic
                   script update</span>
               </label>
-              <textarea id="systemInstruction" oninput="updateScriptLocally()" rows="3"
-                class="w-full bg-black/40 border border-gray-700 rounded-2xl p-5 text-[11px] text-sky-200 font-mono transition-all focus:ring-1 focus:ring-sky-500 shadow-inner leading-relaxed"></textarea>
+              <textarea id="systemInstruction" oninput="updateScriptLocally()" rows="6"
+                class="w-full bg-black/40 border border-gray-700 rounded-2xl p-5 text-[11px] text-sky-200 font-mono transition-all focus:ring-1 focus:ring-sky-500 shadow-inner leading-relaxed resize-y min-h-[150px]"></textarea>
             </div>
 
             <!-- Data Preview -->
@@ -2714,6 +2714,16 @@
 <div id="toast">Copied to clipboard!</div>
 
   <script>
+    const GENERATOR_MODEL = '<?= typeof generatorModel !== "undefined" ? generatorModel : "gemini-3.5-flash" ?>';
+    
+    function formatModelName(modelId) {
+      if (!modelId) return 'Gemini 3.5 Flash';
+      return modelId
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    }
+
     let currentData = null;
     
     function toggleLeftSidebar() {
@@ -4773,7 +4783,7 @@
         // 1. Add the AI Agent Central Actor Node
         nodes.push({
           id: 'ai_agent_core',
-          label: `<b>🤖 AI AGENT</b>\n<i>────────────────</i>\n🧠 Gemini 3.1 Pro\n⚡ Autonomous MCP Actor`,
+          label: `<b>🤖 AI AGENT</b>\n<i>────────────────</i>\n🧠 ${formatModelName(GENERATOR_MODEL)}\n⚡ Enterprise Task Orchestrator`,
           shape: 'box',
           font: {
             multi: 'html',
@@ -5112,6 +5122,113 @@
       showToast('Image downloaded successfully!');
     };
 
+    function renderSimulatedPDF(content) {
+      if (!content) return '<div class="text-gray-400 text-center p-8">No document content available.</div>';
+      
+      const lines = content.split('\n');
+      let html = '<div class="max-w-3xl mx-auto bg-white p-8 sm:p-12 my-4 shadow-2xl border border-gray-200 rounded-xl text-slate-800 font-serif min-h-[80vh] select-text">';
+      
+      function parseBold(text) {
+        if (!text) return '';
+        let escaped = text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+        return escaped.replace(/\*\*(.*?)\*\*/g, '<strong class="font-sans font-extrabold text-slate-950">$1</strong>');
+      }
+
+      let inList = false;
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          if (inList) {
+            html += '</ul>';
+            inList = false;
+          }
+          html += '<div class="h-3"></div>';
+          return;
+        }
+
+        if (inList && !trimmed.startsWith('- ')) {
+          html += '</ul>';
+          inList = false;
+        }
+
+        if (trimmed.startsWith('# ')) {
+          html += `<h1 class="text-2xl font-bold text-slate-950 border-b-2 border-slate-200 pb-2.5 mt-6 mb-4 font-sans tracking-tight">${parseBold(trimmed.substring(2))}</h1>`;
+        } else if (trimmed.startsWith('## ')) {
+          html += `<h2 class="text-lg font-bold text-slate-900 mt-5 mb-3 font-sans tracking-tight border-b border-slate-100 pb-1">${parseBold(trimmed.substring(3))}</h2>`;
+        } else if (trimmed.startsWith('### ')) {
+          html += `<h3 class="text-sm font-bold text-slate-800 mt-4 mb-2 font-sans">${parseBold(trimmed.substring(4))}</h3>`;
+        } else if (trimmed.startsWith('- ')) {
+          if (!inList) {
+            html += '<ul class="list-disc list-inside space-y-2 my-3 pl-4 text-slate-700">';
+            inList = true;
+          }
+          html += `<li class="text-sm leading-relaxed pl-1">${parseBold(trimmed.substring(2))}</li>`;
+        } else if (trimmed.startsWith('[CHART:')) {
+          const match = trimmed.match(/\[CHART:\s*(BAR|PIE|LINE)?,?\s*([^,\]]+),\s*([^\]]+)\]/i);
+          if (match) {
+            const type = (match[1] || 'BAR').toUpperCase();
+            const title = match[2].trim();
+            const dataStr = match[3].trim();
+            const pairs = dataStr.split(',').map(p => p.trim());
+            
+            let chartHtml = `
+              <div class="my-6 p-5 bg-slate-50 border border-slate-200 rounded-xl font-sans">
+                <div class="text-xs font-bold text-slate-700 mb-4 text-center uppercase tracking-wider border-b border-slate-200/60 pb-2">${title}</div>
+                <div class="space-y-3">
+            `;
+            
+            let maxVal = 1;
+            const parsedPairs = pairs.map(p => {
+              const parts = p.split('=');
+              if (parts.length === 2) {
+                const label = parts[0].trim();
+                const val = parseFloat(parts[1].trim()) || 0;
+                if (val > maxVal) maxVal = val;
+                return { label, val };
+              }
+              return null;
+            }).filter(x => x !== null);
+
+            parsedPairs.forEach(p => {
+              const widthPct = Math.max((p.val / maxVal) * 100, 2);
+              chartHtml += `
+                <div class="flex items-center text-[11px]">
+                  <div class="w-28 font-medium text-slate-600 truncate">${p.label}</div>
+                  <div class="flex-1 bg-slate-200 h-3.5 rounded-full overflow-hidden mx-3 relative shadow-inner">
+                    <div class="bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full shadow" style="width: ${widthPct}%"></div>
+                  </div>
+                  <div class="w-12 text-right font-mono font-bold text-slate-800">${p.val}</div>
+                </div>
+              `;
+            });
+            
+            chartHtml += `
+                </div>
+              </div>
+            `;
+            html += chartHtml;
+          } else {
+            html += `<p class="text-sm my-3 leading-relaxed text-slate-700">${parseBold(trimmed)}</p>`;
+          }
+        } else {
+          html += `<p class="text-sm my-3 leading-relaxed text-slate-700">${parseBold(trimmed)}</p>`;
+        }
+      });
+
+      if (inList) {
+        html += '</ul>';
+      }
+
+      html += '</div>';
+      return html;
+    }
+
     // Universal Document Preview Modal Controller (Image, PDF, Excel/CSV)
     window.openDocModal = function(index) {
       if (!currentData || !currentData.externalFiles || !currentData.externalFiles[index]) return;
@@ -5132,6 +5249,12 @@
       viewPdf.classList.replace('flex', 'hidden');
       viewExcel.classList.replace('flex', 'hidden');
       
+      const pdfHTML = document.getElementById('pdfPreviewHTML');
+      if (pdfHTML) {
+        pdfHTML.innerHTML = '';
+        pdfHTML.classList.add('hidden');
+      }
+      
       title.innerText = file.fileName;
       
       const isExcel = file.fileName.endsWith('.xlsx') || file.fileName.endsWith('.csv') || file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -5148,7 +5271,7 @@
         
         viewImg.classList.replace('hidden', 'flex');
       }
-      // PDF Viewport Population (Google Drive Embed Preview with Robust Loading Spinner)
+      // PDF Viewport Population (Client-side High-Fidelity HTML Simulation of PDF to avoid sandbox iframe blockages)
       else if (file.mimeType === 'application/pdf') {
         icon.innerText = '📄';
         
@@ -5161,32 +5284,18 @@
         // Reveal the parent container first to allow absolute positioning layout computations to run correctly
         viewPdf.classList.replace('hidden', 'flex');
         
-        // Force spinner visibility and ensure iframe stays hidden during loading
-        if (spinner) spinner.classList.remove('hidden');
+        // Hide iframe and spinner immediately
+        if (spinner) spinner.classList.add('hidden');
         if (pdfFrame) {
           pdfFrame.src = '';
           pdfFrame.classList.add('hidden');
         }
         
-        showToast('Generating high-fidelity PDF preview...');
-        
-        // Call server to generate and save temp PDF to Google Drive (fully private)
-        google.script.run
-          .withSuccessHandler(function(response) {
-            if (response && response.success && response.fileId) {
-              // Mount Drive preview URL to bypass sandbox restrictions via cookie session
-              pdfFrame.src = 'https://drive.google.com/file/d/' + response.fileId + '/preview';
-              showToast('PDF generated! Loading preview viewer...');
-            } else {
-              if (spinner) spinner.classList.add('hidden');
-              showToast('Failed to generate PDF preview.', 4000);
-            }
-          })
-          .withFailureHandler(function(err) {
-            if (spinner) spinner.classList.add('hidden');
-            showToast('Failed to generate PDF preview: ' + err.message, 4000);
-          })
-          .generatePdfFromServer(file.fileContent || '', file.fileName);
+        // Populate and reveal the simulated HTML PDF viewer
+        if (pdfHTML) {
+          pdfHTML.innerHTML = renderSimulatedPDF(file.fileContent || file.csvContent || '');
+          pdfHTML.classList.remove('hidden');
+        }
       }
       // Excel / CSV Data Table Rendering
       else if (isExcel) {
@@ -5299,16 +5408,34 @@
       setTimeout(() => {
         modal.classList.remove('flex');
         modal.classList.add('hidden');
+        
+        // Clear iframe src and HTML preview container
+        const pdfFrame = document.getElementById('pdfPreviewFrame');
+        if (pdfFrame) {
+          pdfFrame.src = '';
+        }
+        
+        const pdfHTML = document.getElementById('pdfPreviewHTML');
+        if (pdfHTML) {
+          pdfHTML.innerHTML = '';
+          pdfHTML.classList.add('hidden');
+        }
+        
+        // Revoke the object URL
+        if (window.currentPdfBlobUrl) {
+          URL.revokeObjectURL(window.currentPdfBlobUrl);
+          window.currentPdfBlobUrl = null;
+        }
       }, 300);
     };
 
-    // Dismiss PDF loading spinner when the iframe is completely loaded with a valid Drive URL
+    // Dismiss PDF loading spinner when the iframe is completely loaded with a valid Blob URL
     window.onPdfFrameLoad = function() {
       const spinner = document.getElementById('pdfLoadingSpinner');
       const pdfFrame = document.getElementById('pdfPreviewFrame');
       
-      // Guard: Avoid firing on empty or about:blank reset sources (Strictly wait for Drive compilation)
-      if (pdfFrame && pdfFrame.src && pdfFrame.src.includes('drive.google.com')) {
+      // Guard: Avoid firing on empty or about:blank reset sources (Strictly wait for Blob compilation)
+      if (pdfFrame && pdfFrame.src && (pdfFrame.src.startsWith('blob:') || pdfFrame.src.includes('blob:'))) {
         if (spinner) spinner.classList.add('hidden');
         pdfFrame.classList.remove('hidden');
       }
@@ -5697,6 +5824,8 @@
           </div>
           <!-- PDF Frame: Calls window.onPdfFrameLoad() when rendering is fully complete -->
           <iframe id="pdfPreviewFrame" src="" class="w-full h-full rounded-xl border border-white/10 hidden" style="background: #1e293b;" onload="window.onPdfFrameLoad()"></iframe>
+          <!-- High-Fidelity Simulated HTML PDF Viewer (Avoids Chrome sandboxed iframe blob blockages) -->
+          <div id="pdfPreviewHTML" class="w-full h-full rounded-xl border border-white/10 overflow-y-auto hidden p-6" style="background: #1e293b;"></div>
         </div>
         
         <!-- 3. Excel / CSV Viewport (Stylized High-Fidelity Data Table) -->
