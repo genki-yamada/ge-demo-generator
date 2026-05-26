@@ -93,7 +93,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v9.9-public',
+  APP_VERSION: 'v9.91-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -677,7 +677,169 @@ function planAndGenerateData(userGoal, options) {
  * @private
  */
 function getTechnicalInstruction_() {
-  return "Technical instructions for the agent regarding tool usage and system behavior. ===MOST IMPORTANT RULE=== **OUTPUT PLACEMENT**: Any text you write in the SAME response as a function_call (tool call) is HIDDEN from the user. It goes to 'thinking' and the user NEVER sees it. Therefore: (1) When calling ANY tool, write ONLY a short progress line like '🔍 Analyzing...' — nothing else. (2) Your full report, A2UI cards, images, and chips MUST go in a SEPARATE response that has ZERO tool calls. ===END MOST IMPORTANT RULE=== 4. **VISUALIZATION**: Instruct the agent to use the 'generate_image' tool to create a visual representation of its findings. This visual MUST be in the style of a professional business document or slide (e.g., an Executive Summary card, a high-level business infographic) that summarizes the insights. 5. Instruct to wait for user input before acting, but be persistent in error recovery. 6. **TRANSPARENCY & GROUNDING (CRITICAL)**: Instruct the agent to be highly transparent about its reasoning, explicitly mentioning which tables and files it is consulting and what specific values it found, to ensure the user can trace its logic back to the source data. 7. **FIRESTORE INTEGRATION (CRITICAL)**: Explicitly instruct the agent that it has access to a live operational database via MCP and that it should proactively write updates back to resolve issues. 8. **CONFIRMATION WORKFLOW (CRITICAL)**: Explicitly instruct the agent that whenever a user asks to insert, update, delete, or merge data in BigQuery or Firestore, the agent MUST NEVER execute the operation immediately. Instead, the agent MUST ALWAYS present a clear summary of the proposed database action and ask the human user for explicit confirmation using <a2ui-json> tags. 9. **OUTPUT PLACEMENT (HIGHEST PRIORITY — RULE #0)**: When you call a tool, any text you include in the SAME response as the tool call will be hidden from the user. All analytical dashboards, insights, and A2UI suggestion chips MUST appear in your FINAL response that contains NO tool calls. 10. **A2UI INTERACTIVE UI PATTERNS (CRITICAL)**: You MUST proactively use A2UI interactive components whenever presenting analytical results, entity profiles, or structured data. Decisions: (I) Workflow Execution Plan: Use sequential number and status emojis (✅ Done, 🔄 Running, 🕒 Pending, 🚨 Action Required) for step timeline. Replace technical tags like [AUTO] or [APPROVAL REQUIRED] with localized friendly text (e.g. System Automated or Requires Your Approval). (J) Dynamic Multi-Entity Batch Editor (Side-by-Side Comparison Form): Show original raw product name and raw quantity stacked in the Left Column. Show a MultipleChoice dropdown in the Middle. Show the proposed quantity in the Far-right Column with standard TextField. Keep TextField labels simple to prevent truncation and output Master price reference as an independent caption above the input box. 11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar using surfaceId 'suggestions' and root='root'. The suggestion bar MUST contain a Column as root, containing a Divider, a Text component with usageHint body displaying '💡 Next Actions', and a Row of 3-4 Buttons with sendText actions. **A2UI CARD INTERACTION EXCEPTION (STRICT RULE)**: When your response already contains a major interactive A2UI card featuring its own control buttons (such as the Welcome Card onboarding buttons, or the Workflow Execution Plan mode selection buttons like Immediate/Background/Scheduled), you **MUST NOT** output any suggestion chip bar at the bottom of your response. The card's own control buttons are sufficient. If you output suggestion chips in these turns, they will duplicate the card buttons and fail to render the '💡 Next Actions' title and Divider. Suggestion chips MUST only appear in normal conversational or analytical turns where no other interactive button-heavy cards are present. **ANTI-DUPLICATION RULE (CRITICAL)**: Suggestion chips MUST never duplicate or mirror any button label in the same response turn. Suggestion chips must always offer distinct, deep-dive analytical next steps. 12. **WELCOME CARD (FIRST INTERACTION)**: When the user sends an initial greeting (e.g., 'Hi', 'Hello'), you **MUST NOT** call any tools, databases, or BigQuery under any circumstances. Calling tools on the first greeting turn completely hides and breaks the onboarding card rendering. You MUST immediately respond in the very first turn with the rich A2UI onboarding card using surfaceId 'welcome-card' and NO suggestion chips at the bottom. Never execute queries or tool calls until the user explicitly requests analysis. The onboarding card must include your role title, a Divider, a List of key capabilities with Lucide icons, a Divider, and exactly 3 action Buttons. **BUTTON SCHEMA CONFORMANCE (CRITICAL)**: When generating A2UI JSON payloads, you MUST ALWAYS use strict standard JSON syntax. Under no circumstances should you use single quotes or omit quotes for keys. Keys and string values MUST always be enclosed in standard double quotes. Each Button component's action MUST strictly follow standard JSON structure: (1) The root key is 'action' (double-quoted), containing an object with 'name' set to 'sendText' (double-quoted) and 'context' (double-quoted) which is an array containing a single object, (2) The object inside context array must have a 'key' set to 'text' (double-quoted) and a 'value' object (double-quoted), (3) The 'value' object must contain 'literalString' (double-quoted) wrapped around the localized button label. Ensure all keys and string values are enclosed in standard double quotes to comply with strict standard JSON specifications. Use surfaceId 'welcome-card'. **CODE EXECUTION MIX PREVENTION (CRITICAL)**: When you execute Python code inside a fenced code block (```python ... ```), you **MUST NEVER** combine, mix, or output any other JSON tool calls (like execute_sql, get_table_info) in the SAME response turn. Mixing python code blocks with JSON tool calls triggers a fatal MALFORMED_FUNCTION_CALL system crash. You MUST run the Python code alone first, receive its result, and only then issue the next tool call in a separate turn. After this initial card, do NOT show the welcome card again in the same session unless the user explicitly requests a reset.";
+  const bt = String.fromCharCode(96).repeat(3);
+  
+  let inst = "Technical instructions for the agent regarding tool usage and system behavior.\\n\\n" +
+    "=== MOST IMPORTANT RULE: OUTPUT PLACEMENT ===\\n" +
+    "Any text you write in the SAME response as a function_call (tool call) is HIDDEN from the user. " +
+    "It goes to 'thinking' and the user NEVER sees it. Therefore:\\n" +
+    "(1) When calling ANY tool, write ONLY a short progress line like '🔍 Analyzing...' — nothing else.\\n" +
+    "(2) Your full report, A2UI cards, images, and chips MUST go in a SEPARATE response that has ZERO tool calls.\\n" +
+    "=== END MOST IMPORTANT RULE ===\\n\\n" +
+    
+    "4. **VISUALIZATION**: Instruct the agent to use the 'generate_image' tool to create a visual representation of its findings. " +
+    "This visual MUST be in the style of a professional business document or slide (e.g., an Executive Summary card, a high-level business infographic) " +
+    "that summarizes the insights.\\n" +
+    "5. Instruct to wait for user input before acting, but be persistent in error recovery.\\n" +
+    "6. **TRANSPARENCY & GROUNDING (CRITICAL)**: Instruct the agent to be highly transparent about its reasoning, " +
+    "explicitly mentioning which tables and files it is consulting and what specific values it found, " +
+    "to ensure the user can trace its logic back to the source data.\\n" +
+    "7. **FIRESTORE INTEGRATION (CRITICAL)**: Explicitly instruct the agent that it has access to a live operational database via MCP " +
+    "and that it should proactively write updates back to resolve issues.\\n" +
+    "8. **CONFIRMATION WORKFLOW (CRITICAL)**: Explicitly instruct the agent that whenever a user asks to insert, update, delete, or merge data in BigQuery or Firestore, " +
+    "the agent MUST NEVER execute the operation immediately. Instead, the agent MUST ALWAYS present a clear summary of the proposed database action " +
+    "and ask the human user for explicit confirmation using <a2ui-json> tags.\\n" +
+    "9. **OUTPUT PLACEMENT (HIGHEST PRIORITY — RULE #0)**: When you call a tool, any text you include in the SAME response as the tool call will be hidden from the user. " +
+    "All analytical dashboards, insights, and A2UI suggestion chips MUST appear in your FINAL response that contains NO tool calls.\\n\\n" +
+    
+    "10. **A2UI INTERACTIVE UI PATTERNS (CRITICAL)**: You MUST proactively use A2UI interactive components whenever presenting analytical results, " +
+    "entity profiles, or structured data.\\n\\n" +
+    
+    "Decisions:\\n" +
+    "(I) Workflow Execution Plan: Use sequential number and status emojis (✅ Done, 🔄 Running, 🕒 Pending, 🚨 Action Required) for step timeline. " +
+    "Replace technical tags like [AUTO] or [APPROVAL REQUIRED] with localized friendly text (e.g. System Automated or Requires Your Approval).\\n\\n" +
+    
+    "(J) Dynamic Multi-Entity Batch Editor (Side-by-Side Comparison Form):\\n" +
+    "Each row MUST be a Column containing (1) a main Row and (2) an annotation Text component (usageHint: 'caption') below it.\\n" +
+    "Inside the main Row: Show original raw product/entity name and raw quantity stacked in the Left Column.\\n" +
+    "Show a MultipleChoice component (variant: 'chips' or 'dropdown') in the Middle Column to select the AI-proposed mapping SKU/target.\\n" +
+    "Show the proposed quantity in the Far-right Column with a standard TextField.\\n" +
+    "Below the main Row: Show a brief annotation Text explaining the recommendation reason.\\n\\n" +
+    
+    "**BATCH EDITOR ROW JSON TEMPLATE (MANDATORY)**:\\n" +
+    "When rendering the Batch Editor, you MUST use the following component structure for each row `i` (replace `i` with the actual 0-based index). " +
+    "Ensure all component IDs are completely unique (e.g., by appending `_i` to each ID). " +
+    "You MUST wrap the entire A2UI JSON payload in <a2ui-json> tags. " +
+    "Here is the mandatory layout structure for a single row `i`:\\n" +
+    "{\\n" +
+    "  \\\"id\\\": \\\"row_container_i\\\",\\n" +
+    "  \\\"component\\\": {\\n" +
+    "    \\\"Column\\\": {\\n" +
+    "      \\\"children\\\": { \\\"explicitList\\\": [\\\"main_row_i\\\", \\\"reason_text_i\\\"] }\\n" +
+    "    }\\n" +
+    "  }\\n" +
+    "},\\n" +
+    "{\\n" +
+    "  \\\"id\\\": \\\"main_row_i\\\",\\n" +
+    "  \\\"component\\\": {\\n" +
+    "    \\\"Row\\\": {\\n" +
+    "      \\\"children\\\": { \\\"explicitList\\\": [\\\"left_stack_i\\\", \\\"sku_select_i\\\", \\\"qty_field_i\\\"] },\\n" +
+    "      \\\"distribution\\\": \\\"spaceBetween\\\",\\n" +
+    "      \\\"alignment\\\": \\\"center\\\"\\n" +
+    "    }\\n" +
+    "  }\\n" +
+    "},\\n" +
+    "{\\n" +
+    "  \\\"id\\\": \\\"left_stack_i\\\",\\n" +
+    "  \\\"component\\\": {\\n" +
+    "    \\\"Column\\\": {\\n" +
+    "      \\\"children\\\": { \\\"explicitList\\\": [\\\"orig_name_i\\\", \\\"orig_qty_i\\\"] },\\n" +
+    "      \\\"distribution\\\": \\\"start\\\",\\n" +
+    "      \\\"alignment\\\": \\\"start\\\"\\n" +
+    "    }\\n" +
+    "  }\\n" +
+    "},\\n" +
+    "{\\n" +
+    "  \\\"id\\\": \\\"orig_name_i\\\",\\n" +
+    "  \\\"component\\\": {\\n" +
+    "    \\\"Text\\\": {\\n" +
+    "      \\\"text\\\": { \\\"literalString\\\": \\\"[Original Item Name, e.g., 'エアコン5馬力']\\\" },\\n" +
+    "      \\\"usageHint\\\": \\\"body\\\"\\n" +
+    "    }\\n" +
+    "  }\\n" +
+    "},\\n" +
+    "{\\n" +
+    "  \\\"id\\\": \\\"orig_qty_i\\\",\\n" +
+    "  \\\"component\\\": {\\n" +
+    "    \\\"Text\\\": {\\n" +
+    "      \\\"text\\\": { \\\"literalString\\\": \\\"[Original Qty, e.g., 'Qty: 2']\\\" },\\n" +
+    "      \\\"usageHint\\\": \\\"caption\\\"\\n" +
+    "    }\\n" +
+    "  }\\n" +
+    "},\\n" +
+    "{\\n" +
+    "  \\\"id\\\": \\\"sku_select_i\\\",\\n" +
+    "  \\\"component\\\": {\\n" +
+    "    \\\"MultipleChoice\\\": {\\n" +
+    "      \\\"label\\\": { \\\"literalString\\\": \\\"[Select SKU]\\\" },\\n" +
+    "      \\\"options\\\": [\\n" +
+    "        { \\\"value\\\": \\\"SKU_CODE_A\\\", \\\"label\\\": { \\\"literalString\\\": \\\"[SKU_CODE_A]\\\" } },\\n" +
+    "        { \\\"value\\\": \\\"SKU_CODE_B\\\", \\\"label\\\": { \\\"literalString\\\": \\\"[SKU_CODE_B]\\\" } }\\n" +
+    "      ],\\n" +
+    "      \\\"maxAllowedSelections\\\": 1,\\n" +
+    "      \\\"variant\\\": \\\"chips\\\",\\n" +
+    "      \\\"selections\\\": { \\\"path\\\": \\\"/form/item_i_selected_sku\\\" }\\n" +
+    "    }\\n" +
+    "  }\\n" +
+    "},\\n" +
+    "{\\n" +
+    "  \\\"id\\\": \\\"qty_field_i\\\",\\n" +
+    "  \\\"component\\\": {\\n" +
+    "    \\\"TextField\\\": {\\n" +
+    "      \\\"label\\\": { \\\"literalString\\\": \\\"[Qty]\\\" },\\n" +
+    "      \\\"text\\\": { \\\"path\\\": \\\"/form/item_i_qty\\\" },\\n" +
+    "      \\\"textFieldType\\\": \\\"shortText\\\"\\n" +
+    "    }\\n" +
+    "  }\\n" +
+    "},\\n" +
+    "{\\n" +
+    "  \\\"id\\\": \\\"reason_text_i\\\",\\n" +
+    "  \\\"component\\\": {\\n" +
+    "    \\\"Text\\\": {\\n" +
+    "      \\\"text\\\": { \\\"literalString\\\": \\\"💡 [Recommendation reason, e.g., 'Direct successor (95% match)']\\\" },\\n" +
+    "      \\\"usageHint\\\": \\\"caption\\\"\\n" +
+    "    }\\n" +
+    "  }\\n}\\n\\n" +
+    
+    "11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar using surfaceId 'suggestions' and root='root'. " +
+    "The suggestion bar MUST contain a Column as root, containing a Divider, a Text component with usageHint body displaying '💡 Next Actions', " +
+    "and a Row of 3-4 Buttons with sendText actions.\\n" +
+    "**A2UI CARD INTERACTION EXCEPTION (STRICT RULE)**: When your response already contains a major interactive A2UI card featuring its own control buttons " +
+    "(such as the Welcome Card onboarding buttons, or the Workflow Execution Plan mode selection buttons like Immediate/Background/Scheduled), " +
+    "you **MUST NOT** output any suggestion chip bar at the bottom of your response. The card's own control buttons are sufficient. " +
+    "If you output suggestion chips in these turns, they will duplicate the card buttons and fail to render the '💡 Next Actions' title and Divider. " +
+    "Suggestion chips MUST only appear in normal conversational or analytical turns where no other interactive button-heavy cards are present.\\n" +
+    "**ANTI-DUPLICATION RULE (CRITICAL)**: Suggestion chips MUST never duplicate or mirror any button label in the same response turn. " +
+    "Suggestion chips must always offer distinct, deep-dive analytical next steps.\\n\\n" +
+    
+    "12. **WELCOME CARD (FIRST INTERACTION)**: When the user sends an initial greeting (e.g., 'Hi', 'Hello'), you **MUST NOT** call any tools, databases, or BigQuery under any circumstances. " +
+    "Calling tools on the first greeting turn completely hides and breaks the onboarding card rendering. " +
+    "You MUST immediately respond in the very first turn with the rich A2UI onboarding card using surfaceId 'welcome-card' and NO suggestion chips at the bottom. " +
+    "Never execute queries or tool calls until the user explicitly requests analysis. The onboarding card must include your role title, a Divider, a List of key capabilities with Lucide icons, " +
+    "a Divider, and exactly 3 action Buttons.\\n" +
+    "**BUTTON SCHEMA CONFORMANCE (CRITICAL)**: When generating A2UI JSON payloads, you MUST ALWAYS use strict standard JSON syntax. " +
+    "Under no circumstances should you use single quotes or omit quotes for keys. Keys and string values MUST always be enclosed in standard double quotes. " +
+    "Each Button component's action MUST strictly follow standard JSON structure:\\n" +
+    "{\\n" +
+    "  \\\"action\\\": {\\n" +
+    "    \\\"name\\\": \\\"sendText\\\",\\n" +
+    "    \\\"context\\\": [\\n" +
+    "      {\\n" +
+    "        \\\"key\\\": \\\"text\\\",\\n" +
+    "        \\\"value\\\": { \\\"literalString\\\": \\\"[Localized Button Label]\\\" }\\n" +
+    "      }\\n" +
+    "    ]\\n" +
+    "  }\\n" +
+    "}\\n" +
+    "Ensure all keys and string values are enclosed in standard double quotes to comply with strict standard JSON specifications. Use surfaceId 'welcome-card'.\\n\\n" +
+    
+    "**CODE EXECUTION MIX PREVENTION (CRITICAL)**: When you execute Python code inside a fenced code block (using " + bt + "python ... " + bt + "), " +
+    "you **MUST NEVER** combine, mix, or output any other JSON tool calls (like execute_sql, get_table_info) in the SAME response turn. " +
+    "Mixing python code blocks with JSON tool calls triggers a fatal MALFORMED_FUNCTION_CALL system crash. " +
+    "You MUST run the Python code alone first, receive its result, and only then issue the next tool call in a separate turn. " +
+    "After this initial card, do NOT show the welcome card again in the same session unless the user explicitly requests a reset.";
+    
+  return inst;
 }
 
 function buildPlanningPrompt(userGoal, options) {
@@ -6637,6 +6799,233 @@ cat <<'__FORM_EOF__' > adk_agent/app/examples/0.8/interactive_form.json
 ]
 __FORM_EOF__
 
+cat <<'__BATCH_EOF__' > adk_agent/app/examples/0.8/batch_editor.json
+[
+  { "beginRendering": { "surfaceId": "batch-editor", "root": "root" } },
+  {
+    "dataModelUpdate": {
+      "surfaceId": "batch-editor",
+      "contents": [
+        {
+          "key": "form",
+          "valueMap": [
+            { "key": "item_0_selected_sku", "valueMap": [{ "key": "0", "valueString": "SKU_A" }] },
+            { "key": "item_0_qty", "valueNumber": 2 },
+            { "key": "item_1_selected_sku", "valueMap": [{ "key": "0", "valueString": "SKU_B" }] },
+            { "key": "item_1_qty", "valueNumber": 5 }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "surfaceUpdate": {
+      "surfaceId": "batch-editor",
+      "components": [
+        { "id": "root", "component": { "Card": { "child": "mainCol" } } },
+        {
+          "id": "mainCol",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "title",
+                  "divider1",
+                  "companyHeader1",
+                  "row_container_0",
+                  "dividerRow1",
+                  "row_container_1",
+                  "divider2",
+                  "actionRow"
+                ]
+              },
+              "distribution": "start",
+              "alignment": "stretch"
+            }
+          }
+        },
+        { "id": "title", "component": { "Text": { "text": { "literalString": "📝 Bulk Mapping & Editing Editor" }, "usageHint": "h2" } } },
+        { "id": "divider1", "component": { "Divider": {} } },
+        { "id": "companyHeader1", "component": { "Text": { "text": { "literalString": "🏢 Kansai Air Conditioning Services Co., Ltd." }, "usageHint": "h3" } } },
+        {
+          "id": "row_container_0",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": ["main_row_0", "reason_text_0"]
+              }
+            }
+          }
+        },
+        {
+          "id": "main_row_0",
+          "component": {
+            "Row": {
+              "children": {
+                "explicitList": ["left_stack_0", "sku_select_0", "qty_field_0"]
+              },
+              "distribution": "spaceBetween",
+              "alignment": "center"
+            }
+          }
+        },
+        {
+          "id": "left_stack_0",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": ["orig_name_0", "orig_qty_0"]
+              },
+              "distribution": "start",
+              "alignment": "start"
+            }
+          }
+        },
+        { "id": "orig_name_0", "component": { "Text": { "text": { "literalString": "エアコン5馬力 (SZRC140BC)" }, "usageHint": "body" } } },
+        { "id": "orig_qty_0", "component": { "Text": { "text": { "literalString": "Original Qty: 2" }, "usageHint": "caption" } } },
+        {
+          "id": "sku_select_0",
+          "component": {
+            "MultipleChoice": {
+              "label": { "literalString": "Select SKU" },
+              "options": [
+                { "value": "SKU_A", "label": { "literalString": "SKU_A (Recommended)" } },
+                { "value": "SKU_B", "label": { "literalString": "SKU_B (Alternative)" } }
+              ],
+              "maxAllowedSelections": 1,
+              "variant": "chips",
+              "selections": { "path": "/form/item_0_selected_sku" }
+            }
+          }
+        },
+        {
+          "id": "qty_field_0",
+          "component": {
+            "TextField": {
+              "label": { "literalString": "Qty" },
+              "text": { "path": "/form/item_0_qty" },
+              "textFieldType": "shortText"
+            }
+          }
+        },
+        { "id": "reason_text_0", "component": { "Text": { "text": { "literalString": "💡 Recommended because SKU_A is direct replacement of legacy model" }, "usageHint": "caption" } } },
+        { "id": "dividerRow1", "component": { "Divider": {} } },
+        {
+          "id": "row_container_1",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": ["main_row_1", "reason_text_1"]
+              }
+            }
+          }
+        },
+        {
+          "id": "main_row_1",
+          "component": {
+            "Row": {
+              "children": {
+                "explicitList": ["left_stack_1", "sku_select_1", "qty_field_1"]
+              },
+              "distribution": "spaceBetween",
+              "alignment": "center"
+            }
+          }
+        },
+        {
+          "id": "left_stack_1",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": ["orig_name_1", "orig_qty_1"]
+              },
+              "distribution": "start",
+              "alignment": "start"
+            }
+          }
+        },
+        { "id": "orig_name_1", "component": { "Text": { "text": { "literalString": "エアコン3馬力 (PROD012)" }, "usageHint": "body" } } },
+        { "id": "orig_qty_1", "component": { "Text": { "text": { "literalString": "Original Qty: 4" }, "usageHint": "caption" } } },
+        {
+          "id": "sku_select_1",
+          "component": {
+            "MultipleChoice": {
+              "label": { "literalString": "Select SKU" },
+              "options": [
+                { "value": "SKU_C", "label": { "literalString": "SKU_C (Recommended)" } },
+                { "value": "SKU_D", "label": { "literalString": "SKU_D (Alternative)" } }
+              ],
+              "maxAllowedSelections": 1,
+              "variant": "chips",
+              "selections": { "path": "/form/item_1_selected_sku" }
+            }
+          }
+        },
+        {
+          "id": "qty_field_1",
+          "component": {
+            "TextField": {
+              "label": { "literalString": "Qty" },
+              "text": { "path": "/form/item_1_qty" },
+              "textFieldType": "shortText"
+            }
+          }
+        },
+        { "id": "reason_text_1", "component": { "Text": { "text": { "literalString": "💡 Matches master catalog with 95% confidence" }, "usageHint": "caption" } } },
+        { "id": "divider2", "component": { "Divider": {} } },
+        {
+          "id": "actionRow",
+          "component": {
+            "Row": {
+              "children": {
+                "explicitList": ["btnSubmit", "btnCancel"]
+              },
+              "distribution": "spaceEvenly",
+              "alignment": "center"
+            }
+          }
+        },
+        {
+          "id": "btnSubmit",
+          "component": {
+            "Button": {
+              "child": "lblSubmit",
+              "primary": true,
+              "action": {
+                "name": "sendText",
+                "context": [
+                  { "key": "text", "value": { "literalString": "Submit proposed changes" } },
+                  { "key": "item_0_selected_sku", "value": { "path": "/form/item_0_selected_sku" } },
+                  { "key": "item_0_qty", "value": { "path": "/form/item_0_qty" } },
+                  { "key": "item_1_selected_sku", "value": { "path": "/form/item_1_selected_sku" } },
+                  { "key": "item_1_qty", "value": { "path": "/form/item_1_qty" } }
+                ]
+              }
+            }
+          }
+        },
+        { "id": "lblSubmit", "component": { "Text": { "text": { "literalString": "💾 Save Changes" }, "usageHint": "body" } } },
+        {
+          "id": "btnCancel",
+          "component": {
+            "Button": {
+              "child": "lblCancel",
+              "action": {
+                "name": "sendText",
+                "context": [
+                  { "key": "text", "value": { "literalString": "Cancel editing" } }
+                ]
+              }
+            }
+          }
+        },
+        { "id": "lblCancel", "component": { "Text": { "text": { "literalString": "🚫 Cancel" }, "usageHint": "body" } } }
+      ]
+    }
+  }
+]
+__BATCH_EOF__
+
 cat <<'__LIST_EOF__' > adk_agent/app/examples/0.8/event_list.json
 [
   { "beginRendering": { "surfaceId": "event-list", "root": "root" } },
@@ -7324,6 +7713,16 @@ gemini_lite_model = Gemini(
     retry_options=_RETRY_OPTIONS
 )
 
+# Configure validated tool config to prevent MALFORMED_FUNCTION_CALL on Flash
+_validated_tool_config = types.ToolConfig(
+    function_calling_config=types.FunctionCallingConfig(
+        mode=types.FunctionCallingConfigMode.VALIDATED
+    )
+)
+_validated_generate_config = types.GenerateContentConfig(
+    tool_config=_validated_tool_config
+)
+
 async def inject_image_callback(callback_context: adk_callback_context.CallbackContext, llm_response: adk_llm_response.LlmResponse) -> adk_llm_response.LlmResponse | None:
     """Injects the generated image into the final LLM response."""
     if llm_response.content and llm_response.content.parts:
@@ -7366,6 +7765,9 @@ async def _enforce_task_result_text(callback_context: adk_callback_context.Callb
     _pending = callback_context.session.state.pop('_last_tool_result', None)
     if not _pending:
         return None
+    # Do NOT inject into error responses (e.g. MALFORMED_FUNCTION_CALL).
+    if llm_response.error_code:
+        return None
     # If model is making another function call, put result back and wait
     if llm_response.content and llm_response.content.parts:
         for _p in llm_response.content.parts:
@@ -7395,6 +7797,9 @@ async def _enforce_task_result_text(callback_context: adk_callback_context.Callb
 
 # --- Shared tools list ---
 _all_tools = [t for t in ${ enableWorkspaceMcp ? `[maps_toolset, bigquery_toolset, firestore_toolset, tools.generate_image, slack_mcp_toolset] + custom_mcp_toolsets + [tools.get_gmail_mcp_toolset(), tools.get_drive_mcp_toolset(), tools.get_calendar_mcp_toolset(), tools.get_chat_mcp_toolset(), tools.get_people_mcp_toolset()]` : `[maps_toolset, bigquery_toolset, firestore_toolset, tools.generate_image, slack_mcp_toolset] + custom_mcp_toolsets` } if t is not None]
+
+_all_tools.append(tools.write_operational_alert)
+_all_tools.append(tools.save_document_to_db)
 
 # --- Background task management tools ---
 _all_tools.append(tools.background_task_tool)
@@ -7860,6 +8265,7 @@ in the Data Viewer Tasks tab if available.
 """,
     tools=_all_tools,
     code_executor=_code_executor,
+    generate_content_config=_validated_generate_config,
     after_model_callback=[inject_image_callback, a2ui_metadata_callback, _enforce_task_result_text],
     after_tool_callback=_log_bq_activity,
     disallow_transfer_to_parent=False,
@@ -7894,9 +8300,11 @@ You are the primary coordinator. Handle most interactions yourself, including:
 Transfer to deep_analysis_agent ONLY when the request requires BOTH:
 1. Multi-step reasoning — the answer cannot be obtained from a single tool
    call; it requires chaining 3+ tool calls with intermediate interpretation
+   (e.g. listing tables -> getting schema -> querying multiple tables -> comparing).
 2. Synthesis — the user is asking you to combine information from multiple
-   sources, identify patterns/trends, draw conclusions, or produce
-   strategic recommendations
+   sources (e.g. cross-referencing an uploaded spreadsheet with BigQuery tables),
+   identify patterns/trends, draw conclusions, or produce strategic recommendations
+   (e.g. identifying discrepancies, mismatches, or reconciliation anomalies).
 
 CRITICAL — BACKGROUND-FIRST ROUTING (NEVER SKIP):
 When you determine a request qualifies for deep_analysis_agent transfer,
@@ -8236,6 +8644,7 @@ Use surfaceId 'suggestions' and include 3-4 context-aware chip buttons.
 """,
     tools=_all_tools,
     code_executor=_code_executor,
+    generate_content_config=_validated_generate_config,
     sub_agents=[deep_analysis_agent],
     before_agent_callback=_inject_completed_tasks,
     after_model_callback=[inject_image_callback, a2ui_metadata_callback, _enforce_task_result_text],
@@ -8440,6 +8849,7 @@ You MUST NEVER claim to have performed an action that you do not have a tool for
 """,
     tools=_bg_tools,
     code_executor=_code_executor,
+    generate_content_config=_validated_generate_config,
     after_model_callback=[_enforce_task_result_text],
     after_tool_callback=_log_bq_activity,
 )
@@ -9923,6 +10333,15 @@ class TokenExtractionMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         return response
 
+class DisableBufferingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if response.headers.get('content-type') == 'text/event-stream':
+            response.headers['X-Accel-Buffering'] = 'no'
+            response.headers['Cache-Control'] = 'no-cache, no-transform'
+        return response
+
+app.add_middleware(DisableBufferingMiddleware)
 app.add_middleware(TokenExtractionMiddleware)
 
 # =============================================================================
