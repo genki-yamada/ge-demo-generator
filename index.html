@@ -1239,7 +1239,10 @@
         <div class="px-3 mt-8 mb-4">
           <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Support</h3>
         </div>
-        <button onclick="openOnboarding()" class="nav-item w-full text-left">
+        <button onclick="openOnboarding()" class="nav-item w-full text-left flex items-center">
+          <svg class="w-3.5 h-3.5 mr-1.5 inline-block text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
           About this toolkit
         </button>
         <button onclick="openWhatsNew()" class="nav-item w-full text-left flex items-center">
@@ -5714,61 +5717,81 @@
     }
   </script>
 
-  <div id="onboardingModal">
-    <div class="glass max-w-lg w-full rounded-3xl p-8 border border-white/10 shadow-2xl">
-      <div class="text-center mb-8">
+  <div id="onboardingModal" onclick="closeOnboarding()">
+    <div class="glass max-w-xl w-full rounded-3xl p-8 border border-white/10 shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar" onclick="event.stopPropagation()">
+      <div class="text-center mb-6">
         <div
-          class="w-16 h-16 bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-sky-500/20">
-          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          class="w-12 h-12 bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-3 shadow-lg shadow-sky-500/20">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
           </svg>
         </div>
-        <h2 class="text-2xl font-bold text-white mb-2">Welcome! Let's build your AI Demo.</h2>
-        <p class="text-gray-400 text-sm">Create hyper-personalized agent demos in minutes.</p>
+        <h2 class="text-lg font-bold text-white mb-1">Build Your AI Demo in Minutes</h2>
+        <p class="text-gray-400 text-xs">Create highly tailored, highly contextual Gemini agent demos instantly.</p>
       </div>
 
-      <div class="space-y-6 mb-10">
-        <div class="flex gap-4">
+      <div class="space-y-5 mb-7">
+        <!-- 1. Core Value -->
+        <div class="flex gap-3">
           <div
-            class="flex-shrink-0 w-8 h-8 rounded-full bg-sky-500/10 flex items-center justify-center text-xs font-bold text-sky-400 border border-sky-500/20">
-            🚀</div>
+            class="flex-shrink-0 w-8 h-8 rounded-xl bg-sky-500/10 flex items-center justify-center text-sm font-bold text-sky-400 border border-sky-500/20">
+            🎯</div>
           <div>
-            <h4 class="text-sm font-bold text-gray-200 mb-1">What is this?</h4>
-            <p class="text-xs text-gray-400 leading-relaxed">A toolkit to <b>synthesize realistic business datasets</b>
-              and <b>agent instructions</b>, offering customization of sample data on top of the <a
-                href="https://github.com/google/mcp/tree/main/examples/launchmybakery" target="_blank"
-                class="text-sky-400 hover:underline font-bold">LaunchMyBakery</a> demo application. The demo agent
-              generates
-              <b>dynamic responses</b> using <b>BigQuery</b> and <b>Google Maps</b> via Google-hosted <b>MCP
-                servers</b>.
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">Core Value: Highly Tailored Custom Demos</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              Instantly generate <span class="text-sky-400 font-semibold">highly tailored, highly contextual demos</span>. The tool automatically synthesizes realistic sample data (e.g., handwritten FAXes, order forms, and BigQuery master tables) and custom agent instructions specifically matching each customer's unique business and operational challenges.
             </p>
           </div>
         </div>
-        <div class="flex gap-4">
+
+        <!-- 2. Business Value -->
+        <div class="flex gap-3">
           <div
-            class="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-xs font-bold text-emerald-400 border border-emerald-500/20">
-            ⚡</div>
+            class="flex-shrink-0 w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-sm font-bold text-emerald-400 border border-emerald-500/20">
+            💎</div>
           <div>
-            <h4 class="text-sm font-bold text-gray-200 mb-1">The Benefit</h4>
-            <p class="text-xs text-gray-400 leading-relaxed">Skip the data prep. Generate a complete, grounded demo
-              environment tailored to any industry challenge or customer pitch instantly.</p>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">Business Value: Win Pitches with A2UI</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              Show, don't tell. Demonstrate the <span class="text-emerald-400 font-semibold">ultimate value of Gemini Enterprise</span> using <span class="text-emerald-400 font-semibold">A2UI (Agent-to-User Interface)</span>: the agent dynamically renders interactive buttons, custom data cards, and editable forms on the fly, providing a highly responsive, state-of-the-art Agentic AI UX for seamless human validation and approval.
+            </p>
           </div>
         </div>
-        <div class="flex gap-4">
+
+        <!-- 3. The Tech Behind the Scene -->
+        <div class="flex gap-3">
           <div
-            class="flex-shrink-0 w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center text-xs font-bold text-amber-400 border border-amber-500/20">
-            🛡️</div>
+            class="flex-shrink-0 w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center text-sm font-bold text-purple-400 border border-purple-500/20">
+            ⚙️</div>
           <div>
-            <h4 class="text-sm font-bold text-gray-200 mb-1">How it works</h4>
-            <p class="text-xs text-gray-400 leading-relaxed">This app <b>only generates a script</b>. To deploy, you'll
-              copy the script and run it in <b>your own Google Cloud Shell</b>. Your data stay in your project.</p>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">Behind the Scene: Real Tech Stack</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              This is not a mockup. The generator spins up a fully-functioning cloud environment:
+            </p>
+            <ul class="list-disc list-inside mt-1 text-[10.5px] text-gray-400 space-y-0.5 pl-1">
+              <li><span class="text-gray-300 font-medium">Gemini & ADK:</span> Advanced multi-step reasoning and tool orchestration.</li>
+              <li><span class="text-gray-300 font-medium">Rich MCP Ecosystem:</span> Live connections to BigQuery, Google Maps, and Google Workspace.</li>
+              <li><span class="text-gray-300 font-medium">Interactive Data Viewer:</span> A Flask Web UI to visually track documents and database changes.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 4. Deployment -->
+        <div class="flex gap-3">
+          <div
+            class="flex-shrink-0 w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-sm font-bold text-amber-400 border border-amber-500/20">
+            🚀</div>
+          <div>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">How to Deploy: Automatic Cloud Provisioning</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              This tool generates a local setup script. Simply run it in <span class="text-amber-400 font-semibold">your own Google Cloud Shell</span> to automatically provision all demo resources (Cloud Run, BigQuery, Firestore) directly inside your Google Cloud project. All data remains securely within your own project boundary.
+            </p>
           </div>
         </div>
       </div>
 
       <button onclick="closeOnboarding()"
-        class="w-full bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-sky-500/20 active:scale-[0.98]">
-        START BUILDING
+        class="w-full bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-sky-500/20 active:scale-[0.98] text-[11px] uppercase tracking-wider">
+        Start Building Demo
       </button>
     </div>
   </div>
@@ -5860,7 +5883,7 @@
       <!-- Scrollable Content Wrapper -->
       <div class="relative flex-1 min-h-0 flex flex-col mb-6">
         <!-- Scrollable Content -->
-        <div class="flex-1 overflow-y-auto pr-1 modal-scrollable-content pt-12 premium-mask-fade">
+        <div class="flex-1 overflow-y-auto pr-1 modal-scrollable-content pt-3 premium-mask-fade">
           <div class="modal-scrollable-inner">
 
       <!-- Feature 1: Agentic Workflow -->
@@ -6142,7 +6165,7 @@
       </div> <!-- Closes Feature 4 feature-card -->
       </div> <!-- Closes modal-scrollable-inner -->
           <!-- Spacer to allow scrolling past the bottom fade -->
-          <div class="h-16 flex-shrink-0"></div>
+          <div class="h-6 flex-shrink-0"></div>
         </div>
       </div> <!-- End Scrollable Content Wrapper -->
 
