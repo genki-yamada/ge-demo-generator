@@ -1055,6 +1055,10 @@
         <svg class="w-3.5 h-3.5 inline-block mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
         Browse Catalog
       </button>
+      <button class="mcp-tab" data-tab="recipes" onclick="switchMcpTab('recipes')">
+        <svg class="w-3.5 h-3.5 inline-block mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+        Recommended Combos
+      </button>
       <button class="mcp-tab" data-tab="url" onclick="switchMcpTab('url')">
         <svg class="w-3.5 h-3.5 inline-block mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
         Import from URL
@@ -1076,15 +1080,14 @@
         <!-- Catalog Grid (populated by JS) -->
         <div id="mcpCatalogGrid" class="flex flex-col gap-6"></div>
 
-        <!-- Recipe Combos Section -->
-        <div id="mcpRecipesSection" class="flex flex-col gap-3">
-          <div class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
-            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Recommended Combos</h3>
-          </div>
-          <div id="mcpRecipeCards" class="grid grid-cols-1 gap-3"></div>
-        </div>
+      </div>
 
+      <!-- ============ TAB 2: RECOMMENDED COMBOS ============ -->
+      <div id="mcpTabRecipes" class="hidden flex flex-col gap-5">
+        <div class="flex flex-col gap-1.5">
+          <p class="text-xs text-gray-400 leading-relaxed">Select a pre-configured bundle of MCP servers tailored for common business scenarios to quickly bootstrap your demo.</p>
+        </div>
+        <div id="mcpRecipeCards" class="grid grid-cols-1 gap-3"></div>
       </div>
 
       <!-- ============ TAB 2: IMPORT FROM URL ============ -->
@@ -1402,7 +1405,7 @@
                     This web application does not deploy resources directly into your project. Instead, it dynamically synthesizes a personalized <b>Setup Shell Script</b> based on your custom inputs. Once you execute this script in your Google Cloud Shell, it automatically provisions all necessary resources (BigQuery, Firestore, Cloud Run) securely within your own Google Cloud environment, allowing you to instantly start demonstrations.
                   </p>
                   <p class="text-[13px] text-gray-300 leading-relaxed mb-4">
-                    The synthesized agent uses a <b>dual-model architecture</b>: a <span class="text-sky-400 font-semibold">Flash-Lite coordinator</span> (<code class="text-[11px] bg-white/5 px-1 rounded">root_agent</code>) handles routine interactions at low latency, while a <span class="text-emerald-400 font-semibold">Pro sub-agent</span> (<code class="text-[11px] bg-white/5 px-1 rounded">deep_analysis_agent</code>) is automatically delegated to for complex multi-step reasoning tasks. Models are configurable via <code class="text-[11px] bg-white/5 px-1 rounded">--model</code> and <code class="text-[11px] bg-white/5 px-1 rounded">--model-lite</code> CLI flags.
+                    The synthesized agent uses a <b>dual-model architecture</b>: a <span class="text-sky-400 font-semibold">Flash-Lite coordinator</span> (<code class="text-[11px] bg-white/5 px-1 rounded">root_agent</code>) handles routine interactions at low latency, while a <span class="text-emerald-400 font-semibold">Pro sub-agent</span> (<code class="text-[11px] bg-white/5 px-1 rounded">deep_analysis_agent</code>) is automatically delegated to for complex multi-step reasoning tasks. Models are configurable via <code class="text-[11px] bg-white/5 px-1 rounded">--model-analysis-agent</code> and <code class="text-[11px] bg-white/5 px-1 rounded">--model-root-agent</code> CLI flags.
                   </p>
                   <p class="text-[13px] text-gray-300 leading-relaxed mb-4">
                     Additionally, the accelerator generates domain-specific <b>Sample Prompts, PDFs, and Excel files</b> alongside the datasets. This allows you to enjoy a rich, living End-to-End pre-sales demonstration seamlessly.
@@ -6241,6 +6244,12 @@
           ]
         },
         {
+          id: 'environment', name: 'Environment & Weather', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg>',
+          servers: [
+            { id: 'weather-mcp', name: 'Weather Data', github_url: 'https://github.com/weather-mcp/weather-mcp', description: 'Global weather data: forecasts, current conditions, historical data (1940-present), alerts, air quality, marine conditions, and wildfire tracking. No API keys required.', language: 'nodejs', tags: ['weather','environment','forecast','global'], requires_api_key: false, demo_tip: 'Perfect for logistics, retail, or energy demos where weather directly impacts operations, supply chain, or demand.' }
+          ]
+        },
+        {
           id: 'finance', name: 'Finance & Markets', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>',
           servers: [
             { id: 'yahoo-finance', name: 'Yahoo Finance', github_url: 'https://github.com/Alex2Yang97/yahoo-finance-mcp', description: 'Stock info, historical prices, financial statements, options data, and analyst recommendations.', language: 'python', tags: ['stocks','markets','financial-data'], requires_api_key: false, demo_tip: 'Perfect for investment analysis or portfolio monitoring demos.' }
@@ -6271,9 +6280,10 @@
         }
       ],
       recipes: [
-        { name: 'Public Data Analyst', description: 'Combine US government economic data with your internal BigQuery dataset for market intelligence.', servers: ['us-gov-open-data','yahoo-finance'], industries: ['retail','financial-services'] },
-        { name: 'Compliance Monitor', description: 'Track US legislation and court rulings alongside social media sentiment for regulatory risk assessment.', servers: ['us-legal'], industries: ['financial-services','legal'] },
-        { name: 'Japan Market Intelligence', description: 'Cross-reference Japanese infrastructure data with tax law for comprehensive real estate or logistics analysis.', servers: ['mlit-dpf','tax-law'], industries: ['real-estate','logistics','consulting'] }
+        { name: 'Public Data & Climate Analyst', description: 'Correlate global weather hazards and US macroeconomic indicators with market trends and financial performance.', servers: ['us-gov-open-data','yahoo-finance','weather-mcp'], industries: ['retail','financial-services','agriculture'] },
+        { name: 'Regulatory & Legislative Monitor', description: 'Monitor US legislation, Federal Register documents, and court opinions alongside government statistics.', servers: ['us-legal','us-gov-open-data'], industries: ['financial-services','legal','compliance'] },
+        { name: 'Japan Business Intelligence', description: 'Comprehensive analysis of Japanese markets combining geospatial infrastructure, tax law, and labor compliance.', servers: ['mlit-dpf','tax-law','labor-law'], industries: ['real-estate','logistics','consulting'] },
+        { name: 'Japan Climate & Logistics', description: 'Optimize logistics, real estate development, and supply chain resiliency in Japan against weather risks.', servers: ['mlit-dpf','weather-mcp'], industries: ['logistics','real-estate','insurance'] }
       ]
     };
 
@@ -6298,11 +6308,13 @@
 
     // Track servers currently being analyzed to preserve state across re-renders
     const analyzingServers = new Set();
+    const analyzingRecipes = new Set();
 
     window.switchMcpTab = function(tab) {
       document.querySelectorAll('.mcp-tab').forEach(t => {
         t.classList.toggle('active', t.dataset.tab === tab);
       });
+      document.getElementById('mcpTabRecipes').classList.toggle('hidden', tab !== 'recipes');
       document.getElementById('mcpTabCatalog').classList.toggle('hidden', tab !== 'catalog');
       document.getElementById('mcpTabUrl').classList.toggle('hidden', tab !== 'url');
     }
@@ -6394,8 +6406,16 @@
     function renderRecipes() {
       const container = document.getElementById('mcpRecipeCards');
       container.innerHTML = '';
-      MCP_CATALOG.recipes.forEach(recipe => {
+      MCP_CATALOG.recipes.forEach((recipe, recipeIdx) => {
         const allAdded = recipe.servers.every(sid => isServerAdded(sid));
+        
+        // Fix multi-button animation bug by tracking initiated recipe index
+        const hasAnalyzingServers = recipe.servers.some(sid => analyzingServers.has(sid));
+        if (!hasAnalyzingServers && analyzingRecipes.has(recipeIdx)) {
+          analyzingRecipes.delete(recipeIdx);
+        }
+        const isAnalyzing = analyzingRecipes.has(recipeIdx) && hasAnalyzingServers;
+
         const serverNames = recipe.servers.map(sid => {
           const s = getAllCatalogServers().find(x => x.id === sid);
           return s ? s.name : sid;
@@ -6407,10 +6427,21 @@
             '<h4 class="text-sm font-bold text-white">' + recipe.name + '</h4>' +
             '<p class="text-[11px] text-gray-400 mt-1 leading-relaxed">' + recipe.description + '</p>' +
             '<div class="flex items-center gap-1.5 mt-2 flex-wrap">' + serverNames.map(n => '<span class="mcp-tag">' + n + '</span>').join('') + '</div>' +
+        const btnClass = allAdded
+          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 cursor-default'
+          : isAnalyzing
+          ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20 opacity-70 pointer-events-none'
+          : 'bg-sky-500/10 text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 hover:border-sky-500/30 active:scale-[0.98]'; // Glassmorphism
+
+        const btnContent = allAdded
+          ? '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Added'
+          : isAnalyzing
+          ? '<div class="w-3 h-3 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>Analyzing...'
+          : '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>Add Combo';
+
           '</div>' +
-          '<button onclick="addRecipeServers(\'' + recipe.servers.join(',') + '\')" class="flex-shrink-0 px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 ' +
-            (allAdded ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 cursor-default' : 'bg-sky-500 hover:bg-sky-600 text-white active:scale-[0.97]') + '">' +
-            (allAdded ? '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Added' : '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>Add All') +
+          '<button onclick="addRecipeServers(\'' + recipe.servers.join(',') + '\', ' + recipeIdx + ')" class="flex-shrink-0 px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 ' + btnClass + '">' +
+            btnContent +
           '</button>' +
         '</div>';
         container.appendChild(card);
@@ -6502,10 +6533,14 @@
         .analyzeMcpRepository(server.github_url);
     }
 
-    window.addRecipeServers = function(serverIds) {
+    window.addRecipeServers = function(serverIds, recipeIdx) {
       const ids = serverIds.split(',');
       const toAdd = ids.filter(id => !isServerAdded(id));
-      toAdd.forEach(id => addCatalogServer(id));
+      if (toAdd.length > 0) {
+        analyzingRecipes.add(recipeIdx);
+        toAdd.forEach(id => addCatalogServer(id));
+        renderRecipes();
+      }
     }
 
     function updateMcpCountBadge() {

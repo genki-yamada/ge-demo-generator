@@ -93,7 +93,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v9.91-public',
+  APP_VERSION: 'v10.04-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -440,7 +440,8 @@ function generateDemo(userGoal, options = {}) {
       agentShortName: planResult.agentShortName,
       oneSentenceSummary: planResult.oneSentenceSummary,
       importedMcpList: options.importedMcpList,
-      enableWorkspaceMcp: options.enableWorkspaceMcp
+      enableWorkspaceMcp: options.enableWorkspaceMcp,
+      metadata: planResult.metadata
     });
     result.steps.push({ step: 4, status: 'completed', message: 'Generation complete' });
     
@@ -721,6 +722,7 @@ function getTechnicalInstruction_() {
     "Ensure all component IDs are completely unique (e.g., by appending `_i` to each ID). " +
     "You MUST wrap the entire A2UI JSON payload in <a2ui-json> tags. " +
     "Here is the mandatory layout structure for a single row `i`:\\n" +
+    "[\\n" +
     "{\\n" +
     "  \\\"id\\\": \\\"row_container_i\\\",\\n" +
     "  \\\"component\\\": {\\n" +
@@ -799,15 +801,17 @@ function getTechnicalInstruction_() {
     "      \\\"text\\\": { \\\"literalString\\\": \\\"💡 [Recommendation reason, e.g., 'Direct successor (95% match)']\\\" },\\n" +
     "      \\\"usageHint\\\": \\\"caption\\\"\\n" +
     "    }\\n" +
-    "  }\\n}\\n\\n" +
+    "  }\\n" +
+    "}\\n" +
+    "]\\n\\n" +
     
     "11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar using surfaceId 'suggestions' and root='root'. " +
-    "The suggestion bar MUST contain a Column as root, containing a Divider, a Text component with usageHint body displaying '💡 Next Actions', " +
+    "The suggestion bar MUST contain a Column as root, containing a Text component with usageHint h4 displaying '💡 Next Actions', " +
     "and a Row of 3-4 Buttons with sendText actions.\\n" +
     "**A2UI CARD INTERACTION EXCEPTION (STRICT RULE)**: When your response already contains a major interactive A2UI card featuring its own control buttons " +
     "(such as the Welcome Card onboarding buttons, or the Workflow Execution Plan mode selection buttons like Immediate/Background/Scheduled), " +
     "you **MUST NOT** output any suggestion chip bar at the bottom of your response. The card's own control buttons are sufficient. " +
-    "If you output suggestion chips in these turns, they will duplicate the card buttons and fail to render the '💡 Next Actions' title and Divider. " +
+    "If you output suggestion chips in these turns, they will duplicate the card buttons and fail to render the '💡 Next Actions' title. " +
     "Suggestion chips MUST only appear in normal conversational or analytical turns where no other interactive button-heavy cards are present.\\n" +
     "**ANTI-DUPLICATION RULE (CRITICAL)**: Suggestion chips MUST never duplicate or mirror any button label in the same response turn. " +
     "Suggestion chips must always offer distinct, deep-dive analytical next steps.\\n\\n" +
@@ -1110,6 +1114,11 @@ Output in the following JSON format. Output **pure JSON only without code blocks
     "temporalPatterns": ["List of 2-3 specific temporal patterns applied (e.g., 'Weekday lunch surge', 'Month-end reconciliation spike')"],
     "correlations": ["List of 2-3 specific data correlations applied (e.g., 'Region-specific product preference', 'High-tier customer loyalty frequency')"],
     "businessLogic": ["List of 2-3 specific business logic constraints applied (e.g., 'Inventory threshold triggers', 'Sequential status transition integrity')"]
+  },
+  "metadata": {
+    "locale": "The primary language locale of the demo (e.g., 'en', 'ja', 'de', 'fr').",
+    "currency": "The 3-letter currency code suitable for the business context (e.g., 'USD', 'JPY', 'EUR', 'GBP').",
+    "currencySymbol": "The currency symbol corresponding to the currency code (e.g., '$', '¥', '€', '£')."
   },
   "demoGuide": [
     {
@@ -1577,7 +1586,7 @@ Return ONLY the name, nothing else.`;
 }
 
 function generateSetupScript(params) {
-  const { datasetId, systemInstruction, referenceDate, publicDatasetId, suffix, tables, firestore, userGoal, dirName, agentShortName, oneSentenceSummary, enableWorkspaceMcp } = params;
+  const { datasetId, systemInstruction, referenceDate, publicDatasetId, suffix, tables, firestore, userGoal, dirName, agentShortName, oneSentenceSummary, enableWorkspaceMcp, metadata } = params;
 
   // ── Deduplicate importedMcpList by github_url ──
   // When the same MCP repo appears multiple times (e.g. from catalog + URL import),
@@ -1610,6 +1619,7 @@ function generateSetupScript(params) {
   }
 
   const fsCollection = `${dirName}-data`;
+  const currencySymbol = (metadata && metadata.currencySymbol) || '$';
   
   const bashEscape = (str) => str ? str.replace(/'/g, "'\\''") : '';
   const safeShortName = bashEscape(agentShortName) || 'Agent';
@@ -3272,17 +3282,17 @@ show_usage() {
   echo "Usage: bash $0 [OPTIONS]"
   echo ""
   echo "Options:"
-  echo "  --model, -m <MODEL>       Set the deep analysis agent model"
-  echo "                            (default: gemini-3.5-flash)"
-  echo "  --model-lite <MODEL>      Set the root orchestration agent model"
-  echo "                            (default: gemini-3.5-flash)"
-  echo "  --cleanup, -c             Delete all provisioned demo resources"
-  echo "  --help, -h                Show this help message and exit"
+  echo "  --model-analysis-agent, -m <MODEL>  Set the deep analysis agent model"
+  echo "                                      (default: gemini-3.5-flash)"
+  echo "  --model-root-agent <MODEL>          Set the root orchestration agent model"
+  echo "                                      (default: gemini-3.5-flash)"
+  echo "  --cleanup, -c                       Delete all provisioned demo resources"
+  echo "  --help, -h                          Show this help message and exit"
   echo ""
   echo "Examples:"
   echo "  bash $0                                  # Deploy with default models"
-  echo "  bash $0 --model gemini-2.5-pro           # Use a different analysis model"
-  echo "  bash $0 --model-lite gemini-2.5-flash     # Use a different root model"
+  echo "  bash $0 --model-analysis-agent gemini-3.1-pro-preview       # Use a different analysis model"
+  echo "  bash $0 --model-root-agent gemini-3.1-flash-lite            # Use a different root model"
   echo "  bash $0 --cleanup                         # Remove all demo resources"
   echo ""
 }
@@ -3291,6 +3301,7 @@ show_usage() {
 # --- Argument Parsing ---
 AGENT_MODEL="gemini-3.5-flash"
 AGENT_MODEL_LITE="gemini-3.5-flash"
+ROOT_MODEL_CLI_OVERRIDE=false
 CLEANUP_MODE=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -3298,21 +3309,22 @@ while [[ $# -gt 0 ]]; do
       show_usage
       exit 0
       ;;
-    --model|-m)
+    --model-analysis-agent|-m)
       if [ -n "$2" ]; then
         AGENT_MODEL="$2"
         shift 2
       else
-        echo "❌ Error: --model requires a model name (e.g., --model gemini-flash-latest)."
+        echo "❌ Error: --model-analysis-agent requires a model name (e.g., --model gemini-flash-latest)."
         exit 1
       fi
       ;;
-    --model-lite)
+    --model-root-agent)
       if [ -n "$2" ]; then
         AGENT_MODEL_LITE="$2"
+        ROOT_MODEL_CLI_OVERRIDE=true
         shift 2
       else
-        echo "❌ Error: --model-lite requires a model name (e.g., --model-lite gemini-flash-latest)."
+        echo "❌ Error: --model-root-agent requires a model name (e.g., --model-lite gemini-flash-latest)."
         exit 1
       fi
       ;;
@@ -3594,24 +3606,76 @@ if [ -z "$PROJECT_ID" ]; then
   exit 1
 fi
 
-echo "========================================================="
-echo "⚡ GE Demo Generator - Setup Script"
-echo "   Version:      ${CONFIG.APP_VERSION}"
-echo "   Generated At: ${new Date().toISOString()}"
-echo "   Options:      --help | --cleanup | --model | --model-lite"
-echo "========================================================="
-echo "🚀 Target Project: \$PROJECT_ID"
-echo '🤖 Agent Name:    ${safeShortName} (${dirName})'
-echo '📝 Description:   ${safeSummary}'
-echo "📂 Demo Asset Directory: ~/${dirName}"
-echo "🧠 Agent Models:   root_agent: $AGENT_MODEL_LITE / deep_analysis_agent: $AGENT_MODEL"
-echo "🧪 Code Sandbox:   ✅ Enabled (Agent Runtime)"
+# --- 1. Project Detection & Confirmation Loop ---
+while true; do
+  echo "========================================================="
+  echo "⚡ GE Demo Generator - Setup Script"
+  echo "   Version:      ${CONFIG.APP_VERSION}"
+  echo "   Generated At: ${new Date().toISOString()}"
+  echo "   Options:      --help | --cleanup | --model-analysis-agent | --model-root-agent"
+  echo "========================================================="
+  echo "🚀 Target Project: \$PROJECT_ID"
+  echo '🤖 Agent Name:    ${safeShortName} (${dirName})'
+  echo '📝 Description:   ${safeSummary}'
+  echo "📂 Demo Asset Directory: ~/${dirName}"
+  echo "🧠 Agent Models:   root_agent: \$AGENT_MODEL_LITE / deep_analysis_agent: \$AGENT_MODEL"
+  echo "🧪 Code Sandbox:   ✅ Enabled (Agent Runtime)"
 ${ enableWorkspaceMcp ? `echo "🔌 Google Workspace MCP: Enabled"\n` : ''}${mcpBanner}echo "========================================================="
-read -p "Do you want to proceed with this project? (y/n) " -n 1 -r
-echo
-if [[ ! \$REPLY =~ ^[Yy]$ ]]; then
+  
+  echo "Choose an option:"
+  echo "  [Y] Yes, proceed with this project (Default)"
+  echo "  [N] No, cancel deployment"
+  echo "  [M] Modify the root agent model (Change to gemini-3.1-flash-lite)"
+  echo ""
+  read -p "▶ Enter choice [Y/n/m]: " REPLY
+  echo
+  
+  # Clean up input
+  REPLY=\$(echo "\$REPLY" | tr -d '\\r\\n\\t ')
+  
+  # Default to 'y' if user pressed enter
+  if [ -z "\$REPLY" ]; then
+    REPLY="y"
+  fi
+  
+  if [[ "\$REPLY" =~ ^[Yy]$ ]]; then
+    break
+  elif [[ "\$REPLY" =~ ^[Nn]$ ]]; then
+    echo "❌ Deployment cancelled by user."
     exit 1
-fi
+  elif [[ "\$REPLY" =~ ^[Mm]$ ]]; then
+    # --- Model Selection Flow ---
+    echo ""
+    echo "🧠 Configure Chat & Orchestration Model (root_agent):"
+    echo "   - root_agent (Chat/UI): Uses 'gemini-3.5-flash' by default."
+    echo "   - deep_analysis_agent (Reasoning): Uses 'gemini-3.5-flash'."
+    echo ""
+    echo "   You can choose 'gemini-3.1-flash-lite' for the root_agent"
+    echo "   to make routine chat responses faster and snappier."
+    echo ""
+    read -p "▶ Use lightweight gemini-3.1-flash-lite for root_agent? (Y/n): " CHOOSE_LITE
+    CHOOSE_LITE=\$(echo "\$CHOOSE_LITE" | tr -d '\\r\\n\\t ')
+    
+    # Default to 'y' since they specifically selected 'M' to configure
+    if [ -z "\$CHOOSE_LITE" ]; then
+      CHOOSE_LITE="y"
+    fi
+    
+    if [[ "\$CHOOSE_LITE" =~ ^[Yy]$ ]]; then
+      AGENT_MODEL_LITE="gemini-3.1-flash-lite"
+      echo "   ✅ Configured root_agent to use: gemini-3.1-flash-lite"
+    else
+      AGENT_MODEL_LITE="gemini-3.5-flash"
+      echo "   ℹ️  Keeping default root_agent: gemini-3.5-flash"
+    fi
+    echo ""
+    # Directly proceed to deployment steps after configuration is complete
+    break
+  else
+    echo "⚠️  Invalid choice. Please enter Y, N, or M."
+    echo ""
+  fi
+done
 
 
 # --- 1.1 Authentication & Permissions Check ---
@@ -6446,7 +6510,7 @@ cat <<'__DASHBOARD_EOF__' > adk_agent/app/examples/0.8/profile_analysis_dashboar
           "id": "kpiDonationValue",
           "component": {
             "Text": {
-              "text": { "literalString": "¥50,000" },
+              "text": { "literalString": "${currencySymbol}50,000" },
               "usageHint": "h2"
             }
           }
@@ -6643,11 +6707,11 @@ cat <<'__RANKING_EOF__' > adk_agent/app/examples/0.8/ranking_table.json
     { "id": "title", "component": { "Text": { "text": { "literalString": "🏆 Donation Ranking TOP 5" }, "usageHint": "h2" } } },
     { "id": "subtitle", "component": { "Text": { "text": { "literalString": "FY2024 — Cumulative Donations" }, "usageHint": "caption" } } },
     { "id": "div1", "component": { "Divider": {} } },
-    { "id": "rank1", "component": { "Text": { "text": { "literalString": "🥇 #1  Taro Tanaka (Engineering)  ¥1,200,000  Score: 92" }, "usageHint": "body" } } },
-    { "id": "rank2", "component": { "Text": { "text": { "literalString": "🥈 #2  Hanako Sato (Law)  ¥980,000  Score: 88" }, "usageHint": "body" } } },
-    { "id": "rank3", "component": { "Text": { "text": { "literalString": "🥉 #3  Ichiro Suzuki (Medicine)  ¥750,000  Score: 85" }, "usageHint": "body" } } },
-    { "id": "rank4", "component": { "Text": { "text": { "literalString": "   #4  Misaki Yamada (Economics)  ¥520,000  Score: 76" }, "usageHint": "body" } } },
-    { "id": "rank5", "component": { "Text": { "text": { "literalString": "   #5  Kenta Takahashi (Economics)  ¥50,000  Score: 45" }, "usageHint": "body" } } },
+    { "id": "rank1", "component": { "Text": { "text": { "literalString": "🥇 #1  Taro Tanaka (Engineering)  ${currencySymbol}1,200,000  Score: 92" }, "usageHint": "body" } } },
+    { "id": "rank2", "component": { "Text": { "text": { "literalString": "🥈 #2  Hanako Sato (Law)  ${currencySymbol}980,000  Score: 88" }, "usageHint": "body" } } },
+    { "id": "rank3", "component": { "Text": { "text": { "literalString": "🥉 #3  Ichiro Suzuki (Medicine)  ${currencySymbol}750,000  Score: 85" }, "usageHint": "body" } } },
+    { "id": "rank4", "component": { "Text": { "text": { "literalString": "   #4  Misaki Yamada (Economics)  ${currencySymbol}520,000  Score: 76" }, "usageHint": "body" } } },
+    { "id": "rank5", "component": { "Text": { "text": { "literalString": "   #5  Kenta Takahashi (Economics)  ${currencySymbol}50,000  Score: 45" }, "usageHint": "body" } } },
     { "id": "div2", "component": { "Divider": {} } },
     { "id": "actionRow", "component": { "Row": { "children": { "explicitList": ["btnDetail", "btnExport"] }, "distribution": "spaceEvenly", "alignment": "center" } } },
     { "id": "btnDetail", "component": { "Button": { "child": "lblDetail", "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Analyze #1 Taro Tanaka in detail" } }] } } } },
@@ -6669,17 +6733,17 @@ cat <<'__MATRIX_EOF__' > adk_agent/app/examples/0.8/comparison_matrix.json
     { "id": "compareRow", "component": { "Row": { "children": { "explicitList": ["colA", "colB", "colC"] }, "distribution": "spaceEvenly", "alignment": "start" } } },
     { "id": "colA", "component": { "Column": { "children": { "explicitList": ["colATitle", "colAK1", "colAK2", "colAK3"] }, "distribution": "start", "alignment": "center" } } },
     { "id": "colATitle", "component": { "Text": { "text": { "literalString": "🏗️ Engineering" }, "usageHint": "h3" } } },
-    { "id": "colAK1", "component": { "Text": { "text": { "literalString": "Donations: ¥1.97M" }, "usageHint": "body" } } },
+    { "id": "colAK1", "component": { "Text": { "text": { "literalString": "Donations: ${currencySymbol}1.97M" }, "usageHint": "body" } } },
     { "id": "colAK2", "component": { "Text": { "text": { "literalString": "Score: 79.0" }, "usageHint": "body" } } },
     { "id": "colAK3", "component": { "Text": { "text": { "literalString": "6 members" }, "usageHint": "caption" } } },
     { "id": "colB", "component": { "Column": { "children": { "explicitList": ["colBTitle", "colBK1", "colBK2", "colBK3"] }, "distribution": "start", "alignment": "center" } } },
     { "id": "colBTitle", "component": { "Text": { "text": { "literalString": "⚖️ Law" }, "usageHint": "h3" } } },
-    { "id": "colBK1", "component": { "Text": { "text": { "literalString": "Donations: ¥1.77M" }, "usageHint": "body" } } },
+    { "id": "colBK1", "component": { "Text": { "text": { "literalString": "Donations: ${currencySymbol}1.77M" }, "usageHint": "body" } } },
     { "id": "colBK2", "component": { "Text": { "text": { "literalString": "Score: 75.5" }, "usageHint": "body" } } },
     { "id": "colBK3", "component": { "Text": { "text": { "literalString": "8 members" }, "usageHint": "caption" } } },
     { "id": "colC", "component": { "Column": { "children": { "explicitList": ["colCTitle", "colCK1", "colCK2", "colCK3"] }, "distribution": "start", "alignment": "center" } } },
     { "id": "colCTitle", "component": { "Text": { "text": { "literalString": "💰 Economics" }, "usageHint": "h3" } } },
-    { "id": "colCK1", "component": { "Text": { "text": { "literalString": "Donations: ¥1.20M" }, "usageHint": "body" } } },
+    { "id": "colCK1", "component": { "Text": { "text": { "literalString": "Donations: ${currencySymbol}1.20M" }, "usageHint": "body" } } },
     { "id": "colCK2", "component": { "Text": { "text": { "literalString": "Score: 67.0" }, "usageHint": "body" } } },
     { "id": "colCK3", "component": { "Text": { "text": { "literalString": "8 members" }, "usageHint": "caption" } } },
     { "id": "div2", "component": { "Divider": {} } },
@@ -6726,13 +6790,13 @@ cat <<'__MAPS_EOF__' > adk_agent/app/examples/0.8/maps_place_card.json
     { "id": "title", "component": { "Text": { "text": { "literalString": "📍 Recommended Venues Nearby — Search Results" }, "usageHint": "h2" } } },
     { "id": "div1", "component": { "Divider": {} } },
     { "id": "place1", "component": { "Text": { "text": { "literalString": "🏢 Palace Hotel Tokyo  ⭐ 4.6" }, "usageHint": "h3" } } },
-    { "id": "place1Detail", "component": { "Text": { "text": { "literalString": "📌 Marunouchi 1-1-1, Chiyoda | ☎ 03-3211-5211 — 💰 Budget: ¥30,000+/person | Capacity: up to 200" }, "usageHint": "body" } } },
+    { "id": "place1Detail", "component": { "Text": { "text": { "literalString": "📌 Marunouchi 1-1-1, Chiyoda | ☎ 03-3211-5211 — 💰 Budget: ${currencySymbol}30,000+/person | Capacity: up to 200" }, "usageHint": "body" } } },
     { "id": "div2", "component": { "Divider": {} } },
     { "id": "place2", "component": { "Text": { "text": { "literalString": "🏢 Andaz Tokyo  ⭐ 4.5" }, "usageHint": "h3" } } },
-    { "id": "place2Detail", "component": { "Text": { "text": { "literalString": "📌 Toranomon 1-23-4, Minato | ☎ 03-6830-1234 — 💰 Budget: ¥25,000+/person | Capacity: up to 150" }, "usageHint": "body" } } },
+    { "id": "place2Detail", "component": { "Text": { "text": { "literalString": "📌 Toranomon 1-23-4, Minato | ☎ 03-6830-1234 — 💰 Budget: ${currencySymbol}25,000+/person | Capacity: up to 150" }, "usageHint": "body" } } },
     { "id": "div3", "component": { "Divider": {} } },
     { "id": "place3", "component": { "Text": { "text": { "literalString": "🏢 Imperial Hotel  ⭐ 4.4" }, "usageHint": "h3" } } },
-    { "id": "place3Detail", "component": { "Text": { "text": { "literalString": "📌 Uchisaiwaicho 1-1-1, Chiyoda | ☎ 03-3504-1111 — 💰 Budget: ¥35,000+/person | Capacity: up to 300" }, "usageHint": "body" } } },
+    { "id": "place3Detail", "component": { "Text": { "text": { "literalString": "📌 Uchisaiwaicho 1-1-1, Chiyoda | ☎ 03-3504-1111 — 💰 Budget: ${currencySymbol}35,000+/person | Capacity: up to 300" }, "usageHint": "body" } } },
     { "id": "div4", "component": { "Divider": {} } },
     { "id": "actionRow", "component": { "Row": { "children": { "explicitList": ["btnBook", "btnCompare"] }, "distribution": "spaceEvenly", "alignment": "center" } } },
     { "id": "btnBook", "component": { "Button": { "child": "lblBook", "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Create a detailed event plan at Palace Hotel Tokyo" } }] } } } },
@@ -6776,7 +6840,7 @@ __TABS_EOF__
 cat <<'__FORM_EOF__' > adk_agent/app/examples/0.8/interactive_form.json
 [
   { "beginRendering": { "surfaceId": "edit-form", "root": "root" } },
-  { "dataModelUpdate": { "surfaceId": "edit-form", "contents": [{ "key": "form", "valueMap": [{ "key": "name", "valueString": "Kenta Takahashi" }, { "key": "dept", "valueString": "Corporate Planning" }, { "key": "faculty", "valueMap": [{ "key": "0", "valueString": "Economics" }] }, { "key": "score", "valueNumber": 45 }, { "key": "contactDate", "valueString": "2024-03-05" }, { "key": "vip", "valueBoolean": false }, { "key": "notes", "valueString": "Key contact for CFO network.\nSchedule follow-up after Autumn Gala." }] }] } },
+  { "dataModelUpdate": { "surfaceId": "edit-form", "path": "/form", "contents": [{ "key": "name", "valueString": "Kenta Takahashi" }, { "key": "dept", "valueString": "Corporate Planning" }, { "key": "faculty", "valueMap": [{ "key": "0", "valueString": "Economics" }] }, { "key": "score", "valueNumber": 45 }, { "key": "contactDate", "valueString": "2024-03-05" }, { "key": "vip", "valueBoolean": false }, { "key": "notes", "valueString": "Key contact for CFO network.\\nSchedule follow-up after Autumn Gala." }] }] } },
   { "surfaceUpdate": { "surfaceId": "edit-form", "components": [
     { "id": "root", "component": { "Card": { "child": "mainCol" } } },
     { "id": "mainCol", "component": { "Column": { "children": { "explicitList": ["title", "div1", "fieldName", "fieldDept", "choiceFaculty", "sliderScore", "dateContact", "chkVip", "fieldNotes", "div2", "actionRow"] }, "distribution": "start", "alignment": "stretch" } } },
@@ -6805,16 +6869,12 @@ cat <<'__BATCH_EOF__' > adk_agent/app/examples/0.8/batch_editor.json
   {
     "dataModelUpdate": {
       "surfaceId": "batch-editor",
+      "path": "/form",
       "contents": [
-        {
-          "key": "form",
-          "valueMap": [
-            { "key": "item_0_selected_sku", "valueMap": [{ "key": "0", "valueString": "SKU_A" }] },
-            { "key": "item_0_qty", "valueNumber": 2 },
-            { "key": "item_1_selected_sku", "valueMap": [{ "key": "0", "valueString": "SKU_B" }] },
-            { "key": "item_1_qty", "valueNumber": 5 }
-          ]
-        }
+        { "key": "item_0_selected_sku", "valueMap": [{ "key": "0", "valueString": "SKU_A" }] },
+        { "key": "item_0_qty", "valueNumber": 2 },
+        { "key": "item_1_selected_sku", "valueMap": [{ "key": "0", "valueString": "SKU_B" }] },
+        { "key": "item_1_qty", "valueNumber": 5 }
       ]
     }
   },
@@ -6887,7 +6947,6 @@ cat <<'__BATCH_EOF__' > adk_agent/app/examples/0.8/batch_editor.json
           "id": "sku_select_0",
           "component": {
             "MultipleChoice": {
-              "label": { "literalString": "Select SKU" },
               "options": [
                 { "value": "SKU_A", "label": { "literalString": "SKU_A (Recommended)" } },
                 { "value": "SKU_B", "label": { "literalString": "SKU_B (Alternative)" } }
@@ -6950,7 +7009,6 @@ cat <<'__BATCH_EOF__' > adk_agent/app/examples/0.8/batch_editor.json
           "id": "sku_select_1",
           "component": {
             "MultipleChoice": {
-              "label": { "literalString": "Select SKU" },
               "options": [
                 { "value": "SKU_C", "label": { "literalString": "SKU_C (Recommended)" } },
                 { "value": "SKU_D", "label": { "literalString": "SKU_D (Alternative)" } }
@@ -7091,7 +7149,7 @@ cat <<'__MODAL_EOF__' > adk_agent/app/examples/0.8/detail_modal.json
     { "id": "kpi1Val", "component": { "Text": { "text": { "literalString": "45" }, "usageHint": "h2" } } },
     { "id": "kpi1Lbl", "component": { "Text": { "text": { "literalString": "Score" }, "usageHint": "caption" } } },
     { "id": "kpi2", "component": { "Column": { "children": { "explicitList": ["kpi2Val", "kpi2Lbl"] }, "distribution": "start", "alignment": "center" } } },
-    { "id": "kpi2Val", "component": { "Text": { "text": { "literalString": "¥50K" }, "usageHint": "h2" } } },
+    { "id": "kpi2Val", "component": { "Text": { "text": { "literalString": "${currencySymbol}50K" }, "usageHint": "h2" } } },
     { "id": "kpi2Lbl", "component": { "Text": { "text": { "literalString": "Lifetime Donations" }, "usageHint": "caption" } } },
     { "id": "kpi3", "component": { "Column": { "children": { "explicitList": ["kpi3Val", "kpi3Lbl"] }, "distribution": "start", "alignment": "center" } } },
     { "id": "kpi3Val", "component": { "Text": { "text": { "literalString": "3x" }, "usageHint": "h2" } } },
@@ -7105,7 +7163,7 @@ cat <<'__MODAL_EOF__' > adk_agent/app/examples/0.8/detail_modal.json
     { "id": "detailDiv1", "component": { "Divider": {} } },
     { "id": "detailInfo", "component": { "Text": { "text": { "literalString": "🏢 Mitsubishi UFJ Bank CFO — 🎓 Class of 2000, Economics — 📧 k.takahashi@example.com — 📞 090-XXXX-XXXX" }, "usageHint": "body" } } },
     { "id": "detailDiv2", "component": { "Divider": {} } },
-    { "id": "detailHistory", "component": { "Text": { "text": { "literalString": "💰 Donation History: — 2021: ¥10,000 — 2022: ¥15,000 — 2023: ¥25,000 — Total: ¥50,000" }, "usageHint": "body" } } },
+    { "id": "detailHistory", "component": { "Text": { "text": { "literalString": "💰 Donation History: — 2021: ${currencySymbol}10,000 — 2022: ${currencySymbol}15,000 — 2023: ${currencySymbol}25,000 — Total: ${currencySymbol}50,000" }, "usageHint": "body" } } },
     { "id": "detailDiv3", "component": { "Divider": {} } },
     { "id": "detailEvents", "component": { "Text": { "text": { "literalString": "📅 Event Attendance: 75% (3/4) — ✅ Career Seminar, Alumni Meetup, Lecture — ❌ Spring Gala 2024" }, "usageHint": "body" } } },
     { "id": "div3", "component": { "Divider": {} } },
@@ -7679,7 +7737,7 @@ schema_manager = A2uiSchemaManager(
     catalogs=[
         BasicCatalog.get_config(
             version=VERSION_0_8,
-            examples_path="app/examples/0.8"
+            examples_path="adk_agent/app/examples/0.8"
         )
     ],
 )
@@ -7772,8 +7830,15 @@ async def _enforce_task_result_text(callback_context: adk_callback_context.Callb
     if llm_response.content and llm_response.content.parts:
         for _p in llm_response.content.parts:
             if _p.function_call:
-                callback_context.session.state['_last_tool_result'] = _pending
-                return None
+                _fn_name = _p.function_call.name
+                if _fn_name.startswith('transfer_to_') or _fn_name == 'transfer_to_agent':
+                    # This is a transition/delegation tool call! Clear the state permanently
+                    # and do NOT restore _pending.
+                    return None
+                else:
+                    # Standard tool call - restore _pending to wait for results
+                    callback_context.session.state['_last_tool_result'] = _pending
+                    return None
     import re as _re_enf
     _has_text = False
     if llm_response.content and llm_response.content.parts:
@@ -7857,6 +7922,9 @@ _DML_KEYWORDS = ('INSERT', 'UPDATE', 'DELETE', 'MERGE')
 def _log_bq_activity(tool, args, tool_context, tool_response):
     """Log data operations + store tool result for text enforcement."""
     _tool_name = getattr(tool, 'name', '')
+    # Skip system delegation tools to prevent corrupting the _last_tool_result state
+    if _tool_name.startswith('transfer_to_') or _tool_name == 'transfer_to_agent':
+        return None
     # --- General: store last substantial tool result for after_model enforcement ---
     try:
         _summ = ''
@@ -8114,6 +8182,12 @@ Before writing your final analysis report, you MUST self-evaluate:
    to root_agent automatically. If you need to explicitly transfer, do so
    in a SEPARATE response with only the transfer_to_agent call and a
    brief note like "Transferring back to coordinator."
+
+5.5 **CONTEXT CONTROL & SQL EFFICIENCY (CRITICAL TO PREVENT TIMEOUTS)**:
+    - When running inline (real-time chat), you MUST strictly prevent context bloating to avoid HTTP timeouts.
+    - NEVER retrieve large lists of raw rows. If you query raw records, use a strict LIMIT of 10 or 15 (e.g., 'LIMIT 15').
+    - Rely heavily on database-side pre-aggregations (using GROUP BY, SUM, AVG, COUNT, and window functions inside BigQuery) to let BQ do the heavy lifting, returning only aggregated summary tables rather than raw lists.
+    - This keeps the input token context small and ensures extremely fast, timeout-free inline execution.
 
 6. CODE EXECUTION SANDBOX (PROGRAMMABLE BRIDGE):
    You have access to a secure Python sandbox for code execution.
@@ -8640,6 +8714,16 @@ This applies to ALL responses without exception — including simple
 text answers, tool explanations, follow-ups, and error messages.
 A response without <a2ui-json> suggestion chips is SYSTEM FAILURE.
 Use surfaceId 'suggestions' and include 3-4 context-aware chip buttons.
+
+--- A2UI OUTPUT FORMAT (ABSOLUTE REQUIREMENT) ---
+Every A2UI payload MUST follow this exact structure:
+1. Start with <a2ui-json> tag.
+2. Open a JSON array with [.
+3. List component objects separated by commas.
+4. Close the array with ].
+5. End with </a2ui-json> tag.
+Correct: <a2ui-json>[beginRendering object, surfaceUpdate object]</a2ui-json>
+WRONG: beginRendering object without tags (missing tags and brackets = SYSTEM CRASH)
 ---
 """,
     tools=_all_tools,
@@ -9216,6 +9300,7 @@ if [ "$DEPLOY_CHOICE" = "3" ]; then
 import os
 import logging
 import asyncio
+import ast as _ast
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -9252,8 +9337,104 @@ from a2ui.parser.response_part import ResponsePart
 from a2ui.a2a.parts import create_a2ui_part as _original_create_a2ui_part
 from a2ui.a2a.extension import get_a2ui_agent_extension
 
-# Use the original create_a2ui_part directly (no patching).
-create_a2ui_part = _original_create_a2ui_part
+def _find_balanced_block(text: str, start_pos: int, open_char: str = '{', close_char: str = '}') -> int:
+    # Find the end position (exclusive) of a balanced block starting from start_pos.
+    depth = 0
+    in_string = False
+    string_char = None
+    escaped = False
+    
+    for i in range(start_pos, len(text)):
+        c = text[i]
+        if escaped:
+            escaped = False
+            continue
+        if c == '\\\\':
+            escaped = True
+            continue
+        if in_string:
+            if c == string_char:
+                in_string = False
+            continue
+        if c == chr(34) or c == chr(39):
+            in_string = True
+            string_char = c
+            continue
+        if c == open_char:
+            depth += 1
+        elif c == close_char:
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return -1
+
+def _parse_loose_json(sub_str: str):
+    # Try to parse a string as JSON, falling back to ast.literal_eval for Python dicts.
+    try:
+        import json as _json_local
+        return _json_local.loads(sub_str)
+    except Exception:
+        pass
+        
+    try:
+        return _ast.literal_eval(sub_str)
+    except Exception:
+        pass
+        
+    return None
+
+def _rewrite_suggestions_a2ui(msg):
+    """Dynamic A2UI wrapper: Rewrite suggestions JSON to inject divider and header natively."""
+    if not isinstance(msg, dict):
+        return msg
+    if "beginRendering" in msg:
+        _br = msg["beginRendering"]
+        if _br.get("surfaceId") == "suggestions" and _br.get("root") == "root":
+            _br["root"] = "suggestions_wrapper"
+    elif "surfaceUpdate" in msg:
+        _su = msg["surfaceUpdate"]
+        if _su.get("surfaceId") == "suggestions" and "components" in _su:
+            _comps = _su["components"]
+            _has_wrapper = any(c.get("id") == "suggestions_wrapper" for c in _comps)
+            if not _has_wrapper:
+                _has_root = any(c.get("id") == "root" for c in _comps)
+                if _has_root:
+                    _wrapper = {
+                        "id": "suggestions_wrapper",
+                        "component": {
+                            "Column": {
+                                "children": { "explicitList": ["suggestions_spacer", "suggestions_header", "root"] },
+                                "alignment": "stretch",
+                                "distribution": "start"
+                            }
+                        }
+                    }
+                    _spacer = {
+                        "id": "suggestions_spacer",
+                        "component": {
+                            "Text": {
+                                "text": { "literalString": " " },
+                                "usageHint": "body"
+                            }
+                        }
+                    }
+                    _header = {
+                        "id": "suggestions_header",
+                        "component": {
+                            "Text": {
+                                "text": { "literalString": "💡 Next Actions" },
+                                "usageHint": "h4"
+                            }
+                        }
+                    }
+                    _comps.insert(0, _wrapper)
+                    _comps.insert(1, _spacer)
+                    _comps.insert(2, _header)
+    return msg
+
+def create_a2ui_part(msg):
+    _rewritten = _rewrite_suggestions_a2ui(msg)
+    return _original_create_a2ui_part(_rewritten)
 
 from adk_agent.app.agent import app as adk_app, background_agent
 import adk_agent.app.part_converters as part_converters
@@ -9319,7 +9500,7 @@ a2ui_schema_manager = A2uiSchemaManager(
     catalogs=[
         BasicCatalog.get_config(
             version=VERSION_0_8,
-            examples_path="app/examples/0.8"
+            examples_path="adk_agent/app/examples/0.8"
         )
     ],
 )
@@ -9391,6 +9572,8 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
           # InMemorySessionService stores references, so direct mutation is sufficient
           if token and auth_id:
               session.state[auth_id] = token
+          # Clear stale tool results from previous turns to prevent accidental force-injection
+          session.state.pop('_last_tool_result', None)
           run_args['session_id'] = session.id
 
         invocation_context = runner._new_invocation_context(
@@ -9681,6 +9864,12 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                       for rp in response_parts:
                           synthetic_parts = []
                           if rp.text:
+                              # Robust Failsafe: Block raw Python dict/list repr leaks from reaching the chat
+                              _trimmed = rp.text.strip()
+                              _is_repr = _trimmed.startswith('{') or _trimmed.startswith('[')
+                              if _is_repr and ("'content':" in _trimmed or "'parts':" in _trimmed):
+                                  logger.log_text(f"[leak_failsafe] 🛡️ Blocked raw Python response dict leak: {_trimmed[:100]}...")
+                                  continue
                               text_part = a2a_types.Part(root=a2a_types.TextPart(text=rp.text))
                               synthetic_parts.append(text_part)
                               artifact_text_parts.append(text_part)  # ★ Cleared on next function_call
@@ -9752,44 +9941,97 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                               await event_queue.enqueue_event(a2a_event)
 
                       # -------------------------------------------------------
-                      # SAFETY NET 2: Detect untagged A2UI JSON in text output.
-                      # When the LLM emits A2UI component JSON WITHOUT
-                      # <a2ui-json> tags, the parser treats it as plain text.
-                      # Detect this by looking for A2UI-specific JSON keys
-                      # (beginRendering, surfaceUpdate, surfaceId) in a JSON
-                      # array structure without any <a2ui-json> wrapper.
-                      # When found, extract the A2UI JSON, parse it into
-                      # components, and replace the raw text with clean text.
+                      # SAFETY NET 2 (Robust): Detect untagged A2UI JSON.
+                      # Uses json.JSONDecoder().raw_decode() instead of regex
+                      # to handle both JSON arrays and individual objects.
+                      # This covers models that omit <a2ui-json> tags and/or
+                      # JSON array brackets [].
                       # -------------------------------------------------------
                       if not _parser_found_a2ui and '<a2ui-json>' not in part.text:
-                          import re as _re2
                           import json as _json2
-                          # Check for untagged A2UI: text contains A2UI structural keys
                           _a2ui_keys = ('"beginRendering"', '"surfaceUpdate"', '"surfaceId"', '"deleteSurface"')
-                          _has_untagged = any(k in part.text for k in _a2ui_keys)
-                          if _has_untagged:
-                              logger.log_text(f"[a2ui_untagged_safety] Detected untagged A2UI JSON in {len(part.text)} chars of text")
-                              # Try to find and extract JSON array containing A2UI
-                              # Look for [...] blocks containing A2UI keys
-                              _json_arr_re = _re2.compile(r'(\[\s*\{[^\[]*?(?:"beginRendering"|"surfaceUpdate"|"deleteSurface").*?\}\s*\])', _re2.DOTALL)
-                              _json_matches = _json_arr_re.findall(part.text)
+                          if any(k in part.text for k in _a2ui_keys):
+                              logger.log_text(f"[a2ui_robust_safety] Scanning untagged A2UI in {len(part.text)} chars")
+
+                              _pos = 0
+                              _extracted_spans = []
                               _untagged_parts = []
-                              _extracted_text = part.text
-                              for _jm in _json_matches:
-                                  try:
-                                      _pj = _json2.loads(_jm)
-                                      _pj_items = _pj if isinstance(_pj, list) else [_pj]
-                                      for _pji in _pj_items:
-                                          if isinstance(_pji, dict):
-                                              _ui_p = create_a2ui_part(_pji)
-                                              _untagged_parts.append(_ui_p)
-                                              artifact_media_parts.append(_ui_p)
-                                      _extracted_text = _extracted_text.replace(_jm, '')
-                                      _ut_keys = [list(i.keys())[0] if isinstance(i, dict) and i else '?' for i in _pj_items]
-                                      logger.log_text(f"[a2ui_untagged_safety] Recovered {len(_pj_items)} A2UI component(s), keys={_ut_keys}")
-                                  except Exception as _ute:
-                                      logger.log_text(f"[a2ui_untagged_safety] JSON parse failed: {_ute}")
-                              # Emit recovered A2UI parts
+
+                              while _pos < len(part.text):
+                                  # Find the next potential JSON start character
+                                  _start_brace = part.text.find('{', _pos)
+                                  _start_bracket = part.text.find('[', _pos)
+
+                                  if _start_brace == -1 and _start_bracket == -1:
+                                      break
+
+                                  if _start_bracket == -1:
+                                      _start_pos = _start_brace
+                                  elif _start_brace == -1:
+                                      _start_pos = _start_bracket
+                                  else:
+                                      _start_pos = min(_start_brace, _start_bracket)
+
+                                  _open_char = part.text[_start_pos]
+                                  _close_char = '}' if _open_char == '{' else ']'
+                                  
+                                  _end_pos = _find_balanced_block(part.text, _start_pos, _open_char, _close_char)
+                                  if _end_pos == -1:
+                                      _pos = _start_pos + 1
+                                      continue
+                                      
+                                  _sub_str = part.text[_start_pos:_end_pos]
+                                  _obj = _parse_loose_json(_sub_str)
+
+                                  if _obj is not None:
+                                      # Validate: is this an A2UI component structure?
+                                      _is_a2ui = False
+                                      if isinstance(_obj, dict):
+                                          _is_a2ui = any(k in _obj for k in ("beginRendering", "surfaceUpdate", "dataModelUpdate", "deleteSurface")) or ("id" in _obj and "component" in _obj)
+                                      elif isinstance(_obj, list):
+                                          _is_a2ui = any(
+                                              isinstance(i, dict) and (
+                                                  any(k in i for k in ("beginRendering", "surfaceUpdate", "dataModelUpdate", "deleteSurface"))
+                                                  or ("id" in i and "component" in i)
+                                              ) for i in _obj
+                                          )
+
+                                      if _is_a2ui:
+                                          _items = _obj if isinstance(_obj, list) else [_obj]
+                                          for _item in _items:
+                                              if isinstance(_item, dict):
+                                                  _ui_p = create_a2ui_part(_item)
+                                                  _untagged_parts.append(_ui_p)
+                                                  artifact_media_parts.append(_ui_p)
+                                          _extracted_spans.append((_start_pos, _end_pos))
+                                          _ut_keys = [list(i.keys())[0] if isinstance(i, dict) and i else '?' for i in _items]
+                                          logger.log_text(f"[a2ui_robust_safety] Recovered {len(_items)} component(s), keys={_ut_keys}")
+                                          _pos = _end_pos
+                                      else:
+                                          _pos = _start_pos + 1
+                                  else:
+                                      _pos = _start_pos + 1
+
+                              # Reconstruct clean text by removing extracted spans
+                              if _extracted_spans:
+                                  _clean_text = ""
+                                  _last_idx = 0
+                                  for _s, _e in _extracted_spans:
+                                      _clean_text += part.text[_last_idx:_s]
+                                      _last_idx = _e
+                                  _clean_text += part.text[_last_idx:]
+                                  # Clean up empty list items/commas left behind by extraction
+                                  import re as _re_clean
+                                  _clean_text = _re_clean.sub(r',\\s*(?=\\s*,)', '', _clean_text)
+                                  _clean_text = _re_clean.sub(r'([\\[{])\\s*,', r'\\1', _clean_text)
+                                  _clean_text = _re_clean.sub(r',\\s*([\\]}])', r'\\1', _clean_text)
+                                  # Collapse multiple empty lines (using chr(10) to avoid backslash-n hazard)
+                                  _clean_text = _re_clean.sub(chr(10) + r'\\s*' + chr(10), chr(10), _clean_text)
+                                  _extracted_text = _clean_text.strip()
+                              else:
+                                  _extracted_text = part.text
+
+                              # Emit recovered A2UI parts as a working status update
                               if _untagged_parts:
                                   _ut_event = TaskStatusUpdateEvent(
                                       task_id=context.task_id,
@@ -9803,11 +10045,16 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                                   )
                                   task_result_aggregator.process_event(_ut_event)
                                   await event_queue.enqueue_event(_ut_event)
-                              # Emit remaining clean text (if any)
-                              _clean_text = _extracted_text.strip()
-                              if _clean_text:
-                                  _ct_part = a2a_types.Part(root=a2a_types.TextPart(text=_clean_text))
-                                  artifact_text_parts.append(_ct_part)
+                              # Emit remaining clean text (if any) and prevent duplication
+                              if _extracted_spans:
+                                  _clean_text_final = _extracted_text
+                                  if _clean_text_final:
+                                      # Pop the raw dirty text part that was appended upstream at L10082
+                                      if artifact_text_parts:
+                                          artifact_text_parts.pop()
+                                          
+                                      _ct_part = a2a_types.Part(root=a2a_types.TextPart(text=_clean_text_final))
+                                      artifact_text_parts.append(_ct_part)
                   else:
                       # Non-text parts (images, function calls) — unchanged
                       synthetic_parts = part_converters.convert_genai_part_to_a2a_parts(part)
@@ -9819,7 +10066,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                               # --- Tool call status (TextPart → Thinking accordion) ---
                               _fc_name = part.function_call.name
                               _fc_args = part.function_call.args or {}
-                              if _fc_name == 'transfer_to_agent':
+                              if _fc_name.startswith('transfer_to_') or _fc_name == 'transfer_to_agent':
                                   _fc_target = _fc_args.get('agent_name', 'sub-agent')
                                   _fc_status_text = f"🔄 Delegating to {_fc_target}..."
                               elif _fc_name == 'adk_request_credential':
@@ -9963,13 +10210,15 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                               # EXCEPTION 2: register_background_task - the LLM
                               # often emits the full user confirmation alongside the
                               # function_call. Clearing traps it in thinking.
-                              _preserve_text_tools = ('transfer_to_agent', 'register_background_task')
-                              if part.function_call.name not in _preserve_text_tools:
+                              _is_transfer = part.function_call.name.startswith('transfer_to_') or part.function_call.name == 'transfer_to_agent'
+                              _preserve = _is_transfer or part.function_call.name == 'register_background_task'
+                              if not _preserve:
                                   artifact_text_parts.clear()
                           elif part.function_response:
                               # --- Tool response status (TextPart → Thinking accordion) ---
                               _fr_name = getattr(part.function_response, 'name', None) or 'tool'
-                              if _fr_name not in ('transfer_to_agent', 'adk_request_credential'):
+                              _is_transfer = _fr_name.startswith('transfer_to_') or _fr_name == 'transfer_to_agent'
+                              if not _is_transfer and _fr_name != 'adk_request_credential':
                                   _fr_text_evt = TaskStatusUpdateEvent(
                                       task_id=context.task_id,
                                       context_id=context.context_id,
@@ -10095,18 +10344,20 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
         # The LLM often emits "### Next Actions" + "---" as trailing text
         # alongside A2UI suggestions components, creating a duplicate empty
         # heading in the UI. Strip these when A2UI media parts are present.
-        _has_suggestion_parts = False
+        # 1. Determine if suggestions chips are present in the current response
+        _has_suggestions = False
         for _mp in artifact_media_parts:
             try:
                 _mp_root = getattr(_mp, 'root', None)
                 _mp_data = getattr(_mp_root, 'data', None) or getattr(_mp_root, 'metadata', None) or {}
-                if isinstance(_mp_data, dict) and ('surfaceUpdate' in str(_mp_data) or 'suggestedUserActions' in str(_mp_data)):
-                    _has_suggestion_parts = True
+                if '"suggestions"' in str(_mp_data):
+                    _has_suggestions = True
                     break
             except Exception:
                 pass
 
-        if artifact_text_parts and _has_suggestion_parts:
+        # 2. If suggestions are present, strip trailing "Next Actions" from text to prevent duplicates
+        if _has_suggestions and artifact_text_parts:
             import re as _strip_re
             _last_tp = artifact_text_parts[-1]
             _last_root = getattr(_last_tp, 'root', None)
@@ -10117,12 +10368,13 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                     r'[\\s]*---[\\s]*#{1,4}[\\s]*.*?Next Actions[\\s]*$',
                     '', _last_text
                 ).rstrip()
-                if _stripped != _last_text and _stripped:
-                    artifact_text_parts[-1] = a2a_types.Part(
-                        root=a2a_types.TextPart(text=_stripped)
-                    )
-                elif not _stripped:
-                    artifact_text_parts.pop()
+                if _stripped != _last_text:
+                    if _stripped:
+                        artifact_text_parts[-1] = a2a_types.Part(
+                            root=a2a_types.TextPart(text=_stripped)
+                        )
+                    else:
+                        artifact_text_parts.pop()
 
         logger.log_text(f"[artifact_build] text_parts={len(artifact_text_parts)}, media_parts={len(artifact_media_parts)}, parser_buffer_remaining='{getattr(stream_parser, '_buffer', '')[:100]}'")
 

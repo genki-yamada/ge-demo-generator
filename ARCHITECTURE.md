@@ -6,7 +6,7 @@ This document describes the system architecture of the GE Demo Generator and the
 
 ## 1. Overview
 
-The GE Demo Generator is a low-code accelerator built on Google Apps Script that allows users to instantly synthesize fully functional AI agent demo environments for any business domain. It generates domain-specific datasets, an ADK-based agent with MCP toolsets, and a real-time operations dashboard — all provisioned into the user's own Google Cloud project.
+The GE Demo Generator is a low-code accelerator built on Google Apps Script that allows Customer Engineers to instantly synthesize fully functional AI agent demo environments for any business domain. It generates domain-specific datasets, an ADK-based agent with MCP toolsets, and a real-time operations dashboard — all provisioned into the user's own Google Cloud project.
 
 The system is divided into two main parts: the **Generator Dashboard** (the Apps Script web app) and the **Synthesized Demo Environment** (the Google Cloud resources created by the setup script).
 
@@ -16,21 +16,24 @@ The system is divided into two main parts: the **Generator Dashboard** (the Apps
 
 ### 2.1 Frontend (`index.html`)
 
-A Tailwind-based Single Page Application that provides:
+A Tailwind-based Single Page Application (~328 KB, ~5,700 lines) that provides:
 
 - **Demo Wizard**: Step-by-step UI to input business requirements, configure options (row count, table count, public dataset enrichment), and generate the demo.
 - **Customer Domain Research**: Gemini-powered company research via Google Search grounding — automatically identifies business challenges and agent-automatable workflows from a customer's domain.
 - **Data Preview**: Inline data tables and ER diagrams for the generated datasets.
+- **Premium Live Synthesis Progress Dashboard**: Displays a high-fidelity interactive Google Cloud target architecture blueprint SVG during synthesis. It shows the active pulsing/success glowing states across BigQuery, Gemini Agent, and Cloud Run nodes with flowing SVG stream lines. Includes a context-sensitive animated **Dynamic Tips Carousel** rotating every 12 seconds, a real-time **Elapsed Timer**, and an **Automatic Retry Mechanism** (up to 2 retries) for robust Apps Script code generation and parsing recovery. Exposes active model name (`generatorModel`) for transparency.
 - **Setup Script Export**: One-click copy of the generated bash setup script for Cloud Shell.
 - **Demo Guide**: Auto-generated demo prompts tailored to the synthesized domain.
-- **MCP Server Catalog**: A curated catalog of pre-configured MCP servers organized by category (Government & Legal, Finance & Markets, Social & Communication, Japan-Specific, Google Official), with one-click add, recipe bundles, and search/filter. Includes both sidecar (GitHub-based) and remote managed servers (e.g., Slack).
+- **History Sidebar**: Personal and community demo history with favorites, restore, and delete functionality. Includes a Community Activity Feed showing real-time usage.
+- **MCP Server Catalog**: A curated catalog of pre-configured MCP servers organized by category (Government & Legal, Finance & Markets, Social & Communication, Japan-Specific, Environment & Weather, Google Official), with one-click add, recipe bundles, and search/filter. Includes both sidecar (GitHub-based) and remote managed servers (e.g., Slack).
 - **MCP URL Import**: Import third-party MCP servers from any GitHub repository via Gemini-powered analysis.
 - **System Instruction Editor**: Edit the agent's business and technical instructions post-generation.
 - **Onboarding & Feature Notifications**: First-run onboarding modal and feature notification system for new capabilities.
+- **Social Proof & Engagement**: Weekly activity badge in the header, all-time usage statistics inline, Community Activity Feed in the right sidebar, and post-generation share link CTA.
 
 ### 2.2 Backend (`Code.gs`)
 
-A monolithic Google Apps Script file that contains:
+A monolithic Google Apps Script file (~8,100 lines, ~389 KB) that contains:
 
 | Module | Key Functions | Description |
 |---|---|---|
@@ -40,14 +43,16 @@ A monolithic Google Apps Script file that contains:
 | **Public Dataset Discovery** | `discoverPublicDataset`, `verifyAndResolveTable` | Uses Google Search grounding to find and verify real BigQuery public datasets |
 | **Data Validation** | `validateGeneratedData`, `validateAndRepairValue` | Schema-aware validation and auto-repair of generated CSV data |
 | **Setup Script Synthesis** | `generateSetupScript` | Generates a comprehensive bash script including all Cloud resources, agent code, Dockerfile, and deployment logic |
-| **Usage Logging** | `logUsageToSheet` | Usage logging to Google Sheets |
+| **History & Persistence** | `logUsageToSheet`, `saveToDrive`, `restoreDemo`, `getPersonalHistory`, `getGlobalHistory` | Usage logging (Sheets), backup (Drive), and restore |
+| **Usage Statistics** | `getUsageStats` | Aggregated usage data (total/weekly demos, unique users, locations, recent activity feed) from the `Usage_Logs` sheet |
+| **Favorites & Deletion** | `toggleFavorite`, `deleteHistoryItem` | Per-user favorites and owner-only history deletion |
 | **Vertex AI Utilities** | `callVertexAI`, `callVertexAIWithSearch`, `executeWithRetry` | API calls with retry logic and Google Search grounding |
 | **Customer Domain Research** | `researchCompanyByDomain`, `mergeTemplateWithCompanyInfo` | Google Search-grounded company research, challenge identification, and workflow discovery |
 | **MCP Import & Analysis** | `analyzeMcpRepository` | Analyzes GitHub repos via `gemini-3.1-flash-lite` and integrates custom MCP servers as co-located sidecars in the agent container |
 
 ### 2.3 Error Handling (`SetupError.html`)
 
-A standalone HTML page displayed when mandatory Script Properties (`PROJECT_ID`, `LOG_SHEET_URL`) are missing. Provides instructions for both the `initializeProject()` function and manual Script Properties setup.
+A standalone HTML page displayed when mandatory Script Properties (`PROJECT_ID`, `LOG_SHEET_URL`, `BACKUP_FOLDER_ID`) are missing. Provides instructions for both the `initializeProject()` function and manual Script Properties setup.
 
 ---
 
@@ -77,62 +82,64 @@ When the user runs the generated setup script in Cloud Shell, the following arch
 
 ### 3.2 Agent Architecture
 
-The synthesized agent uses a **triple-agent architecture** for optimal latency, cost, and autonomous execution. A coordinator handles the majority of chat interactions, an analytical sub-agent is delegated to for complex inline reasoning, and a standalone background worker processes long-running tasks and scheduled cron jobs asynchronously.
+The synthesized agent uses a **triple-agent/multi-agent autonomous execution** architecture to achieve high-depth operational execution alongside optimal latency and cost. The architecture features three specialized agent instances, all utilizing **Gemini 3.5 Flash** by default for rapid response and high token efficiency:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  root_agent (LlmAgent — Coordinator)                         │
-│  Model: gemini-3.5-flash (AGENT_MODEL_LITE)          │
-│  Role: Handles most interactions directly                     │
+│  Model: gemini-3.5-flash (AGENT_MODEL_LITE)                  │
+│  Role: Chat coordinator, simple queries, A2UI card builder    │
 │  Instruction: Generated system prompt + A2UI schema          │
-│               + Model Routing Rules + Background Tasking     │
+│               + Background-First Routing Rules               │
 │                                                              │
 │  Tools (shared):                                             │
-│  ├── BigQuery MCP Toolset (execute_sql, list_tables, ..)     │
-│  ├── Maps MCP Toolset (search_places, compute_routes,..)     │
-│  ├── Firestore MCP Toolset (get_document, update_doc,..)     │
-│  ├── generate_image (custom Python function → Gemini)        │
-│  ├── Slack MCP Toolset (optional, managed remote)            │
-│  ├── Custom MCP Toolsets (optional, user-imported)           │
-│  └── Workspace MCP Toolsets (optional)                       │
-│       ├── Gmail MCP                                          │
-│       ├── Drive MCP                                          │
-│       ├── Calendar MCP                                       │
-│       └── People MCP                                         │
+│  ├── BigQuery MCP (execute_sql, list_tables, ..)             │
+│  ├── Maps MCP (search_places, compute_routes,..)             │
+│  ├── Firestore MCP (get_document, update_doc,..)             │
+│  ├── generate_image (custom Python function)                 │
+│  ├── Slack MCP (optional managed remote)                     │
+│  ├── Custom MCP (optional, user-imported)                    │
+│  └── Workspace MCP (optional OAuth passthrough)              │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐    │
 │  │  deep_analysis_agent (LlmAgent — Analytical Sub)     │    │
-│  │  Model: gemini-3.5-flash (AGENT_MODEL)               │    │
-│  │  Role: Complex inline multi-step analysis             │    │
+│  │  Model: gemini-3.5-flash (AGENT_MODEL)                │    │
+│  │  Role: Complex inline multi-step reasoning            │    │
 │  │  Tools: Same shared toolset                           │    │
 │  │  Transfer: Returns to root_agent on completion        │    │
 │  └──────────────────────────────────────────────────────┘    │
 │                                                              │
-│  ┌──────────────────────────────────────────────────────┐    │
-│  │  background_agent (LlmAgent — Background Worker)     │    │
-│  │  Model: gemini-3.5-flash (AGENT_MODEL)               │    │
-│  │  Role: Async pipeline execution & cron tasks          │    │
-│  │  Tools: BigQuery, Maps, Firestore, Custom MCP         │    │
-│  │  Trigger: /execute_task endpoint (Firestore-backed)   │    │
-│  └──────────────────────────────────────────────────────┘    │
-│                                                              │
-│  Callbacks (both agents):                                    │
-│  ├── inject_image_callback (attaches generated images)       │
-│  └── a2ui_metadata_callback (sets a2a:response flag)         │
-│                                                              │
-│  Plugins:                                                    │
-│  ├── ReflectAndRetryToolPlugin (automatic tool retry)        │
-│  └── LoggingPlugin (structured logging)                      │
-│                                                              │
-│  App Config:                                                 │
-│  ├── EventsCompactionConfig (interval=20, overlap=3)         │
+│  Callbacks & Plugins:                                        │
+│  ├── inject_image_callback & a2ui_metadata_callback          │
+│  ├── ReflectAndRetryToolPlugin & LoggingPlugin               │
 │  └── ContextCacheConfig (min_tokens=2048, ttl=3600s)         │
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│  background_agent (LlmAgent — Standalone Worker)              │
+│  Model: gemini-3.5-flash (AGENT_MODEL)                       │
+│  Role: Autonomous background operations & deep analysis       │
+│  Instruction: Main instruction + Pipeline guardrails         │
+│               + Anti-Shallow Guard (no UI / no transfers)    │
+│  Tools: Shared toolset (excluding background management tools)│
+│  Triggered by: /execute_task (Cloud Tasks or async cron job) │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Routing logic**: The coordinator delegates to `deep_analysis_agent` only when a request requires 3+ sequential tool calls with intermediate reasoning, cross-table correlation, or strategic business recommendations. Long-running background tasks and scheduled cron jobs are routed to `background_agent` via Firestore task registration and the `/execute_task` endpoint. All other interactions—including A2UI card generation, simple queries, and Firestore operations—are handled directly by the coordinator.
+**Routing logic**: 
+- **Conversation / Greetings / Simple Retrieval**: Handled directly by the `root_agent`.
+- **Background-First Routing (Analytical Requests)**: For complex analytical tasks (e.g., requests requiring cross-table correlation or statistical modeling), the `root_agent` MUST propose running it as a background task **first** via A2UI suggestion chips ("Run in Background" vs. "Run Inline"). 
+  - If the user chooses **Background**: `root_agent` calls `register_background_task` with a detailed, structured task prompt, launching the `background_agent` asynchronously.
+  - If the user chooses **Inline**: `root_agent` transfers the request inline to the `deep_analysis_agent` for processing.
+- **Workflow Execution Mode**: When the user starts a structured business workflow (e.g. from a Workflow Execution Plan card), the routing rules bypass inline transfer and directly register the workflow task for background execution.
 
-**Model configurability**: The setup script accepts `--model <name>` and `--model-lite <name>` CLI flags to override the default model assignments. The selected models are persisted to the `.env` file and read via `AGENT_MODEL` / `AGENT_MODEL_LITE` environment variables at runtime.
+**Task Pipelines & Guardrails (background_agent)**:
+The `background_agent` operates in one of two highly structured pipelines based on task classification:
+1. **Workflow Pipeline**: Processes operational updates systematically: `SCAN -> ANALYZE -> PLAN -> EXECUTE -> VERIFY -> REPORT`. Employs risk thresholds where low-risk tasks are executed automatically and high-risk tasks are flagged for human-in-the-loop approval.
+2. **Analytical Pipeline**: Conducts deep statistical reviews: `DATA COLLECTION -> EXPLORATORY -> DEEP STATISTICAL -> CROSS-REFERENCE -> SYNTHESIS -> COMPREHENSIVE REPORT`.
+3. **Anti-Shallow Guard**: A strict programmatic checklist requiring the background worker to query multiple sources, perform sandboxed Python execution for statistical verification, cite hard numbers, and list 3+ high-impact business recommendations before submitting.
+
+**Model configurability**: The setup script accepts `--model-analysis-agent <name>` and `--model-root-agent <name>` CLI flags to override the default model assignments. The selected models are persisted to the `.env` file and read via `AGENT_MODEL` / `AGENT_MODEL_LITE` environment variables at runtime.
 
 **Context caching**: The `App` object is configured with `ContextCacheConfig` to cache system instructions and schemas when exceeding 2048 tokens, keeping the cache warm for 1 hour to maximize performance.
 
@@ -201,9 +208,10 @@ The frontend includes a curated MCP catalog with servers organized into categori
 | **Finance & Markets** | Yahoo Finance |
 | **Social & Communication** | LINE Bot, Slack (managed remote) |
 | **Japan-Specific** | MLIT Data Platform, Japanese Tax Law, Japanese Labor Law, National Diet Proceedings |
+| **Environment & Weather** | Weather Data |
 | **Google Official** | Google Workspace MCP (Gmail, Drive, Calendar, People) |
 
-The catalog also includes **recipe bundles** — pre-configured combinations of MCP servers for common demo scenarios (e.g., Public Data Analyst, Compliance Monitor, Japan Market Intelligence).
+The catalog also includes **recipe bundles** — pre-configured combinations of MCP servers for common demo scenarios (e.g., Public Data & Climate Analyst, Regulatory & Legislative Monitor, Japan Business Intelligence, Japan Climate & Logistics).
 
 ### 4.3 MCP Server Types
 
@@ -287,7 +295,7 @@ The setup script offers three deployment options and supports model override via
 bash setup-demo-xxx.sh
 
 # Override models
-bash setup-demo-xxx.sh --model gemini-2.5-pro --model-lite gemini-2.5-flash
+bash setup-demo-xxx.sh --model-analysis-agent gemini-3.1-pro-preview --model-root-agent gemini-3.1-flash-lite
 
 # Cleanup
 bash setup-demo-xxx.sh --cleanup
@@ -398,7 +406,7 @@ After running the setup script, the following directory structure is created:
 - **Async Token Cache**: MCP authentication tokens are cached with async-safe locking and automatic expiry refresh.
 
 ### Agent Resilience
-- **Context Caching**: `ContextCacheConfig` caches the system instruction and A2UI schema (>= 2048 tokens) for 1 hour with 10-invocation revalidation, reducing time-to-first-token.
+- **Context Caching**: `ContextCacheConfig` caches the system instruction and A2UI schema (>= 4096 tokens) for 1 hour with 10-invocation revalidation, reducing time-to-first-token.
 - **Events Compaction**: `EventsCompactionConfig` compacts event history every 20 events with a 3-event overlap to prevent context window overflow in long conversations.
 - **ReflectAndRetryToolPlugin**: Automatically retries failed tool calls with error reflection, improving robustness against transient MCP failures.
 - **Tool Name Deduplication**: `get_custom_mcp_toolsets` uses `tool_name_prefix` to prevent "Duplicate function declaration" errors when multiple MCP servers expose identical tool names.
