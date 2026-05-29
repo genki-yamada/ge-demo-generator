@@ -805,7 +805,7 @@ function getTechnicalInstruction_() {
     "}\\n" +
     "]\\n\\n" +
     
-    "11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST write a localized markdown header equivalent to \\`### 💡 Next Actions\\` in the same language as the conversation in your plain text response. Immediately below it, you MUST append a lightweight A2UI suggestion chip bar using surfaceId 'suggestions' and root='root' containing a Row of 3-4 Buttons with sendText actions.\\n\" +
+    "11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar using surfaceId 'suggestions' and root='root' containing a Row of 3-4 Buttons with sendText actions. NEVER write any plain text or markdown headers (like \\\"Next Actions\\\", \\\"💡 Next Actions\\\", or other localized header equivalent) before the suggestions block; the system will automatically render the appropriate header.\\n" +
     "**A2UI CARD INTERACTION EXCEPTION (STRICT RULE)**: When your response already contains a major interactive A2UI card featuring its own control buttons " +
     "(such as the Welcome Card onboarding buttons, or the Workflow Execution Plan mode selection buttons like Immediate/Background/Scheduled), " +
     "you **MUST NOT** output any suggestion chip bar at the bottom of your response. The card's own control buttons are sufficient. " +
