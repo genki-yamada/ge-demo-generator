@@ -10495,18 +10495,19 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                               )
                               task_result_aggregator.process_event(_cr_text_evt)
                               await event_queue.enqueue_event(_cr_text_evt)
-                          a2a_event = TaskStatusUpdateEvent(
-                                  task_id=context.task_id,
-                                  context_id=context.context_id,
-                                  status=TaskStatus(
-                                      state=TaskState.working,
-                                      message=Message(message_id=str(uuid.uuid4()), role=Role.agent, parts=synthetic_parts),
-                                      timestamp=datetime.now(timezone.utc).isoformat(),
-                                  ),
-                                  final=False
-                              )
-                          task_result_aggregator.process_event(a2a_event)
-                          await event_queue.enqueue_event(a2a_event)
+                          if not part.inline_data:
+                              a2a_event = TaskStatusUpdateEvent(
+                                      task_id=context.task_id,
+                                      context_id=context.context_id,
+                                      status=TaskStatus(
+                                          state=TaskState.working,
+                                          message=Message(message_id=str(uuid.uuid4()), role=Role.agent, parts=synthetic_parts),
+                                          timestamp=datetime.now(timezone.utc).isoformat(),
+                                      ),
+                                      final=False
+                                  )
+                              task_result_aggregator.process_event(a2a_event)
+                              await event_queue.enqueue_event(a2a_event)
 
         # Cancel the timeout watchdog now that the event loop has finished
         _watchdog_task.cancel()
