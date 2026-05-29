@@ -93,7 +93,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v10.08-public',
+  APP_VERSION: 'v10.09-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -628,7 +628,7 @@ function planAndGenerateData(userGoal, options) {
       }
     }
   }
-  // Generate in-memory simulated images using Vertex AI gemini-3-pro-image-preview
+  // Generate in-memory simulated images using Vertex AI gemini-3-pro-image
   if (parsed.externalFiles && parsed.externalFiles.length > 0) {
     console.log('[ImageGen-Pipeline] Scanning externalFiles for dynamic images...');
     for (let i = 0; i < parsed.externalFiles.length; i++) {
@@ -690,7 +690,8 @@ function getTechnicalInstruction_() {
     
     "4. **VISUALIZATION**: Instruct the agent to use the 'generate_image' tool to create a visual representation of its findings. " +
     "This visual MUST be in the style of a professional business document or slide (e.g., an Executive Summary card, a high-level business infographic) " +
-    "that summarizes the insights.\\n" +
+    "that summarizes the insights. " +
+    "**NO IMAGE TOOL RAW RESPONSE OUTFALL (CRITICAL)**: When you call 'generate_image', the system automatically handles the image rendering. You MUST NEVER copy, reference, or output the tool's JSON return payload (e.g., `{'status': 'success', 'detail': '...'}`) in your conversational text response. Do NOT write statements like 'Image generated successfully' or repeat the status dictionary. Keep your text focused purely on business insights.\\n" +
     "5. Instruct to wait for user input before acting, but be persistent in error recovery.\\n" +
     "6. **TRANSPARENCY & GROUNDING (CRITICAL)**: Instruct the agent to be highly transparent about its reasoning, " +
     "explicitly mentioning which tables and files it is consulting and what specific values it found, " +
@@ -841,6 +842,8 @@ function getTechnicalInstruction_() {
     "You MUST run the Python code alone first, receive its result, and only then issue the next tool call in a separate turn. " +
     "After this initial card, do NOT show the welcome card again in the same session unless the user explicitly requests a reset.\n\n" +
     "**A2UI SCHEMA VALIDATION: usageHint CONSTRAINT (CRITICAL)**: The 'usageHint' property is ONLY allowed inside 'Text' components. You MUST NEVER place 'usageHint' inside any other component type (such as 'Button', 'Row', 'Column', 'Card', 'List', 'Divider', 'Icon', 'MultipleChoice', 'TextField'). Placing 'usageHint' in these non-Text components violates the schema and will cause the UI to crash and fail to render.\n\n" +
+    "**A2UI ICON VALIDATION (CRITICAL)**: When using 'Icon' components or specifying 'icon' inside components like 'Button', you MUST ONLY use one of the following allowed icon names. Using any other name (such as 'analytics', 'dashboard', 'chart', 'database', 'check_circle', 'lucide:*') is STRICTLY FORBIDDEN and will cause a fatal validation crash. The allowed icon names are:\n" +
+    "['accountCircle', 'add', 'arrowBack', 'arrowForward', 'attachFile', 'calendarToday', 'call', 'camera', 'check', 'close', 'delete', 'download', 'edit', 'event', 'error', 'favorite', 'favoriteOff', 'folder', 'help', 'home', 'info', 'locationOn', 'lock', 'lockOpen', 'mail', 'menu', 'moreVert', 'moreHoriz', 'notificationsOff', 'notifications', 'payment', 'person', 'phone', 'photo', 'print', 'refresh', 'search', 'send', 'settings', 'share', 'shoppingCart', 'star', 'starHalf', 'starOff', 'upload', 'visibility', 'visibilityOff', 'warning']\n\n" +
     "13. **VERTICAL SPACING / SPACER HACK (CRITICAL)**: The tab bar of a Tabs component and its content Column may render extremely close to each other with insufficient vertical space. " +
     "To insert an appropriate vertical gap below the tab bar, you MUST insert a dummy Text component acting as a spacer ONLY as the very first child of the tab content Column (the Column bound to the tab's child ID). " +
     "The spacer component MUST have a single space \" \" as its literalString text and usageHint 'body'. For example:\n" +
@@ -4924,7 +4927,7 @@ async def generate_image(prompt: str, tool_context: ToolContext) -> dict:
         # Generate image via the GenerateContent API
         result = await asyncio.to_thread(
             client.models.generate_content,
-            model='gemini-3.1-flash-image-preview',
+            model='gemini-3.1-flash-image',
             contents=[
                 types.Content(
                     role="user",
@@ -7709,7 +7712,7 @@ if _viewer_url:
         "2. After bulk or high-impact actions: emphasize dashboard KPIs and include the Markdown link.\\n"
         "3. In confirmation cards: include [View changes live](" + _viewer_url + ") as clickable inline text.\\n"
         "4. In the Welcome Card (MANDATORY):\\n"
-        "   Include an Icon (name: dashboard) + Text row. The Text literalString MUST contain:\\n"
+        "   Include an Icon (name: home) + Text row. The Text literalString MUST contain:\\n"
         "   Real-time Operations Console - Monitor live operational data: [Open Dashboard](" + _viewer_url + ")\\n"
         "   Do NOT use a Button. Use inline Markdown link text only.\\n\\n"
         "WHEN NOT TO SHOW:\\n"
@@ -12061,7 +12064,7 @@ function generateImageBase64WithRetry(prompt) {
 
 function generateImageBase64(prompt) {
   const host = 'aiplatform.googleapis.com';
-  const url = `https://${host}/v1/projects/${CONFIG.PROJECT_ID}/locations/global/publishers/google/models/gemini-3-pro-image-preview:generateContent`;
+  const url = `https://${host}/v1/projects/${CONFIG.PROJECT_ID}/locations/global/publishers/google/models/gemini-3-pro-image:generateContent`;
   
   const payload = {
     contents: [
@@ -12077,7 +12080,7 @@ function generateImageBase64(prompt) {
     }
   };
   
-  console.log('[ImageGen] Calling global gemini-3-pro-image-preview. Prompt length: ' + prompt.length);
+  console.log('[ImageGen] Calling global gemini-3-pro-image. Prompt length: ' + prompt.length);
   
   const response = UrlFetchApp.fetch(url, {
     method: 'POST',
