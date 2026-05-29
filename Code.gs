@@ -93,7 +93,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v10.04-public',
+  APP_VERSION: 'v10.08-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -805,9 +805,7 @@ function getTechnicalInstruction_() {
     "}\\n" +
     "]\\n\\n" +
     
-    "11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar using surfaceId 'suggestions' and root='root'. " +
-    "The suggestion bar MUST contain a Column as root, containing a Text component with usageHint h4 displaying '💡 Next Actions', " +
-    "and a Row of 3-4 Buttons with sendText actions.\\n" +
+    "11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST write a localized markdown header equivalent to \\`### 💡 Next Actions\\` in the same language as the conversation in your plain text response. Immediately below it, you MUST append a lightweight A2UI suggestion chip bar using surfaceId 'suggestions' and root='root' containing a Row of 3-4 Buttons with sendText actions.\\n\" +
     "**A2UI CARD INTERACTION EXCEPTION (STRICT RULE)**: When your response already contains a major interactive A2UI card featuring its own control buttons " +
     "(such as the Welcome Card onboarding buttons, or the Workflow Execution Plan mode selection buttons like Immediate/Background/Scheduled), " +
     "you **MUST NOT** output any suggestion chip bar at the bottom of your response. The card's own control buttons are sufficient. " +
@@ -841,7 +839,21 @@ function getTechnicalInstruction_() {
     "you **MUST NEVER** combine, mix, or output any other JSON tool calls (like execute_sql, get_table_info) in the SAME response turn. " +
     "Mixing python code blocks with JSON tool calls triggers a fatal MALFORMED_FUNCTION_CALL system crash. " +
     "You MUST run the Python code alone first, receive its result, and only then issue the next tool call in a separate turn. " +
-    "After this initial card, do NOT show the welcome card again in the same session unless the user explicitly requests a reset.";
+    "After this initial card, do NOT show the welcome card again in the same session unless the user explicitly requests a reset.\n\n" +
+    "**A2UI SCHEMA VALIDATION: usageHint CONSTRAINT (CRITICAL)**: The 'usageHint' property is ONLY allowed inside 'Text' components. You MUST NEVER place 'usageHint' inside any other component type (such as 'Button', 'Row', 'Column', 'Card', 'List', 'Divider', 'Icon', 'MultipleChoice', 'TextField'). Placing 'usageHint' in these non-Text components violates the schema and will cause the UI to crash and fail to render.\n\n" +
+    "13. **VERTICAL SPACING / SPACER HACK (CRITICAL)**: The tab bar of a Tabs component and its content Column may render extremely close to each other with insufficient vertical space. " +
+    "To insert an appropriate vertical gap below the tab bar, you MUST insert a dummy Text component acting as a spacer ONLY as the very first child of the tab content Column (the Column bound to the tab's child ID). " +
+    "The spacer component MUST have a single space \" \" as its literalString text and usageHint 'body'. For example:\n" +
+    "{\n" +
+    "  \"id\": \"[Unique_Spacer_ID]\",\n" +
+    "  \"component\": {\n" +
+    "    \"Text\": {\n" +
+    "      \"text\": { \"literalString\": \" \" },\n" +
+    "      \"usageHint\": \"body\"\n" +
+    "    }\n" +
+    "  }\n" +
+    "}\n" +
+    "You MUST ONLY use this spacer hack as the first child of a tab content Column. Do NOT place this spacer in any other standard Column, Row, or Dashboard layout where standard spacing is already optimal, to avoid creating unnecessary blank gaps.";
     
   return inst;
 }
@@ -3356,6 +3368,47 @@ echo "⚙️  Configuring robust network timeouts for package resolution..."
 export UV_HTTP_TIMEOUT=600
 export UV_RETRIES=10
 
+# --- Detect Project ID early ---
+PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+if [ -z "$PROJECT_ID" ]; then
+  echo "❌ Error: No default project found in your environment."
+  echo "Please run 'gcloud config set project [PROJECT_ID]' first."
+  exit 1
+fi
+
+# --- Authentication & Permissions Check ---
+echo "🔐 Checking authentication..."
+if ! gcloud auth application-default print-access-token >/dev/null 2>&1 || ! gcloud auth print-access-token >/dev/null 2>&1; then
+  echo "❌ Error: Google Cloud credentials have expired or are missing."
+  echo "💡 Please run the following commands to re-authenticate:"
+  echo "    gcloud auth login"
+  echo "    gcloud auth application-default login"
+  echo "Then re-run this setup script."
+  exit 1
+fi
+
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null || echo "")
+if [ -z "$PROJECT_NUMBER" ]; then
+  echo "❌ Error: Could not retrieve project details. The project ID might be invalid or you lack permissions."
+  exit 1
+fi
+
+# --- Disk Space Check (Skip if in cleanup mode) ---
+if [ "$CLEANUP_MODE" != "true" ]; then
+  echo "💾 Checking disk space..."
+  FREE_SPACE=$(df -k . | awk 'NR==2 {print $4}')
+  if [ "$FREE_SPACE" -lt 1048576 ]; then
+    echo "⚠️  CRITICAL: Low disk space detected ($((FREE_SPACE/1024)) MB left)."
+    echo "    Deployment will likely fail (needs ~1GB free)."
+    echo "    Use the cleanup command to free up space:"
+    echo "    cd ~ && bash \$0 --cleanup"
+    echo ""
+    read -p "Attempt to continue anyway? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then exit 1; fi
+  fi
+fi
+
 # --- Cleanup Mode Handler ---
   if [ "$CLEANUP_MODE" = "true" ]; then
     echo ""
@@ -3393,7 +3446,6 @@ export UV_RETRIES=10
       exit 0
     fi
     
-    PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
     TOKEN=$(gcloud auth print-access-token 2>/dev/null)
     
     echo ""
@@ -3598,14 +3650,6 @@ for coll_name in ['${dirName}_task_definitions', '${dirName}_task_executions', '
     exit 0
   fi
 
-# --- 1. Project Detection & Confirmation ---
-PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
-if [ -z "$PROJECT_ID" ]; then
-  echo "❌ Error: No default project found in your environment."
-  echo "Please run 'gcloud config set project [PROJECT_ID]' first."
-  exit 1
-fi
-
 # --- 1. Project Detection & Confirmation Loop ---
 while true; do
   echo "========================================================="
@@ -3650,8 +3694,11 @@ ${ enableWorkspaceMcp ? `echo "🔌 Google Workspace MCP: Enabled"\n` : ''}${mcp
     echo "   - root_agent (Chat/UI): Uses 'gemini-3.5-flash' by default."
     echo "   - deep_analysis_agent (Reasoning): Uses 'gemini-3.5-flash'."
     echo ""
-    echo "   You can choose 'gemini-3.1-flash-lite' for the root_agent"
-    echo "   to make routine chat responses faster and snappier."
+    echo "   You can choose 'gemini-3.1-flash-lite' for the root_agent."
+    echo "   While it yields simpler and more concise responses, it provides"
+    echo "   much faster and snappier interactions for routine chat."
+    echo "   For complex tasks requiring deep analysis, the root_agent can"
+    echo "   still delegate the work to the deep_analysis_agent (3.5-flash)."
     echo ""
     read -p "▶ Use lightweight gemini-3.1-flash-lite for root_agent? (Y/n): " CHOOSE_LITE
     CHOOSE_LITE=\$(echo "\$CHOOSE_LITE" | tr -d '\\r\\n\\t ')
@@ -3677,36 +3724,6 @@ ${ enableWorkspaceMcp ? `echo "🔌 Google Workspace MCP: Enabled"\n` : ''}${mcp
   fi
 done
 
-
-# --- 1.1 Authentication & Permissions Check ---
-echo "🔐 Checking authentication..."
-if ! gcloud auth application-default print-access-token >/dev/null 2>&1 || ! gcloud auth print-access-token >/dev/null 2>&1; then
-  echo "❌ Error: Google Cloud credentials have expired or are missing."
-  echo "💡 Please run the following commands to re-authenticate:"
-  echo "    gcloud auth login"
-  echo "    gcloud auth application-default login"
-  echo "Then re-run this setup script."
-  exit 1
-fi
-
-PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null || echo "")
-if [ -z "$PROJECT_NUMBER" ]; then
-  echo "❌ Error: Could not retrieve project details. The project ID might be invalid or you lack permissions."
-  exit 1
-fi
-
-echo "💾 Checking disk space..."
-FREE_SPACE=$(df -k . | awk 'NR==2 {print $4}')
-if [ "$FREE_SPACE" -lt 1048576 ]; then
-  echo "⚠️  CRITICAL: Low disk space detected ($((FREE_SPACE/1024)) MB left)."
-  echo "    Deployment will likely fail (needs ~1GB free)."
-  echo "    Use the cleanup command to free up space:"
-  echo "    cd ~ && bash \$0 --cleanup"
-  echo ""
-  read -p "Attempt to continue anyway? (y/n) " -n 1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then exit 1; fi
-fi
 
 # --- 1.2 Deployment Choice ---
 echo ""
@@ -4256,6 +4273,7 @@ echo "🔧 Configuring agent..."
 
 cat <<'__TOOLS_EOF__' > adk_agent/app/tools.py
 import os
+from typing import Union, Any
 import asyncio
 from google.adk.agents.readonly_context import ReadonlyContext
 import dotenv
@@ -5566,17 +5584,17 @@ def write_operational_alert(
 def save_document_to_db(
     collection_name: str,
     document_id: str,
-    document_json_string: str,
+    document_json_string: Union[str, dict[str, Any]],
     tool_context: ToolContext = None
 ) -> dict:
     """Saves or updates a structured document in the Firestore operational database.
-    Use this general tool to write structured records (orders, client updates, tasks) as clean JSON strings.
-    Bypasses raw MCP dict serialization bugs by accepting a clean JSON string.
+    Use this general tool to write structured records (orders, client updates, tasks).
+    Accepts either a raw dictionary or a clean JSON-serialized string.
     
     Args:
         collection_name: Target collection name (e.g., 'outreach_tasks', 'client_status').
         document_id: Unique document identifier (e.g., 'client_102').
-        document_json_string: Document body serialized as a clean JSON string (e.g., '{"status": "flagged", "aum": 5000000}').
+        document_json_string: Document body serialized as a JSON string OR a raw key-value dictionary.
         
     Returns:
         dict with database write status.
@@ -5588,7 +5606,11 @@ def save_document_to_db(
         return {"status": "error", "message": "Firestore database is not configured."}
         
     try:
-        data = json.loads(document_json_string)
+        if isinstance(document_json_string, dict):
+            data = document_json_string
+        else:
+            data = json.loads(document_json_string)
+            
         if not isinstance(data, dict):
             return {"status": "error", "message": "JSON body must represent a key-value dictionary."}
         
@@ -6819,11 +6841,13 @@ cat <<'__TABS_EOF__' > adk_agent/app/examples/0.8/tabbed_comparison.json
       { "title": { "literalString": "Before" }, "child": "beforeContent" },
       { "title": { "literalString": "After" }, "child": "afterContent" }
     ] } } },
-    { "id": "beforeContent", "component": { "Column": { "children": { "explicitList": ["beforeTitle", "beforeRole", "beforeScore"] }, "distribution": "start", "alignment": "stretch" } } },
+    { "id": "beforeContent", "component": { "Column": { "children": { "explicitList": ["beforeSpacer", "beforeTitle", "beforeRole", "beforeScore"] }, "distribution": "start", "alignment": "stretch" } } },
+    { "id": "beforeSpacer", "component": { "Text": { "text": { "literalString": " " }, "usageHint": "body" } } },
     { "id": "beforeTitle", "component": { "Text": { "text": { "literalString": "Name: Kenta Takahashi" }, "usageHint": "body" } } },
     { "id": "beforeRole", "component": { "Text": { "text": { "literalString": "Title: Head of Corporate Planning" }, "usageHint": "body" } } },
     { "id": "beforeScore", "component": { "Text": { "text": { "literalString": "Score: 45" }, "usageHint": "body" } } },
-    { "id": "afterContent", "component": { "Column": { "children": { "explicitList": ["afterTitle", "afterRole", "afterScore"] }, "distribution": "start", "alignment": "stretch" } } },
+    { "id": "afterContent", "component": { "Column": { "children": { "explicitList": ["afterSpacer", "afterTitle", "afterRole", "afterScore"] }, "distribution": "start", "alignment": "stretch" } } },
+    { "id": "afterSpacer", "component": { "Text": { "text": { "literalString": " " }, "usageHint": "body" } } },
     { "id": "afterTitle", "component": { "Text": { "text": { "literalString": "Name: Kenta Takahashi" }, "usageHint": "body" } } },
     { "id": "afterRole", "component": { "Text": { "text": { "literalString": "Title: CFO ✏️" }, "usageHint": "body" } } },
     { "id": "afterScore", "component": { "Text": { "text": { "literalString": "Score: 60 ✏️" }, "usageHint": "body" } } },
@@ -7536,7 +7560,7 @@ Help the user answer questions by strategically combining insights from BigQuery
      * WRONG example: \\\`parent: "projects/.../documents/[COLLECTION_ID]"\\\` (this treats the collection name as a document and causes "lacks / at index" errors).
      * RIGHT example: \\\`parent: "projects/.../documents", collection_id: "[COLLECTION_ID]"\\\`.
    - FIRESTORE ERROR RECOVERY: If a Firestore tool call returns an error:
-     * First try \\\`list_collections\\\` with parent \\\`projects/[PROJECT_ID]/databases/(default)/documents\\\` to verify available collections.
+     * NEVER use \\\`list_collections\\\` as it returns massive project-wide metadata that will bloat your context and cause MALFORMED_FUNCTION_CALL. The only valid collection is \\\`[COLLECTION_ID]\\\`.
      * Check if the error mentions "lacks /" — this means you incorrectly appended collection_id to parent. Separate them.
      * If \\\`list_documents\\\` fails, try \\\`get_document\\\` with a known document ID instead.
      * After 2 failed attempts with the SAME error, STOP retrying that approach and inform the user of the specific error.
@@ -7577,7 +7601,7 @@ CRITICAL OPERATIONAL RULES:
 - A2UI_MANDATORY_OUTPUT (HIGHEST PRIORITY — NEVER SKIP):
     * EVERY response that contains an analysis result, data summary, ranking, comparison, entity profile, action plan, OR a confirmation request MUST use A2UI interactive cards wrapped in <a2ui-json> tags. Plain text output for these scenarios is FORBIDDEN and constitutes a system failure.
     * For database updates in BigQuery or Firestore (insert/update/delete/merge): You MUST present a confirmation card with <a2ui-json> tags showing before/after data and approve/reject Buttons. NEVER ask for confirmation in plain text.
-    * At the END of EVERY response, you MUST append suggestion chips in a separate <a2ui-json> block with surfaceId "suggestions" containing 3-4 contextual follow-up Buttons.
+    * At the END of EVERY response, you MUST append suggestion chips in a separate <a2ui-json> block with surfaceId "suggestions" containing 3-4 contextual follow-up Buttons. NEVER write any plain text or markdown headers (like "Next Actions", "💡 Next Actions", or other localized header equivalent) before the suggestions block; the system will automatically render the appropriate header.
     * If you are unsure whether to use A2UI, USE IT. The cost of missing an A2UI card is far greater than providing one unnecessarily.
     * CONTEXT-AWARE ELEMENT SELECTION (CRITICAL): Choose the most appropriate A2UI element for each piece of content. Refer to the A2UI schema examples provided in your system prompt. General guidelines:
       - Tabular data (query results, comparisons, rankings): Use DataTable or structured cards with rows and columns. Never dump raw text tables.
@@ -7621,7 +7645,7 @@ CRITICAL OPERATIONAL RULES:
       Step 4: Report the error to the user with the exact error message and what you tried.
     * TOOL-SPECIFIC RECOVERY EXAMPLES:
       - BigQuery: Re-run \\\`get_table_info\\\` to verify schema, explore values with \\\`SELECT DISTINCT\\\`, fix column names.
-      - Firestore: Run \\\`list_collections\\\` to verify collection names, check path format (parent vs collection_id separation).
+      - Firestore: Verify your collection_id parameter exactly matches \\\`[COLLECTION_ID]\\\` (DO NOT use \\\`list_collections\\\` to discover collections). Check path format (parent vs collection_id separation).
       - Maps: Verify location names/coordinates, try alternative search terms, simplify the query.
       - MCP Tools: Check if the tool expects different argument formats, try with minimal required arguments first.
 - DATA DISCOVERY & ACCURACY (HIGHEST PRIORITY): 
@@ -7908,8 +7932,11 @@ def _inject_completed_tasks(callback_context):
             _msg = "--- BACKGROUND TASK RESULTS ---" + chr(10) + chr(10).join(_summaries) + chr(10) + "--- END RESULTS ---"
             _logging.warning("Injecting " + str(len(_summaries)) + " completed task results into session.")
             callback_context.state["_bg_task_results"] = _msg
+        else:
+            callback_context.state["_bg_task_results"] = ""
     except Exception as _e:
         _logging.error("Failed to inject task results: " + str(_e))
+        callback_context.state["_bg_task_results"] = ""
     return None
 
 # =============================================================================
@@ -7925,17 +7952,31 @@ def _log_bq_activity(tool, args, tool_context, tool_response):
     # Skip system delegation tools to prevent corrupting the _last_tool_result state
     if _tool_name.startswith('transfer_to_') or _tool_name == 'transfer_to_agent':
         return None
+    
+    # Skip background task management and database write utility tools from text enforcement injection
+    _skip_enforce = [
+        'register_background_task',
+        'register_scheduled_task',
+        'update_scheduled_task',
+        'delete_scheduled_task',
+        'cancel_background_task',
+        'update_task_progress',
+        'write_operational_alert',
+        'save_document_to_db'
+    ]
+    
     # --- General: store last substantial tool result for after_model enforcement ---
     try:
         _summ = ''
-        if isinstance(tool_response, dict) and not tool_response.get('error'):
-            _summ = tool_response.get('result_summary', '') or tool_response.get('result', '')
-            if not _summ:
-                _summ = str(tool_response)
-        elif isinstance(tool_response, str) and len(tool_response) > 30:
-            _summ = tool_response
-        if _summ and len(str(_summ)) > 30:
-            tool_context.state['_last_tool_result'] = str(_summ)
+        if _tool_name not in _skip_enforce:
+            if isinstance(tool_response, dict) and not tool_response.get('error'):
+                _summ = tool_response.get('result_summary', '') or tool_response.get('result', '')
+                if not _summ:
+                    _summ = str(tool_response)
+            elif isinstance(tool_response, str) and len(tool_response) > 30:
+                _summ = tool_response
+            if _summ and len(str(_summ)) > 30:
+                tool_context.state['_last_tool_result'] = str(_summ)
     except Exception:
         pass
     # --- Activity logging ---
@@ -8197,7 +8238,8 @@ Before writing your final analysis report, you MUST self-evaluate:
    Prefer BigQuery SQL for aggregation, filtering, JOINs, and window functions.
 
    FORBIDDEN USE (CRITICAL — NEVER VIOLATE):
-   NEVER use Code Execution to simulate, fake, or substitute for
+   - CODE EXECUTION MIX PREVENTION: You MUST NEVER output a Python code block (using 'python' fence) AND call any other custom JSON tool (like execute_sql, save_document_to_db, write_operational_alert) in the SAME response turn. Mixing them triggers a fatal system crash. Execute the Python code alone first, receive its result, and only then issue the next tool call in a separate turn.
+   - NEVER use Code Execution to simulate, fake, or substitute for
    background task registration. When the user asks for "background"
    execution, you MUST call the register_background_task tool — NOT
    write Python code that generates a UUID or prints a fake task ID.
@@ -8254,6 +8296,17 @@ Before writing your final analysis report, you MUST self-evaluate:
    CORRECT WORKFLOW (MANDATORY):
    Step 1: Call tools (execute_sql, get_document, MCP tools) to fetch data
    Step 2: Copy the tool results into Python variables as dicts/lists
+           [NO DATA LEAKS IN CODE EXECUTION (CRITICAL)]: You MUST NOT copy-paste or hardcode
+           large raw data tables (lists, dicts) directly inside your Python script
+           if the data exceeds 20 rows. Doing so saturates the context and crashes.
+           Perform data filtering/aggregation using BigQuery SQL first.
+           
+           [EFFECTIVE SANDBOX USAGE (BEST PRACTICE)]:
+           The Python Sandbox is ONLY for high-level computations that are impossible or highly complex in BigQuery SQL (e.g., Pearson correlation, linear regression, forecasting, clustering).
+           - DO NOT copy raw transaction/history logs to Python.
+           - ALWAYS pre-aggregate data into a small summary matrix (under 20 rows) via BigQuery SQL GROUP BY/AVG first, then pass this small aggregate to Python.
+           - CORRECT: Query BQ for "monthly sales and spend (12 rows)" -> Pass 12 rows to Python -> Calculate correlation via np.corrcoef().
+           - WRONG: Copy 500 raw shipment rows to Python to calculate standard deviation (BigQuery SQL can compute standard deviation directly via STDDEV_SAMP!).
    Step 3: Process with pandas/numpy/sklearn in Code Execution
    Step 4: Print results and present to user
 
@@ -8353,6 +8406,18 @@ root_agent = LlmAgent(
     name='root_agent',
     instruction=final_instruction + r"""
 
+--- AUTOMATIC BACKGROUND TASK NOTIFICATION (MANDATORY) ---
+If a background task you scheduled earlier completes, its final results will be automatically injected into the section below:
+
+{_bg_task_results}
+
+When you see non-empty content inside the block above (meaning the task has completed or failed):
+1. **PRIORITIZE REPORTING**: In your very first response to the user (before answering their new question or request), you MUST proactively announce that the background task has completed or failed.
+2. **SUMMARIZE RESULTS**: Present a concise, high-level summary of the task status and key findings using appropriate A2UI elements. Keep it brief so it does not overwhelm the current conversation.
+3. **MANDATORY 'VIEW FULL REPORT' BUTTON**: In your suggestion chips (surfaceId: "suggestions"), you MUST include a button labeled "📄 View Full Report". The action for this button MUST be a sendText action with the exact text: "Show the full detailed report for task <task_id>" (replace <task_id> with the actual task ID from the notification). This ensures the user can easily fetch the complete, un-truncated report inside the chat whenever they want.
+4. **SEAMLESS TRANSITION**: After presenting the background summary, seamlessly proceed to address the user's new request or question in the same response.
+---
+
 --- TOOL CALL DISCIPLINE (CRITICAL) ---
 When calling any tool, your response MUST contain ONLY:
 1. A brief progress emoji line (e.g., "Checking schema...")
@@ -8381,10 +8446,9 @@ Transfer to deep_analysis_agent ONLY when the request requires BOTH:
    (e.g. identifying discrepancies, mismatches, or reconciliation anomalies).
 
 CRITICAL — BACKGROUND-FIRST ROUTING (NEVER SKIP):
-When you determine a request qualifies for deep_analysis_agent transfer,
-you MUST propose background execution FIRST, BEFORE transferring.
-Do NOT transfer to deep_analysis_agent and then suggest background —
-you must suggest it at the root_agent level.
+When you determine a request qualifies for deep_analysis_agent transfer (complex analysis requiring 3+ tool calls and synthesis), you MUST propose background execution FIRST, BEFORE executing any analytical tools or transferring.
+
+WARNING: You are STRICTLY FORBIDDEN from calling register_background_task or transferring to deep_analysis_agent in your very first response to a complex request without the user's explicit consent. You MUST ask the user first and let them choose.
 
 EXCLUSION: If you are already inside the WORKFLOW EXECUTION MODE flow
 (i.e., the user chose an execution mode from a Workflow Execution Plan card),
@@ -8393,17 +8457,24 @@ itself. This rule applies ONLY to pure analytical requests that are NOT
 part of an active workflow execution. Never register a second background
 task for a request that has already been registered via workflow mode.
 
-Flow:
-1. Recognize that the request is complex enough for deep_analysis_agent
-2. Tell the user: "This is a complex analysis that benefits from
-   deep analysis. Since it involves multi-step reasoning and may take
-   several minutes, I recommend running it as a background task."
-3. Present two A2UI suggestion chips:
-   - "Run in Background" (recommended) — register_background_task
-   - "Run Inline" — transfer to deep_analysis_agent as normal
-4. If user chooses background: call register_background_task with a
-   COMPREHENSIVE task_prompt following the TASK_PROMPT CONSTRUCTION RULES below.
-5. If user chooses inline: transfer to deep_analysis_agent as normal
+Mandatory 2-Turn Flow (MUST FOLLOW EXACTLY):
+Turn 1 (Proposal Turn — DO NOT CALL TOOLS):
+1. Recognize that the request is complex enough for deep_analysis_agent.
+2. Respond to the user in plain text: Explain why this is a complex analysis (e.g., "This requires cross-referencing X and Y, which involves multi-step reasoning"). Propose running it as a background task so they can continue other work.
+3. **DO NOT call register_background_task or transfer to deep_analysis_agent in this turn.** Doing so without user consent is a critical failure.
+4. Present exactly two A2UI suggestion chips:
+   - "🚀 Run in Background" (Recommended)
+   - "💬 Run Inline"
+5. End your response and wait for the user's choice.
+
+Turn 2 (Execution Turn — After User Responds):
+- If the user chooses "Run in Background":
+  1. Call register_background_task tool with a COMPREHENSIVE task_prompt following the TASK_PROMPT CONSTRUCTION RULES below.
+  2. In the same turn, confirm the registration, show the ticket ID, and explain how to monitor it.
+  3. **MANDATORY SUGGESTION CHIPS**: In the suggestion chips (surfaceId: "suggestions"), you MUST include a button labeled "📊 Check Task Status". The action for this button MUST be a sendText action with the text "Check progress of task <task_id>" (replace <task_id> with the actual ticket ID).
+  4. If DATA_VIEWER_URL is available, also include a suggestion chip labeled "🖥️ Open Operations Console" with an openUrl action pointing to the viewer URL.
+- If the user chooses "Run Inline":
+  1. Call transfer_to_deep_analysis_agent to hand over the task.
 
 TASK_PROMPT CONSTRUCTION RULES (CRITICAL — PREVENTS SHALLOW RESULTS):
 The task_prompt you pass to register_background_task MUST contain ALL of the
@@ -8428,8 +8499,8 @@ following. A vague or generic task_prompt is the #1 cause of shallow results.
      pricing response strategy with expected margin impact"
 
 3. SUCCESS CRITERIA: Define what makes this analysis "deep" vs. "shallow":
-   - Minimum 5 tool calls (SQL queries + Code Execution combined)
-   - At least 1 Code Execution block for statistical computation
+   - Minimum 3 tool calls (SQL queries + optional Code Execution)
+   - Use Code Execution ONLY when BigQuery SQL is insufficient for high-order statistics (like Pearson correlation). NEVER copy large raw datasets into the sandbox.
    - Cross-reference at least 2 data sources
    - Every conclusion must cite specific numbers
    - At least 3 actionable recommendations with quantified business impact
@@ -8656,7 +8727,8 @@ perform. A task_prompt without this structure produces shallow results.
    Prefer BigQuery SQL for aggregation, filtering, JOINs, and window functions.
 
    FORBIDDEN USE (CRITICAL — NEVER VIOLATE):
-   NEVER use Code Execution to simulate, fake, or substitute for
+   - CODE EXECUTION MIX PREVENTION: You MUST NEVER output a Python code block (using 'python' fence) AND call any other custom JSON tool (like execute_sql, save_document_to_db, write_operational_alert) in the SAME response turn. Mixing them triggers a fatal system crash. Execute the Python code alone first, receive its result, and only then issue the next tool call in a separate turn.
+   - NEVER use Code Execution to simulate, fake, or substitute for
    background task registration. When the user asks for "background"
    execution, you MUST call the register_background_task tool — NOT
    write Python code that generates a UUID or prints a fake task ID.
@@ -8698,6 +8770,17 @@ perform. A task_prompt without this structure produces shallow results.
    CORRECT WORKFLOW (MANDATORY — ALWAYS FOLLOW THIS ORDER):
    Step 1: Call tools (execute_sql, get_document, MCP tools) to fetch data
    Step 2: Copy the tool results into Python variables as dicts/lists
+           [NO DATA LEAKS IN CODE EXECUTION (CRITICAL)]: You MUST NOT copy-paste or hardcode
+           large raw data tables (lists, dicts) directly inside your Python script
+           if the data exceeds 20 rows. Doing so saturates the context and crashes.
+           Perform data filtering/aggregation using BigQuery SQL first.
+           
+           [EFFECTIVE SANDBOX USAGE (BEST PRACTICE)]:
+           The Python Sandbox is ONLY for high-level computations that are impossible or highly complex in BigQuery SQL (e.g., Pearson correlation, linear regression, forecasting, clustering).
+           - DO NOT copy raw transaction/history logs to Python.
+           - ALWAYS pre-aggregate data into a small summary matrix (under 20 rows) via BigQuery SQL GROUP BY/AVG first, then pass this small aggregate to Python.
+           - CORRECT: Query BQ for "monthly sales and spend (12 rows)" -> Pass 12 rows to Python -> Calculate correlation via np.corrcoef().
+           - WRONG: Copy 500 raw shipment rows to Python to calculate standard deviation (BigQuery SQL can compute standard deviation directly via STDDEV_SAMP!).
    Step 3: Process with pandas/numpy/sklearn in Code Execution
    Step 4: Print results and present to user
 
@@ -9403,7 +9486,7 @@ def _rewrite_suggestions_a2ui(msg):
                         "id": "suggestions_wrapper",
                         "component": {
                             "Column": {
-                                "children": { "explicitList": ["suggestions_spacer", "suggestions_header", "root"] },
+                                "children": { "explicitList": ["suggestions_spacer", "root"] },
                                 "alignment": "stretch",
                                 "distribution": "start"
                             }
@@ -9418,22 +9501,82 @@ def _rewrite_suggestions_a2ui(msg):
                             }
                         }
                     }
-                    _header = {
-                        "id": "suggestions_header",
-                        "component": {
-                            "Text": {
-                                "text": { "literalString": "💡 Next Actions" },
-                                "usageHint": "h4"
-                            }
-                        }
-                    }
+
                     _comps.insert(0, _wrapper)
                     _comps.insert(1, _spacer)
-                    _comps.insert(2, _header)
     return msg
 
+def _heal_buttons_in_a2ui(msg):
+    if not isinstance(msg, dict):
+        return msg
+    if 'surfaceUpdate' in msg:
+        su = msg['surfaceUpdate']
+        if 'components' in su and isinstance(su['components'], list):
+            comps = su['components']
+            new_comps = []
+            for comp in comps:
+                if not isinstance(comp, dict):
+                    continue
+                if 'component' in comp and isinstance(comp['component'], dict):
+                    c_type = list(comp['component'].keys())[0] if comp['component'] else None
+                    if c_type == 'Button':
+                        btn = comp['component']['Button']
+                        if isinstance(btn, dict):
+                            # Capture and remove accidental usageHint on the Button component itself to prevent validation failure
+                            btn_usage_hint = btn.pop('usageHint', None)
+                            
+                            has_child = 'child' in btn
+                            label_val = btn.get('label') or btn.get('text')
+                            if not has_child and label_val:
+                                label_str = ''
+                                if isinstance(label_val, dict):
+                                    label_str = label_val.get('literalString') or ''
+                                else:
+                                    label_str = str(label_val)
+                                if label_str:
+                                    parent_id = comp.get('id') or 'btn'
+                                    child_id = parent_id + '_lbl'
+                                    btn['child'] = child_id
+                                    if 'label' in btn:
+                                        del btn['label']
+                                    if 'text' in btn:
+                                        del btn['text']
+                                    
+                                    # Use the captured usageHint for the child Text component, or default to 'body'
+                                    target_hint = btn_usage_hint if btn_usage_hint else 'body'
+                                    
+                                    new_text = {
+                                        'id': child_id,
+                                        'component': {
+                                            'Text': {
+                                                'text': { 'literalString': label_str },
+                                                'usageHint': target_hint
+                                            }
+                                        }
+                                    }
+                                    new_comps.append(new_text)
+            comps.extend(new_comps)
+    return msg
+
+def _is_suggestions_part(part) -> bool:
+    try:
+        _root = getattr(part, 'root', None)
+        if _root and isinstance(_root, a2a_types.DataPart):
+            _data = _root.data
+            _items = _data if isinstance(_data, list) else [_data]
+            for _item in _items:
+                if isinstance(_item, dict):
+                    for _k in ('beginRendering', 'surfaceUpdate', 'deleteSurface'):
+                        if _k in _item and isinstance(_item[_k], dict):
+                            if _item[_k].get('surfaceId') == 'suggestions':
+                                return True
+    except Exception:
+        pass
+    return False
+
 def create_a2ui_part(msg):
-    _rewritten = _rewrite_suggestions_a2ui(msg)
+    _healed = _heal_buttons_in_a2ui(msg)
+    _rewritten = _rewrite_suggestions_a2ui(_healed)
     return _original_create_a2ui_part(_rewritten)
 
 from adk_agent.app.agent import app as adk_app, background_agent
@@ -9506,6 +9649,37 @@ a2ui_schema_manager = A2uiSchemaManager(
 )
 a2ui_selected_catalog = a2ui_schema_manager.get_selected_catalog()
 
+def _heal_session_events(session):
+    if not session or not hasattr(session, 'events') or not session.events:
+        return
+    
+    healed_events = []
+    prev_content_event = None
+    
+    for event in session.events:
+        # Strip failed/error events (like MALFORMED_FUNCTION_CALL) from history to prevent recovery pollution
+        if getattr(event, 'error_code', None):
+            logger.log_text(f"[HEALER] Stripping failed event with error_code '{event.error_code}' from session history.")
+            continue
+            
+        if getattr(event, 'content', None) and getattr(event.content, 'role', None):
+            role = event.content.role
+            if prev_content_event and getattr(prev_content_event, 'content', None) and prev_content_event.content.role == role:
+                # Duplicate role detected! Merge parts.
+                logger.log_text(f"[HEALER] Duplicate role '{role}' detected in history. Merging events.")
+                if getattr(event.content, 'parts', None):
+                    if not getattr(prev_content_event.content, 'parts', None):
+                        prev_content_event.content.parts = []
+                    prev_content_event.content.parts.extend(event.content.parts)
+                # Skip adding this event to healed_events (it is merged into prev)
+                continue
+            else:
+                prev_content_event = event
+        healed_events.append(event)
+        
+    session.events = healed_events
+
+
 class AdkAgentToA2AExecutor(A2aAgentExecutor):
     async def _handle_request(
         self,
@@ -9575,6 +9749,10 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
           # Clear stale tool results from previous turns to prevent accidental force-injection
           session.state.pop('_last_tool_result', None)
           run_args['session_id'] = session.id
+
+        # Heal the session history before running the agent to prevent MALFORMED_FUNCTION_CALL errors
+        # caused by concurrent request race conditions (duplicate roles) or crash-recovery (consecutive user roles).
+        _heal_session_events(session)
 
         invocation_context = runner._new_invocation_context(
             session=session,
@@ -9682,11 +9860,26 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
               # mixed text + function_call). Instead of failing hard, provide
               # a user-friendly retry message so the conversation can continue.
               if 'MALFORMED_FUNCTION_CALL' in _err_code_str:
-                  logger.log_text(f"MALFORMED_FUNCTION_CALL detected - providing retry guidance to user.")
+                  logger.log_text("MALFORMED_FUNCTION_CALL detected - event: " + str(adk_event) + " - vars: " + str(getattr(adk_event, '__dict__', 'N/A')) + " - providing retry guidance to user.")
                   _recovery_text = "I encountered a temporary processing error. Let me try a different approach - please repeat your request or click a suggestion below."
                   _recovery_part = a2a_types.Part(root=a2a_types.TextPart(text=_recovery_text))
                   artifact_text_parts.clear()
                   artifact_text_parts.append(_recovery_part)
+
+                  # Programmatically inject fallback suggestion chips so the user can actually "click a suggestion below" to recover!
+                  _fallback_suggestions = [
+                      { 'beginRendering': { 'surfaceId': 'suggestions', 'root': 'root' } },
+                      { 'surfaceUpdate': { 'surfaceId': 'suggestions', 'components': [
+                          { 'id': 'root', 'component': { 'Row': { 'children': { 'explicitList': ['fb_chip1', 'fb_chip2'] }, 'distribution': 'spaceEvenly', 'alignment': 'center' } } },
+                          { 'id': 'fb_chip1', 'component': { 'Button': { 'child': 'fb_chip1Lbl', 'action': { 'name': 'sendText', 'context': [{ 'key': 'text', 'value': { 'literalString': 'Please try the last analysis step again' } }] } } } },
+                          { 'id': 'fb_chip1Lbl', 'component': { 'Text': { 'text': { 'literalString': '🔄 Try Again' }, 'usageHint': 'body' } } },
+                          { 'id': 'fb_chip2', 'component': { 'Button': { 'child': 'fb_chip2Lbl', 'action': { 'name': 'sendText', 'context': [{ 'key': 'text', 'value': { 'literalString': 'Hello' } }] } } } },
+                          { 'id': 'fb_chip2Lbl', 'component': { 'Text': { 'text': { 'literalString': '🏠 Restart' }, 'usageHint': 'body' } } }
+                      ] } }
+                  ]
+                  for _item in _fallback_suggestions:
+                      fb_ui_part = create_a2ui_part(_item)
+                      artifact_media_parts.append(fb_ui_part)
                   # Emit as working status so the user sees it immediately
                   _recovery_evt = TaskStatusUpdateEvent(
                       task_id=context.task_id,
@@ -9911,6 +10104,19 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                           _a2ui_re = _re.compile(r'<a2ui-json>(.*?)</a2ui-json>', _re.DOTALL)
                           _a2ui_matches = _a2ui_re.findall(part.text)
                           logger.log_text(f"[a2ui_safety_net] Parser missed A2UI! Found {len(_a2ui_matches)} A2UI block(s) via regex in {len(part.text)} chars")
+                          
+                          # Strip A2UI blocks from the already accumulated text parts to prevent double-rendering
+                          if artifact_text_parts:
+                              _last_text_part = artifact_text_parts[-1]
+                              _lt_root = getattr(_last_text_part, 'root', None)
+                              _lt_text = getattr(_lt_root, 'text', '') if _lt_root else ''
+                              if _lt_text:
+                                  _cleaned_text = _a2ui_re.sub('', _lt_text).strip()
+                                  if _cleaned_text:
+                                      artifact_text_parts[-1] = a2a_types.Part(root=a2a_types.TextPart(text=_cleaned_text))
+                                  else:
+                                      artifact_text_parts.pop()
+
                           _safety_parts = []
                           for _match_str in _a2ui_matches:
                               try:
@@ -10339,46 +10545,47 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
         # Without this, only the last streamed chunk appears as the "final response"
         # and all preceding text is trapped inside thinking.
         # =============================================================================
-        # Combine: final response text + all media (images, A2UI)
-        # --- Strip trailing empty "Next Actions" headers from text ---
-        # The LLM often emits "### Next Actions" + "---" as trailing text
-        # alongside A2UI suggestions components, creating a duplicate empty
-        # heading in the UI. Strip these when A2UI media parts are present.
-        # 1. Determine if suggestions chips are present in the current response
-        _has_suggestions = False
-        for _mp in artifact_media_parts:
+        # --- Re-order media parts ---
+        _normal_media = []
+        _suggestion_media = []
+        def _is_suggestions_part(mp):
             try:
-                _mp_root = getattr(_mp, 'root', None)
+                _mp_root = getattr(mp, 'root', None)
                 _mp_data = getattr(_mp_root, 'data', None) or getattr(_mp_root, 'metadata', None) or {}
-                if '"suggestions"' in str(_mp_data):
-                    _has_suggestions = True
-                    break
+                return '"suggestions"' in str(_mp_data)
             except Exception:
-                pass
+                return False
 
-        # 2. If suggestions are present, strip trailing "Next Actions" from text to prevent duplicates
-        if _has_suggestions and artifact_text_parts:
-            import re as _strip_re
-            _last_tp = artifact_text_parts[-1]
-            _last_root = getattr(_last_tp, 'root', None)
-            _last_text = getattr(_last_root, 'text', '') if _last_root else ''
-            if _last_text:
-                # Remove trailing "--- ### Next Actions" or similar
-                _stripped = _strip_re.sub(
-                    r'[\\s]*---[\\s]*#{1,4}[\\s]*.*?Next Actions[\\s]*$',
-                    '', _last_text
-                ).rstrip()
-                if _stripped != _last_text:
-                    if _stripped:
-                        artifact_text_parts[-1] = a2a_types.Part(
-                            root=a2a_types.TextPart(text=_stripped)
-                        )
-                    else:
-                        artifact_text_parts.pop()
+        for _mp in artifact_media_parts:
+            if _is_suggestions_part(_mp):
+                _suggestion_media.append(_mp)
+            else:
+                _normal_media.append(_mp)
 
-        logger.log_text(f"[artifact_build] text_parts={len(artifact_text_parts)}, media_parts={len(artifact_media_parts)}, parser_buffer_remaining='{getattr(stream_parser, '_buffer', '')[:100]}'")
+        # --- Auto-Inject Localized "Next Actions" Header ---
+        _next_actions_part = None
+        if _suggestion_media:
+            # Detect language based on text parts to localize the header safely
+            def _is_jp(t):
+                import re as _jp_re
+                return bool(_jp_re.search('[' + chr(92) + 'u3040-' + chr(92) + 'u309F' + chr(92) + 'u30A0-' + chr(92) + 'u30FF]', t))
+            
+            _is_japanese = False
+            if artifact_text_parts:
+                _last_tp = artifact_text_parts[-1]
+                _last_root = getattr(_last_tp, 'root', None)
+                _last_text = getattr(_last_root, 'text', '') if _last_root else ''
+                _is_japanese = _is_jp(_last_text) or (len(artifact_text_parts) > 1 and _is_jp(getattr(getattr(artifact_text_parts[0], 'root', None), 'text', '')))
+            
+            _hdr_text = (chr(10) * 2 + "#### 💡 次の推奨アクション") if _is_japanese else (chr(10) * 2 + "#### 💡 Next Actions")
+            _next_actions_part = [a2a_types.Part(root=a2a_types.TextPart(text=_hdr_text))]
 
-        artifact_parts = artifact_text_parts + artifact_media_parts
+        # --- Combine parts in correct logical order (Main text -> Images/Cards -> Relocated Header -> Buttons) ---
+        if _next_actions_part:
+            artifact_parts = artifact_text_parts + _normal_media + _next_actions_part + _suggestion_media
+        else:
+            artifact_parts = artifact_text_parts + _normal_media + _suggestion_media
+
 
         if (
             task_result_aggregator.task_state == TaskState.working
@@ -12385,7 +12592,7 @@ Requirements for the Structured Output:
         - **High-fidelity Assets & Multi-modal Integration**: Intelligently design the challenge to utilize the platform's asset generation capabilities:
             1. **Visual/HITL Triggers**: If the workflow involves any paper forms, manual applications, receipts, shipping box damages, visual inspection anomalies, or legacy physical processes, explicitly mandate a **JPEG image asset** (e.g. handwritten fax order, scanned invoice, damaged package photograph) as the primary trigger, requiring the agent to use multimodal vision before routing to Firestore for Human-in-the-Loop (HITL) manager approval.
             2. **Structured Ledgers**: Integrate transactional logs, excel data dumps, or raw CSV exports as **Excel/CSV/TSV files** that the agent must parse (using TSV/CSV delimiter logic) and reconcile against the DB.
-            3. **Executive Outward Documents**: Design the workflow to output professional, executive-ready **PDF audit reports or customer statements** as the final outcome or human review package.
+            3. **Executive Reports & Interactive Cards**: Design the workflow to output professional, structured reports (saved to the operational database/Firestore) and rich interactive UI cards (using A2UI) as the final outcome or human review package.
         *NOTE*: If the input already lists target workflows or specific steps, respect them and build the operational challenge specifically around those workflows.
 2.  **Operational/Database Focus**: ALWAYS frame the scenario as a database-driven workflow where the agent reads from analytical sources (BigQuery/external files) and **writes back status updates, high-risk alerts, or proposed changes to the operational database (Firestore)** to keep the real-time console updated.
 3.  **No Fictional Placeholders**: Use realistic brand names, locations, and values appropriate to the language context. Do NOT use generic placeholders like \"Product A\", \"Company XYZ\", etc.
