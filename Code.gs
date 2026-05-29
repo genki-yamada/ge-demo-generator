@@ -6864,7 +6864,7 @@ __TABS_EOF__
 cat <<'__FORM_EOF__' > adk_agent/app/examples/0.8/interactive_form.json
 [
   { "beginRendering": { "surfaceId": "edit-form", "root": "root" } },
-  { "dataModelUpdate": { "surfaceId": "edit-form", "path": "/form", "contents": [{ "key": "name", "valueString": "Kenta Takahashi" }, { "key": "dept", "valueString": "Corporate Planning" }, { "key": "faculty", "valueMap": [{ "key": "0", "valueString": "Economics" }] }, { "key": "score", "valueNumber": 45 }, { "key": "contactDate", "valueString": "2024-03-05" }, { "key": "vip", "valueBoolean": false }, { "key": "notes", "valueString": "Key contact for CFO network.\\nSchedule follow-up after Autumn Gala." }] }] } },
+  { "dataModelUpdate": { "surfaceId": "edit-form", "path": "/form", "contents": [{ "key": "name", "valueString": "Kenta Takahashi" }, { "key": "dept", "valueString": "Corporate Planning" }, { "key": "faculty", "valueMap": [{ "key": "0", "valueString": "Economics" }] }, { "key": "score", "valueNumber": 45 }, { "key": "contactDate", "valueString": "2024-03-05" }, { "key": "vip", "valueBoolean": false }, { "key": "notes", "valueString": "Key contact for CFO network.\\nSchedule follow-up after Autumn Gala." }] } },
   { "surfaceUpdate": { "surfaceId": "edit-form", "components": [
     { "id": "root", "component": { "Card": { "child": "mainCol" } } },
     { "id": "mainCol", "component": { "Column": { "children": { "explicitList": ["title", "div1", "fieldName", "fieldDept", "choiceFaculty", "sliderScore", "dateContact", "chkVip", "fieldNotes", "div2", "actionRow"] }, "distribution": "start", "alignment": "stretch" } } },
