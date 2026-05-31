@@ -69,7 +69,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v10.37-public',
+  APP_VERSION: 'v10.38-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -9867,6 +9867,26 @@ def _is_suggestions_part(part) -> bool:
         pass
     return False
 
+def _has_button_components(part) -> bool:
+    """Detect A2UI parts that contain Button components (any surfaceId).
+    Models sometimes embed suggestion buttons in surfaces other than 'suggestions'."""
+    try:
+        _root = getattr(part, 'root', None)
+        if _root and isinstance(_root, a2a_types.DataPart):
+            _data = _root.data
+            _items = _data if isinstance(_data, list) else [_data]
+            for _item in _items:
+                if isinstance(_item, dict) and 'surfaceUpdate' in _item:
+                    _su = _item['surfaceUpdate']
+                    if isinstance(_su, dict) and 'components' in _su:
+                        for _comp in _su['components']:
+                            if isinstance(_comp, dict) and 'component' in _comp:
+                                if 'Button' in _comp['component']:
+                                    return True
+    except Exception:
+        pass
+    return False
+
 def create_a2ui_part(msg):
     _healed = _heal_buttons_in_a2ui(msg)
     _rewritten = _rewrite_suggestions_a2ui(_healed)
@@ -10051,47 +10071,18 @@ def _heal_session_events(session):
 
 
 class AdkAgentToA2AExecutor(A2aAgentExecutor):
-    # Set of context_ids currently being processed.
-    # Prevents concurrent request processing when GE sends rapid-fire
-    # button clicks. Only the first request is processed; subsequent
-    # requests for the same context_id are skipped.
-    # Thread-safe in asyncio: single event loop, no preemption between
-    # check-and-add within the same coroutine execution.
-    _active_contexts: set = set()
+    # Note: Concurrent request dedup is handled at the Firestore level
+    # in register_background_task (duplicate task_name check).
+    # The previous _active_contexts guard was removed because context_id
+    # is shared across all interactions in a conversation, causing
+    # legitimate subsequent requests to be blocked.
 
     async def _handle_request(
         self,
         context: RequestContext,
         event_queue: EventQueue,
     ) -> None:
-        # --- Concurrent request guard ---
-        _ctx_id = getattr(context, 'context_id', None) or ''
-        if _ctx_id in self.__class__._active_contexts:
-            logger.log_text(f"[request_guard] SKIPPED duplicate request for context_id={_ctx_id} (already processing)")
-            await event_queue.enqueue_event(
-                TaskStatusUpdateEvent(
-                    task_id=context.task_id,
-                    context_id=context.context_id,
-                    status=TaskStatus(
-                        state=TaskState.completed,
-                        message=Message(
-                            message_id=str(uuid.uuid4()),
-                            role=Role.agent,
-                            parts=[a2a_types.Part(root=a2a_types.TextPart(
-                                text="Your previous request is still being processed. Please wait for it to complete."
-                            ))],
-                        ),
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                    ),
-                    final=True,
-                )
-            )
-            return
-        self.__class__._active_contexts.add(_ctx_id)
-        try:
-            await self._process_request(context, event_queue)
-        finally:
-            self.__class__._active_contexts.discard(_ctx_id)
+        await self._process_request(context, event_queue)
 
     async def _process_request(
         self,
@@ -11038,16 +11029,22 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
             else:
                 _normal_media.append(_mp)
 
-        # --- Inject "💡 Next Actions" header above suggestions ---
+        # --- Inject "💡 Next Actions" header above suggestion chips ---
         # GE's suggestions surface only renders Button components, silently ignoring
         # Text/Column/Row layout in the surface. So the header must be appended to
         # the last TextPart. GE renders text parts ABOVE data parts, so the header
         # naturally appears right above the suggestion chips.
-        if _suggestion_media and artifact_text_parts:
+        # Note: Models may use surfaceId='suggestions' OR embed buttons in other
+        # surfaces. We detect any surface containing Button components as suggestions.
+        _has_any_buttons = _suggestion_media or any(
+            _is_suggestions_part(_mp) or _has_button_components(_mp)
+            for _mp in artifact_media_parts
+        )
+        if _has_any_buttons and artifact_text_parts:
             _last_text = artifact_text_parts[-1]
             _ltr = getattr(_last_text, 'root', None)
             if _ltr and hasattr(_ltr, 'text'):
-                _ltr.text = _ltr.text.rstrip() + chr(10) + chr(10) + "**💡 Next Actions**"
+                _ltr.text = _ltr.text.rstrip() + chr(10) + chr(10) + "---" + chr(10) + chr(10) + "**💡 Next Actions**" + chr(10)
 
         artifact_parts = artifact_text_parts + _normal_media + _suggestion_media
 
