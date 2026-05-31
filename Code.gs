@@ -2961,7 +2961,7 @@ __VIEWER_REQ__\n`;
     firestoreCommands += `    sleep 5\n`;
     firestoreCommands += `  done\n`;
     firestoreCommands += `  echo ""\n`;
-    firestoreCommands += `  wait \$VIEWER_PID\n`;
+    firestoreCommands += `  wait \$VIEWER_PID || true\n`;
     firestoreCommands += `  VIEWER_EXIT=\$?\n`;
     firestoreCommands += `  if [ \$VIEWER_EXIT -eq 0 ]; then\n`;
     firestoreCommands += `    echo "    ✅ Cloud Run Function deployed."\n`;
