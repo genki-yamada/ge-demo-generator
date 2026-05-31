@@ -569,7 +569,6 @@
     }
 
 
-
     /* ER Diagram Styles */
     #erDiagramContainer {
       width: 100%;
@@ -1205,7 +1204,6 @@
 </div>
 
 
-
   <div class="max-w-[1780px] mx-auto flex h-screen overflow-hidden relative">
     <!-- Floating Sidebar Toggles (Visible when sidebars are closed) -->
     <button id="leftToggle" onclick="toggleLeftSidebar()"
@@ -1260,10 +1258,19 @@
           </svg>
           GitHub
         </a>
+
       </div>
 
       <!-- Sidebar Footer: Author, Version & Update -->
       <div class="pt-6 mt-auto border-t border-white/5 space-y-4">
+            <div class="flex flex-col">
+              <span
+                class="text-[11px] font-bold text-gray-300 group-hover/author:text-sky-400 transition-colors">ryotat@google.com</span>
+              <span class="text-[9px] text-gray-500">Customer Engineer</span>
+            </div>
+          </a>
+        </div>
+
         <div class="px-3 py-3 bg-white/5 rounded-2xl border border-white/5">
           <span class="text-[10px] font-medium text-gray-500 font-mono italic">
             <?= appVersion ?>
@@ -1528,6 +1535,7 @@
                       <p class="text-[13px] text-gray-300 leading-relaxed">
                         Need a full comprehensive explanation? Deep-dive into our architecture guidelines in the <a href="https://github.com/ryotat7/ge-demo-generator.git" target="_blank" class="text-sky-400 hover:underline underline-offset-4">GitHub Repository</a>.
                       </p>
+                      <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
                     </div>
                   </div>
                 </div>
@@ -1829,13 +1837,11 @@
           </div>
 
 
-
           <!-- STEP 2 Container (Hidden initially, no header needed) -->
           <div id="step2Container" style="display: none;" class="opacity-0 translate-y-4 transition-all duration-500 mt-4 font-inter">
 
             <!-- MCP Added Alert List (Dynamic, supports multiple MCP servers) -->
             <div id="mcpStatusList" class="mt-2 flex flex-col gap-2 font-inter"></div>
-
 
 
             <!-- Generate Button -->
@@ -2401,8 +2407,6 @@
             </div>
 
 
-
-
           </div>
         </section>
 
@@ -2417,7 +2421,6 @@
               <p class="text-[11px] text-gray-500">Engage with your agent using personalized scenarios</p>
             </div>
           </div>
-
 
 
           <!-- External Files Section -->
@@ -2466,7 +2469,7 @@
 
   </div>
 
-  <!-- Confirmation Modal -->
+  <!-- Usage Tracking Modal -->
   <div id="oppModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
     <div class="glass max-w-md w-full rounded-3xl p-8 border border-white/10 shadow-2xl animate-fade-in relative">
       <button onclick="closeOppModal()" class="absolute top-6 right-6 p-2 rounded-xl text-gray-500 hover:text-white hover:bg-white/5 transition-all">
@@ -2479,11 +2482,12 @@
         </div>
         <div>
           <h3 class="text-xl font-bold text-white tracking-tight">Confirm Generation</h3>
-          <p class="text-sm text-gray-400 mt-1">Ready to generate your demo environment?</p>
+          <p class="text-[9px] text-gray-400 font-medium mt-1 leading-relaxed">Ready to generate your demo environment?</p>
         </div>
       </div>
 
-      <div class="pt-4">
+      <div class="space-y-6">
+        <div class="pt-4">
           <button onclick="confirmGeneration()" id="confirmBtn" class="w-full px-4 py-4 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white text-[12px] font-bold shadow-lg shadow-sky-500/25 transition-all uppercase tracking-widest">
             Start Generation
           </button>
@@ -2520,7 +2524,7 @@
       }
     }
 
-// Global Toast Utility
+    // Global Toast Utility
     window.showToast = function(msg, duration = 3000) {
       if (!msg) return;
       const toast = document.createElement('div');
@@ -3050,13 +3054,18 @@
       }
     });
 
+    // Real-time validation for Opportunity ID
+
     function confirmGeneration() {
       closeOppModal();
       generateDemo();
     }
 
     // Tab Logic
-// Back from template gallery → always goes to initial two-choice screen
+
+
+
+    // Back from template gallery → always goes to initial two-choice screen
     function switchMethod() {
       const selection = document.getElementById('methodSelection');
       const template = document.getElementById('templateContainer');
@@ -4052,11 +4061,13 @@
               try {
                 showFinalResult(res);
                 
+                // Handle persistence feedback
                 showToast('✅ Demo generated successfully!');
               } catch (uiErr) {
                 console.error('UI Rendering Error:', uiErr);
               }
               
+              setTimeout(refreshHistory, 1000);
             }, 800);
           })
           .withFailureHandler(err => {
@@ -5393,7 +5404,7 @@
      * Copies a deep link URL for a specific demo to the clipboard.
      * Uses the Web App URL from GAS with the demoId query parameter.
      */
-/**
+    /**
      * Copies the demo name and all demo guide prompts to clipboard as formatted text.
      * Users can paste into Google Docs, Notion, or any document editor.
      */
@@ -5434,9 +5445,6 @@
     }
 
 
-
-
-
     window.onload = () => {
       console.log('App initialization...');
       
@@ -5444,6 +5452,8 @@
       localStorage.removeItem('ge_generator_input');
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
+        console.log('Fetching initial history...');
+        
         // Run diagnostics
         google.script.run.withSuccessHandler(resRaw => {
           const res = typeof resRaw === 'string' ? JSON.parse(resRaw) : resRaw;
@@ -5460,3 +5470,1423 @@
       }
 
       // Deep Link Auto-Load: restore demo if demoId is in URL
+      updateSamples();
+      updateProjectSetCmd();
+
+      // Onboarding check
+      if (!localStorage.getItem('onboarding_seen')) {
+        const onboardingModal = document.getElementById('onboardingModal');
+        if (onboardingModal) onboardingModal.classList.add('show');
+        // Feature notification will be shown after onboarding closes
+      } else {
+        // No onboarding needed — check feature notification directly
+        maybeShowFeatureNotify();
+      }
+
+      // Scroll Spy Implementation
+      const sections = document.querySelectorAll('section[id], div[id^="section-"]');
+      const navItems = document.querySelectorAll('.nav-item');
+
+      const observerOptions = {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.3
+      };
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            navItems.forEach(item => {
+              item.classList.remove('active');
+              if (item.getAttribute('data-section') === entry.target.id) {
+                item.classList.add('active');
+              }
+            });
+          }
+        });
+      }, observerOptions);
+
+      sections.forEach(section => observer.observe(section));
+
+      initArchZoom();
+    };
+
+    let zoomScale = 1;
+    let zoomPos = { x: 0, y: 0 };
+    function initArchZoom() {
+      const container = document.querySelector('.zoom-container');
+      const content = document.getElementById('archZoomContent');
+      if (!container || !content) {
+        console.warn('Arch zoom elements not found, skipping initialization.');
+        return;
+      }
+      let isDragging = false;
+      let startPos = { x: 0, y: 0 };
+
+      container.onmousedown = (e) => {
+        isDragging = true;
+        startPos = { x: e.clientX - zoomPos.x, y: e.clientY - zoomPos.y };
+        container.style.cursor = 'grabbing';
+      };
+
+      window.onmousemove = (e) => {
+        if (!isDragging) return;
+        zoomPos.x = e.clientX - startPos.x;
+        zoomPos.y = e.clientY - startPos.y;
+        updateZoomTransform();
+      };
+
+      window.onmouseup = () => {
+        isDragging = false;
+        if (container) container.style.cursor = 'grab';
+      };
+
+      container.onwheel = (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        changeZoom(delta);
+      };
+    }
+
+    function changeZoom(delta) {
+      zoomScale = Math.min(Math.max(0.5, zoomScale + delta), 3);
+      updateZoomTransform();
+    }
+
+    function resetZoom() {
+      zoomScale = 1;
+      zoomPos = { x: 0, y: 0 };
+      updateZoomTransform();
+    }
+
+    function updateZoomTransform() {
+      const content = document.getElementById('archZoomContent');
+      if (!content) return;
+      content.style.transform = `translate(${zoomPos.x}px, ${zoomPos.y}px) scale(${zoomScale})`;
+    }
+
+    function togglePublicDatasetOverride() {
+      const isChecked = document.getElementById('usePublicDataset').checked;
+      const container = document.getElementById('publicOverrideContainer');
+      const input = document.getElementById('publicDatasetId');
+
+      if (isChecked) {
+        container.classList.remove('opacity-50', 'pointer-events-none');
+        input.disabled = false;
+      } else {
+        container.classList.add('opacity-50', 'pointer-events-none');
+        input.disabled = true;
+        input.value = ''; // Optional: clear if disabled
+      }
+    }
+  </script>
+
+  <div id="onboardingModal" onclick="closeOnboarding()">
+    <div class="glass max-w-xl w-full rounded-3xl p-8 border border-white/10 shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar" onclick="event.stopPropagation()">
+      <div class="text-center mb-6">
+        <div
+          class="w-12 h-12 bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-3 shadow-lg shadow-sky-500/20">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+        </div>
+        <h2 class="text-lg font-bold text-white mb-1">Build Your AI Demo in Minutes</h2>
+        <p class="text-gray-400 text-xs">Create highly tailored, highly contextual Gemini agent demos instantly.</p>
+      </div>
+
+      <div class="space-y-5 mb-7">
+        <!-- 1. Core Value -->
+        <div class="flex gap-3">
+          <div
+            class="flex-shrink-0 w-8 h-8 rounded-xl bg-sky-500/10 flex items-center justify-center text-sm font-bold text-sky-400 border border-sky-500/20">
+            🎯</div>
+          <div>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">Core Value: Highly Tailored Custom Demos</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              Instantly generate <span class="text-sky-400 font-semibold">highly tailored, highly contextual demos</span>. The tool automatically synthesizes realistic sample data (e.g., handwritten FAXes, order forms, and BigQuery master tables) and custom agent instructions specifically matching each customer's unique business and operational challenges.
+            </p>
+          </div>
+        </div>
+
+        <!-- 2. Business Value -->
+        <div class="flex gap-3">
+          <div
+            class="flex-shrink-0 w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-sm font-bold text-emerald-400 border border-emerald-500/20">
+            💎</div>
+          <div>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">Business Value: Win Pitches with A2UI</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              Show, don't tell. Demonstrate the <span class="text-emerald-400 font-semibold">ultimate value of Gemini Enterprise</span> using <span class="text-emerald-400 font-semibold">A2UI (Agent-to-User Interface)</span>: the agent dynamically renders interactive buttons, custom data cards, and editable forms on the fly, providing a highly responsive, state-of-the-art Agentic AI UX for seamless human validation and approval.
+            </p>
+          </div>
+        </div>
+
+        <!-- 3. The Tech Behind the Scene -->
+        <div class="flex gap-3">
+          <div
+            class="flex-shrink-0 w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center text-sm font-bold text-purple-400 border border-purple-500/20">
+            ⚙️</div>
+          <div>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">Behind the Scene: Real Tech Stack</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              This is not a mockup. The generator spins up a fully-functioning cloud environment:
+            </p>
+            <ul class="list-disc list-inside mt-1 text-[10.5px] text-gray-400 space-y-0.5 pl-1">
+              <li><span class="text-gray-300 font-medium">Gemini & ADK:</span> Advanced multi-step reasoning and tool orchestration.</li>
+              <li><span class="text-gray-300 font-medium">Rich MCP Ecosystem:</span> Live connections to BigQuery, Google Maps, and Google Workspace.</li>
+              <li><span class="text-gray-300 font-medium">Interactive Data Viewer:</span> A Flask Web UI to visually track documents and database changes.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 4. Deployment -->
+        <div class="flex gap-3">
+          <div
+            class="flex-shrink-0 w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-sm font-bold text-amber-400 border border-amber-500/20">
+            🚀</div>
+          <div>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">How to Deploy: Automatic Cloud Provisioning</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              This tool generates a local setup script. Simply run it in <span class="text-amber-400 font-semibold">your own Google Cloud Shell</span> to automatically provision all demo resources (Cloud Run, BigQuery, Firestore) directly inside your Google Cloud project. All data remains securely within your own project boundary.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="closeOnboarding()"
+        class="w-full bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-sky-500/20 active:scale-[0.98] text-[11px] uppercase tracking-wider">
+        Start Building Demo
+      </button>
+    </div>
+  </div>
+
+  <script>
+    function openOnboarding() {
+      document.getElementById('onboardingModal').classList.add('show');
+    }
+
+    function closeOnboarding() {
+      document.getElementById('onboardingModal').classList.remove('show');
+      localStorage.setItem('onboarding_seen', 'true');
+      // Chain: show feature notification after onboarding closes
+      setTimeout(() => maybeShowFeatureNotify(), 400);
+    }
+  </script>
+
+  <!-- Universal Document Preview Modal (PDF / Excel / Image 統合プレビューワー) -->
+  <div id="docPreviewModal" class="fixed inset-0 z-50 hidden items-center justify-center p-6 bg-black/85 backdrop-blur-sm transition-all duration-300 opacity-0" onclick="closeDocModal()">
+    <!-- Modal Card: Responsive max-w-5xl wide canvas for documents -->
+    <div class="relative max-w-5xl w-full h-[85vh] flex flex-col rounded-2xl overflow-hidden border border-white/10 bg-slate-950/95 shadow-2xl cursor-default" onclick="event.stopPropagation()">
+      <!-- Header -->
+      <div class="w-full p-4 flex items-center justify-between border-b border-white/5 bg-slate-950 z-10">
+        <div class="flex items-center gap-2.5">
+          <span id="docPreviewIcon" class="text-lg">📄</span>
+          <h4 id="docPreviewTitle" class="text-xs font-bold text-gray-300 font-mono break-all pr-4">document.pdf</h4>
+        </div>
+        <button onclick="closeDocModal()" aria-label="Close Preview" class="text-gray-400 hover:text-white focus:outline-none rounded-lg p-1 transition-colors hover:bg-white/5 border border-white/5 cursor-pointer">
+          <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      
+      <!-- Content Viewports -->
+      <div class="flex-1 w-full overflow-hidden relative flex flex-col">
+        <!-- 1. Image Viewport -->
+        <div id="previewContainerImage" class="hidden w-full h-full items-center justify-center bg-black/30">
+          <img id="imagePreviewSrc" src="" class="max-w-full max-h-[75vh] object-contain block" alt="Image Preview"/>
+        </div>
+        
+        <!-- 2. PDF Viewport (Embedded Interactive Chrome PDF Reader with robust dynamic spinner) -->
+        <div id="previewContainerPDF" class="hidden flex-1 w-full h-full p-3 bg-slate-900/40 relative flex flex-col items-center justify-center">
+          <!-- Dedicated PDF Loading Spinner (Visible during server-side generation and iframe loading) -->
+          <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 z-20 rounded-xl gap-3.5">
+            <div class="w-10 h-10 rounded-full border-4 border-sky-500/20 border-t-sky-500 spinner-loader"></div>
+            <span class="text-[10px] font-bold text-sky-400 uppercase tracking-widest animate-pulse">Generating High-Fidelity PDF... Please Wait</span>
+          </div>
+          <!-- PDF Frame: Calls window.onPdfFrameLoad() when rendering is fully complete -->
+          <iframe id="pdfPreviewFrame" src="" class="w-full h-full rounded-xl border border-white/10 hidden" style="background: #1e293b;" onload="window.onPdfFrameLoad()"></iframe>
+          <!-- High-Fidelity Simulated HTML PDF Viewer (Avoids Chrome sandboxed iframe blob blockages) -->
+          <div id="pdfPreviewHTML" class="w-full h-full rounded-xl border border-white/10 overflow-y-auto hidden p-6" style="background: #1e293b;"></div>
+        </div>
+        
+        <!-- 3. Excel / CSV Viewport (Stylized High-Fidelity Data Table) -->
+        <div id="previewContainerExcel" class="hidden w-full h-full overflow-auto p-5 bg-slate-950/40">
+          <div class="overflow-x-auto rounded-xl border border-white/5 bg-slate-900/20 shadow-inner no-scrollbar">
+            <table id="excelPreviewTable" class="w-full border-collapse text-left text-[10.5px] font-mono text-gray-300">
+              <thead id="excelPreviewHead" class="bg-slate-900/80 sticky top-0 border-b border-white/10 text-gray-400 uppercase tracking-wider">
+                <!-- Headers injected here -->
+              </thead>
+              <tbody id="excelPreviewBody" class="divide-y divide-white/5">
+                <!-- Rows injected here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature Notification Modal -->
+  <div id="featureNotifyModal">
+    <div class="glass max-w-2xl w-full rounded-3xl p-7 border border-white/10 shadow-2xl fade-in relative flex flex-col max-h-[90vh]">
+      <!-- Close Button -->
+      <button onclick="closeFeatureNotify(false)" aria-label="Close" class="absolute top-5 right-5 text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 rounded-lg p-1 transition-colors z-10">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+      <!-- Header -->
+      <div class="text-center mb-6 flex-shrink-0">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-sky-500 flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-violet-500/25" style="animation: featureShimmer 4s ease-in-out infinite; background-size: 200% auto;">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+        </div>
+        <div class="flex items-center justify-center gap-2 mb-2">
+          <span class="feature-badge">🚀 Major Update</span>
+        </div>
+        <h2 class="text-xl font-bold text-white mb-1">What's New</h2>
+        <p class="text-gray-400 text-xs">4 powerful capabilities to elevate your demos</p>
+      </div>
+
+      <!-- Scrollable Content Wrapper -->
+      <div class="relative flex-1 min-h-0 flex flex-col mb-6">
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto pr-1 modal-scrollable-content pt-3 premium-mask-fade">
+          <div class="modal-scrollable-inner">
+
+      <!-- Feature 1: Agentic Workflow -->
+      <div class="feature-card mb-4">
+        <div class="flex gap-3 mb-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/15 flex items-center justify-center text-amber-400 border border-amber-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-bold text-white mb-0.5">Agentic Workflow</h4>
+            <p class="text-[11px] text-gray-200 leading-relaxed">Instantly generate highly tailored <span class="font-bold text-amber-400">agentic workflows</span> using unstructured documents (images/PDFs). The synthesized demo lets your agent read fuzzy documents, self-correct ambiguities against BigQuery master tables, and present smart A2UI dropdown recommendations for direct approval. <span class="text-amber-400/80">Win your customer pitches by demonstrating advanced Human-in-the-loop autonomous operations in minutes. Just describe your scenario — the generator builds the data, custom business documents, DB tables, and agent instructions instantly with zero coding.</span></p>
+          </div>
+        </div>
+        <!-- Agentic Workflow Inline Dynamic SVG Animation (ULTRA ENLARGED VERTICAL STACK - width 100% to fill 672px modal) -->
+        <div class="mt-3 rounded-xl overflow-hidden relative group">
+          <svg viewBox="0 0 600 260" class="w-full h-auto bg-slate-950/70 rounded-xl border border-amber-500/20 p-4" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <!-- Colors and Gradients -->
+              <linearGradient id="sparkleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#f59e0b" />
+                <stop offset="100%" stop-color="#d97706" />
+              </linearGradient>
+              <linearGradient id="dbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#38bdf8" />
+                <stop offset="100%" stop-color="#0284c7" />
+              </linearGradient>
+              <linearGradient id="activeHeaderGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.02"/>
+                <stop offset="50%" stop-color="#fbbf24" stop-opacity="0.15"/>
+                <stop offset="100%" stop-color="#fbbf24" stop-opacity="0.02"/>
+              </linearGradient>
+              
+              <!-- CSS Animation -->
+              <style>
+                @keyframes flowDot {
+                  0% { stroke-dashoffset: 40; }
+                  100% { stroke-dashoffset: 0; }
+                }
+                @keyframes dbPulse {
+                  0%, 76%, 91%, 100% { fill-opacity: 0.15; stroke: #475569; filter: none; }
+                  77%, 90% { fill-opacity: 0.4; stroke: #38bdf8; filter: drop-shadow(0 0 6px #38bdf8); }
+                }
+                @keyframes highlightFocus {
+                  0%, 100% { stroke: #334155; }
+                  50% { stroke: #fbbf24; filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.35)); }
+                }
+                
+                /* Mega Timeline: Cursor path movement & clicking (10s loop) */
+                @keyframes cursorMove {
+                  0%, 10%, 100% { transform: translate(300px, 170px) scale(1); }
+                  18% { transform: translate(90px, 100px) scale(1); }
+                  20% { transform: translate(90px, 100px) scale(0.82); } /* Click Chip A */
+                  22%, 28% { transform: translate(90px, 100px) scale(1); }
+                  35% { transform: translate(165px, 144px) scale(1); }
+                  37% { transform: translate(165px, 144px) scale(0.82); } /* Click Qty TextField */
+                  40%, 48% { transform: translate(165px, 144px) scale(1); }
+                  56% { transform: translate(240px, 100px) scale(1); }
+                  58% { transform: translate(240px, 100px) scale(0.82); } /* Click Chip B */
+                  60%, 68% { transform: translate(240px, 100px) scale(1); }
+                  76% { transform: translate(170px, 184px) scale(1); }
+                  78% { transform: translate(170px, 184px) scale(0.82); } /* Click Approve Button */
+                  82%, 90% { transform: translate(170px, 184px) scale(1); }
+                }
+
+                /* Button A (Standard SKU) States */
+                @keyframes buttonAState {
+                  0%, 19%, 58%, 100% { fill: #1e293b; stroke: #475569; stroke-width: 1; filter: none; }
+                  20%, 57% { fill: rgba(251, 191, 36, 0.12); stroke: #fbbf24; stroke-width: 1.5; filter: drop-shadow(0 2px 6px rgba(251,191,36,0.15)); }
+                }
+                @keyframes textAState {
+                  0%, 19%, 58%, 100% { fill: #64748b; font-weight: normal; }
+                  20%, 57% { fill: #fbbf24; font-weight: bold; }
+                }
+                @keyframes checkAState {
+                  0%, 19%, 58%, 100% { opacity: 0; }
+                  20%, 57% { opacity: 1; }
+                }
+
+                /* Button B (Premium SKU) States */
+                @keyframes buttonBState {
+                  0%, 19%, 58%, 100% { fill: rgba(251, 191, 36, 0.12); stroke: #fbbf24; stroke-width: 1.5; filter: drop-shadow(0 2px 6px rgba(251,191,36,0.15)); }
+                  20%, 57% { fill: #1e293b; stroke: #475569; stroke-width: 1; filter: none; }
+                }
+                @keyframes textBState {
+                  0%, 19%, 58%, 100% { fill: #fbbf24; font-weight: bold; }
+                  20%, 57% { fill: #64748b; font-weight: normal; }
+                }
+                @keyframes checkBState {
+                  0%, 19%, 58%, 100% { opacity: 1; }
+                  20%, 57% { opacity: 0; }
+                }
+
+                /* Qty Value Text States: AI Mismatched Qty (720) vs Human Corrected Qty (120) */
+                @keyframes qtyErrState {
+                  0%, 36% { opacity: 1; }
+                  37%, 100% { opacity: 0; }
+                }
+                @keyframes qtyOkState {
+                  0%, 36% { opacity: 0; }
+                  37%, 100% { opacity: 1; }
+                }
+
+                /* Approve Button Clicking State */
+                @keyframes approveBtnState {
+                  0%, 77%, 82%, 100% { fill: #1e3a8a; stroke: #3b82f6; }
+                  78%, 81% { fill: #1d4ed8; stroke: #60a5fa; filter: drop-shadow(0 0 4px #3b82f6); }
+                }
+
+                .anim-cursor {
+                  animation: cursorMove 8s infinite ease-in-out;
+                  transform-origin: 0 0;
+                }
+                .anim-btn-a { animation: buttonAState 8s infinite ease-in-out; }
+                .anim-txt-a { animation: textAState 8s infinite ease-in-out; }
+                .anim-chk-a { animation: checkAState 8s infinite ease-in-out; }
+                
+                .anim-btn-b { animation: buttonBState 8s infinite ease-in-out; }
+                .anim-txt-b { animation: textBState 8s infinite ease-in-out; }
+                .anim-chk-b { animation: checkBState 8s infinite ease-in-out; }
+
+                .anim-qty-err { animation: qtyErrState 8s infinite ease-in-out; }
+                .anim-qty-ok { animation: qtyOkState 8s infinite ease-in-out; }
+                .anim-btn-approve { animation: approveBtnState 8s infinite ease-in-out; }
+
+                .anim-flow {
+                  stroke-dasharray: 8, 8;
+                  animation: flowDot 2s infinite linear;
+                }
+                .anim-db {
+                  animation: dbPulse 8s infinite ease-in-out;
+                }
+                .anim-card-focus {
+                  animation: highlightFocus 4s infinite ease-in-out;
+                }
+              </style>
+            </defs>
+
+            <!-- Background Grid Patterns (Tech Vibe) -->
+            <g opacity="0.02">
+              <path d="M0 40 H600 M0 80 H600 M0 120 H600 M0 160 H600 M0 200 H600 M0 240 H600" stroke="#fff" stroke-width="1"/>
+              <path d="M100 0 V280 M200 0 V280 M300 0 V280 M400 0 V280 M500 0 V280" stroke="#fff" stroke-width="1"/>
+            </g>
+
+            <!-- ================= LEFT: UNSTRUCTURED INPUT (Highly Minimized - Centered on Y=125) ================= -->
+            <g transform="translate(15, 65)" opacity="0.35">
+              <rect x="0" y="0" width="70" height="110" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+              <path d="M12 20 H58 M12 35 H45 M12 50 H52" stroke="#64748b" stroke-width="3" stroke-linecap="round"/>
+              <!-- handwritten qty in document -->
+              <path d="M12 70 Q25 65, 35 72 T58 68" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+              <!-- Original Quantity Label -->
+              <text x="35" y="92" text-anchor="middle" fill="#f59e0b" font-size="9" font-family="monospace" font-weight="bold">"Qty: 120"</text>
+              <rect x="40" y="98" width="20" height="20" rx="3" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+              <path d="M45 108 L48 112 L54 104" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="35" y="123" text-anchor="middle" fill="#64748b" font-size="9" font-weight="bold" font-family="sans-serif">RAW DOC</text>
+            </g>
+
+            <!-- ================= MIDDLE: AGENTIC INTERACTION (MEGA ENLARGED CARD & CENTER-ALIGNED) ================= -->
+            <g transform="translate(130, 20)">
+              <!-- Card Container with breathing focus border -->
+              <rect class="anim-card-focus" x="0" y="0" width="340" height="215" rx="16" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+              
+              <!-- Center-Aligned Header -->
+              <rect x="1" y="1" width="338" height="30" rx="15" fill="url(#activeHeaderGrad)"/>
+              <text x="170" y="19" text-anchor="middle" fill="#fbbf24" font-size="9" font-weight="bold" font-family="sans-serif" letter-spacing="0.8">AI PROPOSED SKU (A2UI)</text>
+              <line x1="0" y1="31" x2="340" y2="31" stroke="#334155" stroke-width="1"/>
+              
+              <!-- 1. Raw Text Box (Centered) -->
+              <text x="170" y="48" text-anchor="middle" fill="#94a3b8" font-size="8.5" font-family="sans-serif">Original Handwritten Value</text>
+              <text x="170" y="61" text-anchor="middle" fill="#cbd5e1" font-size="11" font-weight="bold" font-family="monospace">"Prod-B / Qty: 120"</text>
+              
+              <!-- Process Flow Downward Arrow (Perfect Center Align) -->
+              <path d="M170 68 V78" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M166 74 L170 78 L174 74" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+              <!-- 2. Single-Select Multi-Button Chips (AI Proposals - Large & Center-Aligned) -->
+              <g transform="translate(0, 84)">
+                <!-- Unselected Option (Standard SKU) -->
+                <g transform="translate(25, 0)">
+                  <rect class="anim-btn-a" x="0" y="0" width="140" height="32" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+                  <text class="anim-txt-a" x="70" y="19" text-anchor="middle" fill="#64748b" font-size="8.5" font-family="sans-serif"><tspan class="anim-chk-a" fill="#fbbf24" font-weight="bold">✓ </tspan>PRD-A: Standard (350ml)</text>
+                </g>
+                
+                <!-- Selected Active Option (AI Recommended Premium SKU - Highlighted & Checked) -->
+                <g transform="translate(175, 0)">
+                  <rect class="anim-btn-b" x="0" y="0" width="140" height="32" rx="8" fill="#fbbf24" fill-opacity="0.15" stroke="#fbbf24" stroke-width="1.5" filter="drop-shadow(0 2px 6px rgba(251,191,36,0.15))"/>
+                  <text class="anim-txt-b" x="70" y="19" text-anchor="middle" fill="#fbbf24" font-size="8.5" font-weight="bold" font-family="sans-serif"><tspan class="anim-chk-b" fill="#fbbf24" font-weight="bold">✓ </tspan>PRD-B: Premium (500ml)</text>
+                </g>
+              </g>
+
+              <!-- 3. Editable Qty Field (Centered with AI Mismatch [720] ➔ Human Corrected [120] Story) -->
+              <g transform="translate(0, 128)">
+                <!-- Label & Input Box centered together -->
+                <text x="115" y="18" text-anchor="end" fill="#94a3b8" font-size="9" font-family="sans-serif">AI Recognized Qty:</text>
+                <rect x="125" y="4" width="50" height="20" rx="5" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+                
+                <!-- Dynamic Qty value switching (720 in Red ➔ 120 in Blue) -->
+                <text class="anim-qty-err" x="150" y="18" text-anchor="middle" fill="#f87171" font-size="11" font-weight="bold" font-family="monospace">720</text>
+                <text class="anim-qty-ok" x="150" y="18" text-anchor="middle" fill="#38bdf8" font-size="11" font-weight="bold" font-family="monospace">120</text>
+                
+                <text x="182" y="18" fill="#64748b" font-size="8" font-family="sans-serif">(AI Mismatch ➔ Click to Edit)</text>
+              </g>
+
+              <!-- 4. Giant Approve Button (Centered) -->
+              <g transform="translate(20, 168)">
+                <rect class="anim-btn-approve" x="0" y="0" width="300" height="32" rx="8" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.2))"/>
+                <text x="150" y="20" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold" font-family="sans-serif" letter-spacing="0.5">⚡ APPROVE & EXECUTE ACTION</text>
+              </g>
+              
+              <!-- Dynamic Mouse Cursor Overlay (カチカチ切り替えアニメーション) -->
+              <g class="anim-cursor">
+                <path d="M0 0 L0 16 L4.5 12 L8.5 19 L10 18 L6.5 11.5 L11 11 Z" fill="white" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+              </g>
+            </g>
+
+            <!-- ================= RIGHT: ENTERPRISE DATABASE (Minimized - Centered on Y=125) ================= -->
+            <g transform="translate(515, 65)" opacity="0.35">
+              <g class="anim-db">
+                <ellipse cx="30" cy="20" rx="18" ry="6" fill="#0284c7" stroke="#38bdf8" stroke-width="1"/>
+                <path d="M12 20 V65 A 18 6 0 0 0 48 65 V20" fill="#0284c7" fill-opacity="0.15" stroke="#38bdf8" stroke-width="1"/>
+                <ellipse cx="30" cy="38" rx="18" ry="6" stroke="#38bdf8" stroke-dasharray="2,2" stroke-width="0.8"/>
+                <ellipse cx="30" cy="52" rx="18" ry="6" stroke="#38bdf8" stroke-dasharray="2,2" stroke-width="0.8"/>
+                <text x="30" y="95" text-anchor="middle" fill="#38bdf8" font-size="9" font-family="monospace" font-weight="bold">Enterprise DB</text>
+              </g>
+            </g>
+
+            <!-- ================= COMPACT FLOW CONNECTORS (Aligned on Y=120) ================= -->
+            <path d="M90 120 H120" stroke="#475569" stroke-dasharray="3,3" stroke-width="1.2"/>
+            <path class="anim-flow" d="M90 120 H120" stroke="#f59e0b" stroke-width="2" opacity="0.8"/>
+
+            <path d="M480 120 H510" stroke="#475569" stroke-dasharray="3,3" stroke-width="1.2"/>
+            <path class="anim-flow" d="M480 120 H510" stroke="#38bdf8" stroke-width="2" opacity="0.8"/>
+
+            <rect x="88" y="98" width="36" height="13" rx="3" fill="#1e293b" stroke="#f59e0b" stroke-opacity="0.3" stroke-width="1"/>
+            <text x="106" y="107" text-anchor="middle" fill="#f59e0b" font-size="7" font-weight="bold" font-family="sans-serif">1. Input</text>
+
+            <rect x="476" y="98" width="36" height="13" rx="3" fill="#1e293b" stroke="#38bdf8" stroke-opacity="0.3" stroke-width="1"/>
+            <text x="494" y="107" text-anchor="middle" fill="#38bdf8" font-size="7" font-weight="bold" font-family="sans-serif">2. Commit</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Feature 2: A2UI -->
+      <div class="feature-card mb-3">
+        <div class="flex gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-fuchsia-500/15 to-violet-500/15 flex items-center justify-center text-fuchsia-400 border border-fuchsia-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-bold text-white mb-0.5">A2UI Interactive Demos</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">Bring demos to life with rich UI components — cards, forms, approval flows & more. <span class="text-fuchsia-400/80">Accelerate customer decisions and spark immediate "I want this" moments.</span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 3: Custom MCP Server Import -->
+      <div class="feature-card mb-3">
+        <div class="flex gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/15 to-cyan-500/15 flex items-center justify-center text-sky-400 border border-sky-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-bold text-white mb-0.5">Custom MCP Server Import</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">Just paste a GitHub URL to auto-analyze & integrate any MCP server. <span class="text-sky-400/80">Instantly connect to customer-specific data sources for compelling, tailored demos.</span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 4: Autonomous Workflow Operator -->
+      <div class="feature-card mb-1">
+        <div class="flex gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/15 flex items-center justify-center text-amber-400 border border-amber-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-bold text-white mb-0.5">Autonomous Workflow Operator</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">Multi-step dependent workflows with automatic pipeline execution — scan, classify, process & audit. <span class="text-amber-400/80">The agent proactively proposes and executes operational tasks on behalf of users.</span></p>
+          </div>
+        </div>
+      </div> <!-- Closes Feature 4 feature-card -->
+      </div> <!-- Closes modal-scrollable-inner -->
+          <!-- Spacer to allow scrolling past the bottom fade -->
+          <div class="h-6 flex-shrink-0"></div>
+        </div>
+      </div> <!-- End Scrollable Content Wrapper -->
+
+      <!-- Footer (Fixed) -->
+      <div class="flex-shrink-0">
+        <!-- CTA Button -->
+        <button onclick="closeFeatureNotify(true)"
+          class="w-full feature-shimmer-btn text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-sky-500/20 active:scale-[0.98] mb-3 text-base tracking-wide">
+          🎉 LET'S GO!
+        </button>
+
+        <!-- Don't show again checkbox -->
+        <label class="flex items-center justify-center gap-2 cursor-pointer group">
+          <input type="checkbox" id="featureNotifyDontShow" class="w-3 h-3 rounded border-white/15 text-sky-500/60 focus:ring-sky-500/20 bg-white/5 cursor-pointer opacity-50 hover:opacity-80 transition-opacity">
+          <span class="text-[11px] text-gray-500 group-hover:text-gray-400 transition-colors select-none">Don't show this again</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const FEATURE_NOTIFY_KEY = 'feature_v3_whats_new_dismissed';
+
+    function maybeShowFeatureNotify() {
+      if (localStorage.getItem(FEATURE_NOTIFY_KEY)) return;
+      const modal = document.getElementById('featureNotifyModal');
+      if (modal) {
+        setTimeout(() => modal.classList.add('show'), 200);
+      }
+    }
+
+    function closeFeatureNotify(fromButton) {
+      const modal = document.getElementById('featureNotifyModal');
+      if (modal) modal.classList.remove('show');
+      const dontShow = document.getElementById('featureNotifyDontShow');
+      if (dontShow && dontShow.checked) {
+        localStorage.setItem(FEATURE_NOTIFY_KEY, 'true');
+      }
+    }
+
+    function openWhatsNew() {
+      const modal = document.getElementById('featureNotifyModal');
+      if (modal) modal.classList.add('show');
+    }
+
+    // Close on ESC
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('featureNotifyModal');
+        if (modal && modal.classList.contains('show')) closeFeatureNotify(false);
+      }
+    });
+
+    // Close on backdrop click
+    document.getElementById('featureNotifyModal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('featureNotifyModal')) closeFeatureNotify(false);
+    });
+
+  </script>
+
+
+  <script>
+    let cachedImportedMcpList = [];
+    let lastAnalyzedMcp = null;
+
+    // ========== MCP CATALOG DATA ==========
+    const MCP_CATALOG = {
+      categories: [
+        {
+          id: 'gov-legal', name: 'Government & Legal', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"></path></svg>',
+          servers: [
+            { id: 'us-gov-open-data', name: 'US Government Open Data', github_url: 'https://github.com/lzinga/us-gov-open-data-mcp', description: '40+ US government APIs: Treasury, FRED, Congress, FDA, CDC health stats, and more.', language: 'nodejs', tags: ['government','economics','health','finance'], requires_api_key: 'partial', demo_tip: 'Combine with BigQuery internal data to correlate macroeconomic indicators with business performance.' },
+            { id: 'us-legal', name: 'US Legal & Legislation', github_url: 'https://github.com/JamesANZ/us-legal-mcp', description: 'Congress bills, Federal Register documents, and court opinions via CourtListener.', language: 'python', tags: ['legal','regulation','compliance'], requires_api_key: false, demo_tip: 'Great for compliance-focused demos showing regulatory monitoring.' }
+          ]
+        },
+        {
+          id: 'environment', name: 'Environment & Weather', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg>',
+          servers: [
+            { id: 'weather-mcp', name: 'Weather Data', github_url: 'https://github.com/weather-mcp/weather-mcp', description: 'Global weather data: forecasts, current conditions, historical data (1940-present), alerts, air quality, marine conditions, and wildfire tracking. No API keys required.', language: 'nodejs', tags: ['weather','environment','forecast','global'], requires_api_key: false, demo_tip: 'Perfect for logistics, retail, or energy demos where weather directly impacts operations, supply chain, or demand.' }
+          ]
+        },
+        {
+          id: 'finance', name: 'Finance & Markets', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>',
+          servers: [
+            { id: 'yahoo-finance', name: 'Yahoo Finance', github_url: 'https://github.com/Alex2Yang97/yahoo-finance-mcp', description: 'Stock info, historical prices, financial statements, options data, and analyst recommendations.', language: 'python', tags: ['stocks','markets','financial-data'], requires_api_key: false, demo_tip: 'Perfect for investment analysis or portfolio monitoring demos.' }
+          ]
+        },
+        {
+          id: 'social', name: 'Social & Communication', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path></svg>',
+          servers: [
+
+            { id: 'line-bot', name: 'LINE Bot', github_url: 'https://github.com/line/line-bot-mcp-server', description: 'LINE Messaging API integration: send messages, manage rich menus, retrieve profiles.', language: 'nodejs', tags: ['messaging','japan','chatbot'], requires_api_key: true, demo_tip: 'Essential for Japan-market demos with customer-facing messaging.' },
+            { id: 'slack-mcp', name: 'Slack', type: 'remote', endpoint_url: 'https://mcp.slack.com/mcp', auth_type: 'oauth2_slack', github_url: null, docs_url: 'https://docs.slack.dev/ai/slack-mcp-server/', description: 'Search channels & messages, send messages, manage canvases, and access user profiles via Slack MCP Server.', language: 'managed', tags: ['communication','collaboration','messaging','slack'], requires_api_key: true, demo_tip: 'Enable team communication analysis and automated Slack messaging in demos.' }
+          ]
+        },
+        {
+          id: 'japan', name: 'Japan-Specific', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+          servers: [
+            { id: 'mlit-dpf', name: 'MLIT Data Platform', github_url: 'https://github.com/MLIT-DATA-PLATFORM/mlit-dpf-mcp', description: 'Japanese Ministry of Land, Infrastructure, Transport and Tourism data platform for geospatial data.', language: 'python', tags: ['infrastructure','geospatial','japan-gov'], requires_api_key: true, demo_tip: 'Combine with internal real estate or logistics data for location intelligence.' },
+            { id: 'tax-law', name: 'Japanese Tax Law', github_url: 'https://github.com/kentaroajisaka/tax-law-mcp', description: 'Japanese tax laws, administrative circulars (tsutatsu), and judicial precedents.', language: 'python', tags: ['tax','legal','japan-gov'], requires_api_key: false, demo_tip: 'Ideal for accounting/consulting demos needing authoritative tax references.' },
+            { id: 'labor-law', name: 'Japanese Labor Law', github_url: 'https://github.com/kentaroajisaka/labor-law-mcp', description: 'Japanese labor & social insurance law via e-Gov API, MHLW circulars, and JAISH safety directives. 45+ preset laws with abbreviation support.', language: 'nodejs', tags: ['labor','legal','compliance','japan-gov'], requires_api_key: false, demo_tip: 'Perfect for HR/compliance demos verifying labor regulations against actual statute text.' },
+            { id: 'kokkai-giji', name: 'National Diet Proceedings', github_url: 'https://github.com/seiichi3141/kokkai_giji_mcp', description: 'Search Japanese National Diet proceedings: meeting records, individual speeches, speaker analysis via NDL API.', language: 'nodejs', tags: ['government','politics','parliament','japan-gov'], requires_api_key: false, demo_tip: 'Great for public affairs or policy analysis demos tracking legislative discussions.' }
+          ]
+        },
+
+        {
+          id: 'google-official', name: 'Google Official', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>',
+          servers: [
+            { id: 'google-workspace-mcp', name: 'Google Workspace MCP', type: 'workspace', dev_preview: true, github_url: null, docs_url: 'https://developers.google.com/workspace/guides/configure-mcp-servers', description: 'Official Google Workspace MCP servers: Gmail, Google Drive, Calendar, Chat, and People. Access emails, files, events, and contacts.', language: 'managed', tags: ['google','workspace','gmail','drive','calendar','chat'], requires_api_key: 'oauth', demo_tip: 'Powerful for enterprise demos needing email, calendar, and document integration.' }
+          ]
+        }
+      ],
+      recipes: [
+        { name: 'Public Data & Climate Analyst', description: 'Correlate global weather hazards and US macroeconomic indicators with market trends and financial performance.', servers: ['us-gov-open-data','yahoo-finance','weather-mcp'], industries: ['retail','financial-services','agriculture'] },
+        { name: 'Regulatory & Legislative Monitor', description: 'Monitor US legislation, Federal Register documents, and court opinions alongside government statistics.', servers: ['us-legal','us-gov-open-data'], industries: ['financial-services','legal','compliance'] },
+        { name: 'Japan Business Intelligence', description: 'Comprehensive analysis of Japanese markets combining geospatial infrastructure, tax law, and labor compliance.', servers: ['mlit-dpf','tax-law','labor-law'], industries: ['real-estate','logistics','consulting'] },
+        { name: 'Japan Climate & Logistics', description: 'Optimize logistics, real estate development, and supply chain resiliency in Japan against weather risks.', servers: ['mlit-dpf','weather-mcp'], industries: ['logistics','real-estate','insurance'] }
+      ]
+    };
+
+    // ========== CATALOG FUNCTIONS ==========
+    function getAllCatalogServers() {
+      const all = [];
+      MCP_CATALOG.categories.forEach(cat => cat.servers.forEach(s => all.push({...s, categoryName: cat.name})));
+      return all;
+    }
+
+    function isServerAdded(serverId) {
+      const server = getAllCatalogServers().find(s => s.id === serverId);
+      if (!server) return false;
+      if (server.type === 'workspace') {
+        return window.workspaceMcpIncluded || false;
+      }
+      if (server.type === 'remote') {
+        return cachedImportedMcpList.some(m => m.type === 'remote' && m.endpoint_url === server.endpoint_url);
+      }
+      return cachedImportedMcpList.some(m => m.github_url === server.github_url);
+    }
+
+    // Track servers currently being analyzed to preserve state across re-renders
+    const analyzingServers = new Set();
+    const analyzingRecipes = new Set();
+
+    window.switchMcpTab = function(tab) {
+      document.querySelectorAll('.mcp-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tab);
+      });
+      document.getElementById('mcpTabRecipes').classList.toggle('hidden', tab !== 'recipes');
+      document.getElementById('mcpTabCatalog').classList.toggle('hidden', tab !== 'catalog');
+      document.getElementById('mcpTabUrl').classList.toggle('hidden', tab !== 'url');
+    }
+
+    window.filterMcpCatalog = function() {
+      const query = (document.getElementById('mcpCatalogSearch').value || '').toLowerCase().trim();
+      renderCatalogGrid(query);
+    }
+
+    function renderCatalogGrid(filter) {
+      const grid = document.getElementById('mcpCatalogGrid');
+      grid.innerHTML = '';
+      let staggerIdx = 0;
+
+      MCP_CATALOG.categories.forEach(cat => {
+        const filtered = cat.servers.filter(s => {
+          if (!filter) return true;
+          const haystack = (s.name + ' ' + s.description + ' ' + s.tags.join(' ') + ' ' + cat.name).toLowerCase();
+          return haystack.includes(filter);
+        });
+        if (filtered.length === 0) return;
+
+        // Category header
+        const header = document.createElement('div');
+        header.className = 'flex items-center gap-2';
+        header.innerHTML = '<span class="text-sky-400">' + cat.icon + '</span><h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">' + cat.name + '</h3>';
+        grid.appendChild(header);
+
+        // Cards container
+        const cards = document.createElement('div');
+        cards.className = 'grid grid-cols-1 md:grid-cols-2 gap-3';
+        
+        filtered.forEach(server => {
+          staggerIdx++;
+          const added = isServerAdded(server.id);
+          const analyzing = analyzingServers.has(server.id);
+          const card = document.createElement('div');
+          card.id = 'catalog-card-' + server.id;
+          card.className = 'mcp-catalog-card catalog-animate catalog-stagger-' + Math.min(staggerIdx, 7) + (added ? ' is-added' : '') + (analyzing ? ' is-adding' : '');
+          
+          const apiKeyTag = server.requires_api_key === true
+            ? '<span class="mcp-tag tag-apikey"><svg class="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>API Key</span>'
+            : server.requires_api_key === 'partial'
+            ? '<span class="mcp-tag tag-apikey"><svg class="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>Some APIs</span>'
+            : '<span class="mcp-tag tag-free"><svg class="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>No Key</span>';
+
+          const managedTag = (server.type === 'remote' || server.type === 'workspace') ? '<span class="mcp-tag" style="background:rgba(168,85,247,0.15);color:#c084fc;border-color:rgba(168,85,247,0.25)">☁️ Managed</span>' : '';
+          const devPreviewTag = server.dev_preview ? '<span class="mcp-tag" style="background:rgba(245,158,11,0.12);color:#fbbf24;border-color:rgba(245,158,11,0.2)">🧪 Developer Preview</span>' : '';
+          const langTag = (server.type === 'remote' || server.type === 'workspace') ? '' : '<span class="mcp-tag tag-lang">' + server.language + '</span>';
+
+          card.innerHTML = '<div class="relative z-10 flex flex-col gap-2.5">' +
+            '<div class="flex items-start justify-between">' +
+              '<div class="flex-1 min-w-0">' +
+                '<div class="flex items-center gap-1.5">' +
+                  '<h4 class="text-sm font-bold text-white truncate">' + server.name + '</h4>' +
+                  ((server.type === 'remote' || server.type === 'workspace')
+                    ? '<a href="' + (server.docs_url || '#') + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="View documentation" class="flex-shrink-0 text-gray-600 hover:text-gray-300 transition-colors"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>'
+                    : '<a href="' + server.github_url + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="View on GitHub" class="flex-shrink-0 text-gray-600 hover:text-gray-300 transition-colors">' +
+                      '<svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>' +
+                    '</a>') +
+                '</div>' +
+                '<p class="text-[11px] text-gray-400 leading-relaxed mt-0.5 line-clamp-2">' + server.description + '</p>' +
+              '</div>' +
+            '</div>' +
+            '<div class="flex items-center gap-1.5 flex-wrap">' + managedTag + devPreviewTag + apiKeyTag + langTag + '</div>' +
+            (server.dev_preview ? '<div class="bg-amber-950/30 border border-amber-500/15 rounded-lg p-2 mt-0.5"><p class="text-[10px] text-amber-300/80 leading-snug"><svg class="w-2.5 h-2.5 inline -mt-0.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>Requires enrollment in the <a href="https://developers.google.com/workspace/preview" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="text-amber-300 underline hover:text-amber-200">Google Workspace Developer Preview Program</a>.</p></div>' : '') +
+            (server.demo_tip ? '<p class="text-[10px] text-sky-400/60 leading-snug"><svg class="w-2.5 h-2.5 inline -mt-0.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>' + server.demo_tip + '</p>' : '') +
+            (server.type === 'workspace'
+              ? '<button onclick="' + (added ? 'removeWorkspaceMcpFromPlan()' : 'addWorkspaceMcpFromCatalog()') + '" id="catalog-btn-' + server.id + '" class="catalog-toggle-btn mt-1 w-full py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ' +
+                (added ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/30' : 'bg-sky-500/10 text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 hover:border-sky-500/30 active:scale-[0.98]') + '">' +
+                (added ? '<span class="catalog-btn-added"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Added</span><span class="catalog-btn-remove"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>Remove</span>' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>Add to Demo') +
+              '</button>'
+              : '<button onclick="' + (added ? 'removeCatalogServer(\'' + server.id + '\')' : 'addCatalogServer(\'' + server.id + '\')') + '" id="catalog-btn-' + server.id + '" class="catalog-toggle-btn mt-1 w-full py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ' +
+                (added ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/30' : analyzing ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20 opacity-70 pointer-events-none' : 'bg-sky-500/10 text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 hover:border-sky-500/30 active:scale-[0.98]') + '">' +
+                (added ? '<span class="catalog-btn-added"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Added</span><span class="catalog-btn-remove"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>Remove</span>' : analyzing ? '<div class="w-3.5 h-3.5 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>Analyzing...' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>Add to Demo') +
+              '</button>') +
+          '</div>';
+          cards.appendChild(card);
+        });
+        grid.appendChild(cards);
+      });
+
+      // Empty state
+      if (grid.children.length === 0) {
+        grid.innerHTML = '<div class="text-center py-8 text-gray-500 text-sm">No servers match your search. Try the <button onclick="switchMcpTab(\'url\')" class="text-sky-400 underline">Import from URL</button> tab.</div>';
+      }
+    }
+
+    function renderRecipes() {
+      const container = document.getElementById('mcpRecipeCards');
+      container.innerHTML = '';
+      MCP_CATALOG.recipes.forEach((recipe, recipeIdx) => {
+        const allAdded = recipe.servers.every(sid => isServerAdded(sid));
+        
+        // Fix multi-button animation bug by tracking initiated recipe index
+        const hasAnalyzingServers = recipe.servers.some(sid => analyzingServers.has(sid));
+        if (!hasAnalyzingServers && analyzingRecipes.has(recipeIdx)) {
+          analyzingRecipes.delete(recipeIdx);
+        }
+        const isAnalyzing = analyzingRecipes.has(recipeIdx) && hasAnalyzingServers;
+
+        const serverNames = recipe.servers.map(sid => {
+          const s = getAllCatalogServers().find(x => x.id === sid);
+          return s ? s.name : sid;
+        });
+
+        const btnClass = allAdded
+          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 cursor-default'
+          : isAnalyzing
+          ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20 opacity-70 pointer-events-none'
+          : 'bg-sky-500/10 text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 hover:border-sky-500/30 active:scale-[0.98]'; // Glassmorphism
+
+        const btnContent = allAdded
+          ? '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Added'
+          : isAnalyzing
+          ? '<div class="w-3 h-3 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>Analyzing...'
+          : '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>Add Combo';
+
+        const card = document.createElement('div');
+        card.className = 'mcp-recipe-card';
+        card.innerHTML = '<div class="flex items-start justify-between gap-3">' +
+          '<div class="flex-1 min-w-0">' +
+            '<h4 class="text-sm font-bold text-white">' + recipe.name + '</h4>' +
+            '<p class="text-[11px] text-gray-400 mt-1 leading-relaxed">' + recipe.description + '</p>' +
+            '<div class="flex items-center gap-1.5 mt-2 flex-wrap">' + serverNames.map(n => '<span class="mcp-tag">' + n + '</span>').join('') + '</div>' +
+          '</div>' +
+          '<button onclick="addRecipeServers(\'' + recipe.servers.join(',') + '\', ' + recipeIdx + ')" class="flex-shrink-0 px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 ' + btnClass + '">' +
+            btnContent +
+          '</button>' +
+        '</div>';
+        container.appendChild(card);
+      });
+    }
+
+    window.addCatalogServer = function(serverId) {
+      if (isServerAdded(serverId) || analyzingServers.has(serverId)) return;
+      const server = getAllCatalogServers().find(s => s.id === serverId);
+      if (!server) return;
+
+      // ── Remote Managed Server: skip Gemini analysis, add directly ──
+      if (server.type === 'remote') {
+        cachedImportedMcpList.push({
+          name: server.name,
+          type: 'remote',
+          endpoint_url: server.endpoint_url,
+          auth_type: server.auth_type || 'bearer_token',
+          language: 'managed',
+          transport_mode: 'streamable_http',
+          is_supported: true,
+          required_env_vars: [
+            { key: 'SLACK_CLIENT_ID', description: 'Slack App Client ID', is_secret: false, is_required: true },
+            { key: 'SLACK_CLIENT_SECRET', description: 'Slack App Client Secret', is_secret: true, is_required: true }
+          ],
+          github_url: server.docs_url,
+          docs_url: server.docs_url,
+          entrypoint: null,
+          capabilities: ['search_messages', 'send_message', 'list_channels', 'manage_canvases'],
+        });
+        renderMcpList();
+        updateMcpCountBadge();
+        updateMcpNextStepsBanner();
+        renderCatalogGrid(document.getElementById('mcpCatalogSearch').value.toLowerCase().trim());
+        renderRecipes();
+        return;
+      }
+
+      // ── Sidecar Server: Gemini analysis required ──
+      // Track this server as analyzing
+      analyzingServers.add(serverId);
+
+      // Update just this card's button without full re-render
+      const btn = document.getElementById('catalog-btn-' + serverId);
+      const card = document.getElementById('catalog-card-' + serverId);
+      if (card) card.classList.add('is-adding');
+      if (btn) {
+        btn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>Analyzing...';
+        btn.classList.add('opacity-70', 'pointer-events-none');
+      }
+
+      // Trigger real Gemini analysis (no skip)
+      google.script.run
+        .withSuccessHandler((res) => {
+          analyzingServers.delete(serverId);
+          if (!res.success || !res.data.is_supported) {
+            // Update just this button to failed state
+            const failBtn = document.getElementById('catalog-btn-' + serverId);
+            const failCard = document.getElementById('catalog-card-' + serverId);
+            if (failCard) failCard.classList.remove('is-adding');
+            if (failBtn) {
+              failBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Failed';
+              failBtn.classList.remove('opacity-70', 'pointer-events-none');
+              failBtn.classList.add('text-red-400', 'border-red-500/20');
+            }
+            setTimeout(() => { renderCatalogGrid(document.getElementById('mcpCatalogSearch').value.toLowerCase().trim()); renderRecipes(); }, 2000);
+            return;
+          }
+          res.data.github_url = server.github_url;
+          res.data.name = server.name;
+          cachedImportedMcpList.push(res.data);
+          renderMcpList();
+          updateMcpCountBadge();
+          updateMcpNextStepsBanner();
+          renderCatalogGrid(document.getElementById('mcpCatalogSearch').value.toLowerCase().trim());
+          renderRecipes();
+        })
+        .withFailureHandler((err) => {
+          analyzingServers.delete(serverId);
+          const errBtn = document.getElementById('catalog-btn-' + serverId);
+          const errCard = document.getElementById('catalog-card-' + serverId);
+          if (errCard) errCard.classList.remove('is-adding');
+          if (errBtn) {
+            errBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Error';
+            errBtn.classList.remove('opacity-70', 'pointer-events-none');
+          }
+          setTimeout(() => { renderCatalogGrid(document.getElementById('mcpCatalogSearch').value.toLowerCase().trim()); renderRecipes(); }, 2000);
+        })
+        .analyzeMcpRepository(server.github_url);
+    }
+
+    window.addRecipeServers = function(serverIds, recipeIdx) {
+      const ids = serverIds.split(',');
+      const toAdd = ids.filter(id => !isServerAdded(id));
+      if (toAdd.length > 0) {
+        analyzingRecipes.add(recipeIdx);
+        toAdd.forEach(id => addCatalogServer(id));
+        renderRecipes();
+      }
+    }
+
+    function updateMcpCountBadge() {
+      const badge = document.getElementById('mcpCountBadge');
+      if (!badge) return;
+      const totalCount = cachedImportedMcpList.length + (window.workspaceMcpIncluded ? 1 : 0);
+      if (totalCount > 0) {
+        badge.textContent = totalCount + ' added';
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    // Initialize catalog on modal open
+    window.openMcpModal = function() {
+      document.getElementById('mcpModal').classList.remove('hidden');
+      renderCatalogGrid();
+      renderRecipes();
+      updateMcpNextStepsBanner();
+    }
+    
+    window.closeMcpModal = function() {
+      document.getElementById('mcpModal').classList.add('hidden');
+    }
+
+    // ── Next Steps Banner Logic ──
+    function updateMcpNextStepsBanner() {
+      const banner = document.getElementById('mcpNextStepsBanner');
+      if (!banner) return;
+
+      const totalCount = cachedImportedMcpList.length + (window.workspaceMcpIncluded ? 1 : 0);
+      if (totalCount === 0) {
+        banner.classList.remove('visible');
+        return;
+      }
+
+      const userGoal = document.getElementById('userGoal');
+      const hasGoal = userGoal && userGoal.value.trim().length > 20;
+
+      const icon = document.getElementById('nextStepsIcon');
+      const title = document.getElementById('nextStepsTitle');
+      const desc = document.getElementById('nextStepsDesc');
+      const cta = document.getElementById('nextStepsCta');
+
+      if (hasGoal) {
+        icon.className = 'flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-sky-500/15';
+        icon.innerHTML = '<svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+        title.textContent = totalCount + ' server' + (totalCount > 1 ? 's' : '') + ' selected — ready to go!';
+        desc.textContent = 'Your business challenge is set. Close this catalog and generate.';
+        cta.className = 'next-step-cta flex-shrink-0 cta-generate cursor-pointer';
+        cta.innerHTML = 'Generate Setup Script <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>';
+        window._mcpNextStepAction = 'generate';
+      } else {
+        icon.className = 'flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-amber-500/15';
+        icon.innerHTML = '<svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+        title.textContent = totalCount + ' server' + (totalCount > 1 ? 's' : '') + ' selected — define your challenge next';
+        desc.textContent = 'Pick from the gallery or describe a customer scenario to continue.';
+        cta.className = 'next-step-cta flex-shrink-0 cta-setup cursor-pointer';
+        cta.innerHTML = 'Set Up Challenge <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>';
+        window._mcpNextStepAction = 'setup';
+      }
+
+      if (!banner.classList.contains('visible')) {
+        banner.classList.add('visible');
+      }
+    }
+
+    window.handleMcpNextStep = function() {
+      closeMcpModal();
+      setTimeout(() => {
+        if (window._mcpNextStepAction === 'generate') {
+          const genBtn = document.getElementById('generateBtn');
+          if (genBtn) genBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          const methodSection = document.getElementById('methodSelection');
+          if (methodSection) methodSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+    }
+
+    window.addWorkspaceMcpFromCatalog = function() {
+      if (window.workspaceMcpIncluded) return;
+      window.workspaceMcpIncluded = true;
+      renderMcpList();
+      updateMcpCountBadge();
+      updateMcpNextStepsBanner();
+      renderCatalogGrid(document.getElementById('mcpCatalogSearch').value.toLowerCase().trim());
+      renderRecipes();
+    }
+
+    window.removeCatalogServer = function(serverId) {
+      const server = getAllCatalogServers().find(s => s.id === serverId);
+      if (!server) return;
+      if (server.type === 'remote') {
+        const idx = cachedImportedMcpList.findIndex(m => m.type === 'remote' && m.endpoint_url === server.endpoint_url);
+        if (idx !== -1) cachedImportedMcpList.splice(idx, 1);
+      } else {
+        const idx = cachedImportedMcpList.findIndex(m => m.github_url === server.github_url);
+        if (idx !== -1) cachedImportedMcpList.splice(idx, 1);
+      }
+      renderMcpList();
+      updateMcpCountBadge();
+      updateMcpNextStepsBanner();
+      renderCatalogGrid(document.getElementById('mcpCatalogSearch').value.toLowerCase().trim());
+      renderRecipes();
+    }
+
+    window.removeWorkspaceMcpFromPlan = function() {
+      window.workspaceMcpIncluded = false;
+      renderMcpList();
+      updateMcpCountBadge();
+      updateMcpNextStepsBanner();
+      renderCatalogGrid(document.getElementById('mcpCatalogSearch').value.toLowerCase().trim());
+      renderRecipes();
+    }
+
+    window.triggerMcpAnalysis = function() {
+      const url = document.getElementById('mcpRepoUrl').value.trim();
+      if(!url) return alert('Please enter a valid GitHub Repository URL.');
+      
+      const btn = document.getElementById('btnMcpImport');
+      const loading = document.getElementById('mcpLoading');
+      const resultSection = document.getElementById('mcpResult');
+      
+      btn.disabled = true;
+      loading.classList.remove('hidden');
+      resultSection.classList.add('hidden');
+
+      google.script.run
+        .withSuccessHandler((res) => {
+          btn.disabled = false;
+          loading.classList.add('hidden');
+          resultSection.classList.remove('hidden');
+          
+          if (!res.success) {
+            document.getElementById('mcpStatusMessage').innerHTML = '<p class="text-red-400 text-sm">Analysis Error: ' + res.message + '</p>';
+            return;
+          }
+          
+          const data = res.data;
+          if (!data.is_supported) {
+            document.getElementById('mcpStatusMessage').innerHTML = '<div class="p-4 bg-red-950/30 border border-red-500/20 rounded-2xl text-sm text-red-400">🚨 <strong>Unsupported Repository:</strong> ' + data.unsupported_reason + '</div>';
+            document.getElementById('mcpEnvVarList').classList.add('hidden');
+            return;
+          }
+          
+          data.github_url = url;
+          lastAnalyzedMcp = data;
+          
+          // Check for duplicate URL
+          const isDuplicate = cachedImportedMcpList.some(m => m.github_url === url);
+          
+          let addButtonHtml;
+          if (isDuplicate) {
+            addButtonHtml = '<div class="p-2 bg-amber-950/30 border border-amber-500/20 rounded-xl text-xs text-amber-400 mt-2">⚠️ This MCP server is already added to your demo plan.</div>' +
+              '<button disabled class="w-full bg-gray-700 text-gray-400 mt-4 py-3 font-bold text-sm rounded-2xl cursor-not-allowed flex items-center justify-center gap-2 select-none">' +
+              '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Already Added</button>';
+          } else {
+            addButtonHtml = '<button onclick="applyImportAndClose()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white mt-4 py-3 font-bold text-sm rounded-2xl transition-all flex items-center justify-center gap-2 select-none">Add to Demo Generation</button>';
+          }
+          
+          document.getElementById('mcpStatusMessage').innerHTML = '<div class="p-4 bg-emerald-950/30 border border-emerald-500/20 rounded-2xl text-sm text-emerald-400">✅ <strong>Analysis Completed!</strong> Language: ' + data.language.toUpperCase() + ' (' + data.transport_mode.toUpperCase() + ')</div>' + addButtonHtml;
+            
+          // Update Analyze button state to allow re-analysis
+          btn.disabled = false;
+          btn.classList.remove('bg-sky-500', 'hover:bg-sky-600');
+          btn.classList.add('bg-slate-600', 'hover:bg-slate-700');
+          btn.innerText = 'Re-analyze';
+             
+          const box = document.getElementById('mcpEnvVarsBox');
+          box.innerHTML = '';
+          if(data.required_env_vars && data.required_env_vars.length > 0) {
+            data.required_env_vars.forEach(v => {
+              const reqStatus = v.is_required ? '<span class="text-red-400 font-bold">[REQUIRED]</span>' : '<span class="text-gray-500">[OPTIONAL]</span>';
+              box.innerHTML += '<div class="text-sm text-gray-300">🔑 ' + v.key + ' (' + v.description + ') ' + reqStatus + (v.is_secret ? ' <span class="text-amber-400">[SECRET]</span>' : '') + '</div>';
+            });
+            document.getElementById('mcpEnvVarList').classList.remove('hidden');
+          } else {
+            box.innerHTML = '<span class="text-gray-500 font-sans">No environmental variables are required.</span>';
+            document.getElementById('mcpEnvVarList').classList.remove('hidden');
+          }
+
+          // Show degraded tools warning if applicable
+          if (data.degraded_tools && data.degraded_tools.length > 0) {
+            let degradedHtml = '<div class="mt-3 p-3 bg-amber-950/30 border border-amber-500/20 rounded-2xl">' +
+              '<h4 class="text-amber-400 font-bold text-[10px] uppercase tracking-wider mb-2">⚠️ Limited Tools (native binary not available)</h4>';
+            data.degraded_tools.forEach(t => {
+              degradedHtml += '<div class="text-xs text-amber-300/80">• ' + t + '</div>';
+            });
+            degradedHtml += '</div>';
+            document.getElementById('mcpEnvVarsBox').innerHTML += degradedHtml;
+          }
+
+          // Show credential file requirement if applicable
+          if (data.credential_file) {
+            let credHtml = '<div class="mt-3 p-3 bg-blue-950/30 border border-blue-500/20 rounded-2xl">' +
+              '<h4 class="text-blue-400 font-bold text-[10px] uppercase tracking-wider mb-2">📄 Credential File Required</h4>' +
+              '<p class="text-xs text-gray-300">' + data.credential_file.file_description + '</p>' +
+              '<div class="mt-2 text-xs text-gray-400 font-mono">→ Env: ' + data.credential_file.env_var_name + '</div>' +
+              '<p class="text-blue-400/70 text-[10px] mt-2">⚠️ You will be prompted to paste the credential file during script execution in Cloud Shell.</p>' +
+              '</div>';
+            document.getElementById('mcpEnvVarsBox').innerHTML += credHtml;
+          }
+        })
+        .withFailureHandler((err) => {
+          btn.disabled = false;
+          loading.classList.add('hidden');
+          alert("System Failure: " + err.message);
+        })
+        .analyzeMcpRepository(url);
+    }
+
+    window.applyImportAndClose = function() {
+      if (!lastAnalyzedMcp) return;
+
+      // Prevent duplicate: check if the same github_url already exists
+      const existingUrl = lastAnalyzedMcp.github_url;
+      if (existingUrl && cachedImportedMcpList.some(m => m.github_url === existingUrl)) {
+        const existingName = cachedImportedMcpList.find(m => m.github_url === existingUrl)?.name || existingUrl;
+        alert('⚠️ This MCP server is already added:\n' + existingName + '\n\nDuplicate entries are not allowed.');
+        return;
+      }
+
+      // Derive name from URL if not already set
+      if (!lastAnalyzedMcp.name && lastAnalyzedMcp.github_url) {
+        lastAnalyzedMcp.name = lastAnalyzedMcp.github_url.split('/').pop().replace(/\.git$/, '');
+      }
+      cachedImportedMcpList.push(lastAnalyzedMcp);
+      lastAnalyzedMcp = null;
+      renderMcpList();
+      updateMcpCountBadge();
+      updateMcpNextStepsBanner();
+      
+      // Reset import form for next import (stay in modal)
+      document.getElementById('mcpRepoUrl').value = '';
+      document.getElementById('mcpResult').classList.add('hidden');
+      const btn = document.getElementById('btnMcpImport');
+      btn.classList.remove('bg-slate-600', 'hover:bg-slate-700');
+      btn.classList.add('bg-sky-500', 'hover:bg-sky-600');
+      btn.innerText = 'Analyze';
+    }
+
+    window.removeMcpFromPlan = function(index) {
+      cachedImportedMcpList.splice(index, 1);
+      renderMcpList();
+      updateMcpCountBadge();
+      updateMcpNextStepsBanner();
+    }
+
+    function renderMcpList() {
+      const container = document.getElementById('mcpStatusList');
+      container.innerHTML = '';
+
+      // Render workspace MCP if included
+      if (window.workspaceMcpIncluded) {
+        const wsEl = document.createElement('div');
+        wsEl.className = 'bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between backdrop-blur-sm';
+        wsEl.innerHTML = '<div class="flex items-center gap-3">' +
+          '<div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">' +
+            '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>' +
+          '</div>' +
+          '<div>' +
+            '<h4 class="text-sm font-bold text-white">Google Workspace MCP</h4>' +
+            '<p class="text-xs text-gray-400">☁️ MANAGED · GMAIL, DRIVE, CALENDAR, CHAT</p>' +
+          '</div>' +
+        '</div>' +
+        '<button onclick="removeWorkspaceMcpFromPlan()" class="text-gray-500 hover:text-white text-xs underline focus:outline-none">Remove</button>';
+        container.appendChild(wsEl);
+      }
+
+      cachedImportedMcpList.forEach((mcp, i) => {
+        const isRemote = mcp.type === 'remote';
+        const displayName = isRemote ? (mcp.name || 'Remote MCP') : mcp.github_url.split('/').pop().replace(/\.git$/, '');
+        const subtitle = isRemote
+          ? '☁️ MANAGED · ' + (mcp.endpoint_url || '').replace('https://', '').split('/')[0].toUpperCase()
+          : (mcp.language || 'unknown').toUpperCase() + ' · ' + (mcp.transport_mode || 'stdio').toUpperCase();
+        const el = document.createElement('div');
+        el.className = 'bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between backdrop-blur-sm';
+        el.innerHTML = '<div class="flex items-center gap-3">' +
+          '<div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">' +
+            (isRemote
+              ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg>'
+              : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>') +
+          '</div>' +
+          '<div>' +
+            '<h4 class="text-sm font-bold text-white">' + displayName + '</h4>' +
+            '<p class="text-xs text-gray-400">' + subtitle + '</p>' +
+          '</div>' +
+        '</div>' +
+        '<button onclick="removeMcpFromPlan(' + i + ')" class="text-gray-500 hover:text-white text-xs underline focus:outline-none">Remove</button>';
+        container.appendChild(el);
+      });
+    }
+
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.banner-slide');
+    let bannerTimer;
+    
+    function showSlide(index) {
+      if (slides.length === 0) return;
+      const prev = slides[currentSlide];
+      currentSlide = (index + slides.length) % slides.length;
+      const next = slides[currentSlide];
+      
+      prev.classList.add('opacity-0', 'pointer-events-none');
+      prev.classList.remove('opacity-100');
+      
+      next.classList.add('opacity-100');
+      next.classList.remove('opacity-0', 'pointer-events-none');
+    }
+    
+    window.nextSlide = function() {
+      clearInterval(bannerTimer);
+      showSlide(currentSlide + 1);
+      startTimer();
+    }
+    
+    window.prevSlide = function() {
+      clearInterval(bannerTimer);
+      showSlide(currentSlide - 1);
+      startTimer();
+    }
+    
+    function startTimer() {
+      bannerTimer = setInterval(() => {
+        showSlide(currentSlide + 1);
+      }, 5000);
+    }
+    
+    if (slides.length > 0) {
+      startTimer();
+    }
+
+    // ── Social Proof: Usage Stats ──
+    function animateCounter(elementId, targetValue) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      if (!targetValue || targetValue === 0) { el.textContent = '0'; return; }
+      const duration = 800;
+      const start = performance.now();
+      function step(now) {
+        const progress = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = Math.floor(eased * targetValue).toLocaleString();
+        if (progress < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    function getRelativeTime(date) {
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMin = Math.floor(diffMs / 60000);
+      const diffHr = Math.floor(diffMin / 60);
+      const diffDay = Math.floor(diffHr / 24);
+      if (diffMin < 1) return 'just now';
+      if (diffMin < 60) return diffMin + ' min ago';
+      if (diffHr < 24) return diffHr + 'h ago';
+      if (diffDay < 7) return diffDay + 'd ago';
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+
+    // --- Activity Ticker (Header) ---
+    let tickerInterval = null;
+    let tickerIndex = 0;
+    let tickerPaused = false;
+
+    function renderActivityTicker() {
+      const stats = window._usageStats;
+      const wrapper = document.getElementById('activityTicker');
+      if (!wrapper) return;
+      if (!stats || !stats.recentActivity || stats.recentActivity.length === 0) {
+        wrapper.classList.add('hidden');
+        return;
+      }
+
+      wrapper.classList.remove('hidden');
+      // Show the parent activity module container
+      const module = document.getElementById('activityModule');
+      if (module) module.classList.remove('hidden');
+      const ticker = wrapper.querySelector('.activity-ticker');
+      if (!ticker) return;
+
+      const items = stats.recentActivity.slice(0, 10);
+      ticker.innerHTML = items.map((item, i) => {
+        const relTime = getRelativeTime(new Date(item.timestamp));
+        const goal = item.userGoal || 'Demo';
+        const locationLabel = item.location
+          ? `Someone in <span class="text-white font-medium">${item.location}</span>`
+          : 'A teammate';
+        return `<div class="activity-ticker-item${i === 0 ? ' active' : ''}" data-idx="${i}">
+          <span class="inline-flex items-center text-[9px] text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded-full border border-emerald-500/25 whitespace-nowrap font-medium shrink-0">${relTime}</span>
+          <span class="text-[11px] text-gray-400 ticker-text-clamp flex-1 min-w-0">${locationLabel} generated <span class="text-gray-200 font-medium">${goal}</span></span>
+        </div>`;
+      }).join('');
+
+      // Start rotation
+      tickerIndex = 0;
+      if (tickerInterval) clearInterval(tickerInterval);
+      if (items.length > 1) {
+        tickerInterval = setInterval(() => {
+          if (tickerPaused) return;
+          const allItems = ticker.querySelectorAll('.activity-ticker-item');
+          allItems.forEach(el => el.classList.remove('active'));
+          tickerIndex = (tickerIndex + 1) % allItems.length;
+          allItems[tickerIndex].classList.add('active');
+        }, 5000);
+      }
+
+      // Pause on hover
+      wrapper.addEventListener('mouseenter', () => { tickerPaused = true; });
+      wrapper.addEventListener('mouseleave', () => { tickerPaused = false; });
+
+      // Update Community tab badge — count only activities from last 24h
+      const now24h = Date.now() - 24 * 60 * 60 * 1000;
+      const recentCount = items.filter(a => new Date(a.timestamp).getTime() > now24h).length;
+      updateCommunityBadge(recentCount);
+    }
+
+    function updateCommunityBadge(count) {
+      const badge = document.getElementById('communityBadge');
+      if (!badge) return;
+      if (count > 0) {
+        badge.textContent = count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    function copyShareLink() {
+      // Build deep link for current demo, fall back to static tool URL
+      const url = 'https://goo.gle/ge-demo-gen';
+      navigator.clipboard.writeText(url).then(() => {
+        const btn = document.getElementById('shareLinkBtn');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = `
+          <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+          <span class="text-emerald-400">Copied!</span>`;
+        btn.classList.add('border-emerald-500/40');
+        setTimeout(() => {
+          btn.innerHTML = originalHTML;
+          btn.classList.remove('border-emerald-500/40');
+        }, 2000);
+      }).catch(() => {
+        copyToClipboard(url);
+      });
+    }
+
+    // Fetch usage stats on page load (single call serves Stats + Ticker + Badge)
+    google.script.run
+      .withSuccessHandler(function(raw) {
+        try {
+          const stats = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          window._usageStats = stats;
+
+          // Pill badge (all-time cumulative)
+          if (stats.totalDemos > 0) {
+            animateCounter('statTotalDemosBanner', stats.totalDemos);
+            animateCounter('statTotalUsersBanner', stats.uniqueUsers);
+            if (stats.uniqueLocations > 0) {
+              animateCounter('statTotalLocationsBanner', stats.uniqueLocations);
+            }
+            document.getElementById('weeklyStatsBadge').classList.remove('hidden');
+            // Show the parent activity module container
+            const actModule = document.getElementById('activityModule');
+            if (actModule) actModule.classList.remove('hidden');
+          }
+
+          // Activity ticker (header) + Community tab badge
+          renderActivityTicker();
+        } catch(e) { console.error('Stats parse error:', e); }
+      })
+      .withFailureHandler(function(err) {
+        console.warn('Usage stats unavailable:', err);
+      })
+
+  </script>
+
+</body>
+
+</html>
