@@ -69,7 +69,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v10.38-public',
+  APP_VERSION: 'v10.39-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -9548,8 +9548,62 @@ def _parse_loose_json(sub_str: str):
     return None
 
 def _rewrite_suggestions_a2ui(msg):
-    """No-op: GE suggestions surface only renders Button components, ignoring Text/Column.
-    Header '💡 Next Actions' is injected as text in the artifact assembly instead."""
+    """Insert a spacer component before button groups in A2UI surfaces.
+    Finds the root Column, locates the first Button or Button-Row child,
+    and inserts a blank Text spacer before it for visual separation."""
+    if not isinstance(msg, dict) or 'surfaceUpdate' not in msg:
+        return msg
+    _su = msg['surfaceUpdate']
+    _comps = _su.get('components', [])
+    if not _comps:
+        return msg
+
+    # Build ID -> component map
+    _cmap = {}
+    for _c in _comps:
+        if isinstance(_c, dict) and _c.get('id'):
+            _cmap[_c['id']] = _c
+
+    def _leads_to_buttons(_child_id):
+        _cc = _cmap.get(_child_id, {}).get('component', {})
+        if 'Button' in _cc:
+            return True
+        if 'Row' in _cc:
+            _rc = _cc['Row'].get('children', {}).get('explicitList', [])
+            return any('Button' in _cmap.get(_r, {}).get('component', {}) for _r in _rc if _r in _cmap)
+        return False
+
+    # Process first Column only (root level)
+    for _c in _comps:
+        _ct = _c.get('component', {})
+        if 'Column' not in _ct:
+            continue
+        _children = _ct['Column'].get('children', {}).get('explicitList')
+        if not _children or len(_children) < 2:
+            break
+
+        # Find first button-group child
+        _btn_start = None
+        for _i, _cid in enumerate(_children):
+            if _leads_to_buttons(_cid):
+                _btn_start = _i
+                break
+
+        # Only add spacer if there is content before the buttons
+        if _btn_start is not None and _btn_start > 0:
+            _sp_id = 'sp_' + _c.get('id', 'root')
+            _children.insert(_btn_start, _sp_id)
+            _comps.append({
+                'id': _sp_id,
+                'component': {
+                    'Text': {
+                        'text': {'literalString': ' '},
+                        'usageHint': 'body'
+                    }
+                }
+            })
+        break  # Only first Column
+
     return msg
 
 def _heal_buttons_in_a2ui(msg):
@@ -9867,25 +9921,6 @@ def _is_suggestions_part(part) -> bool:
         pass
     return False
 
-def _has_button_components(part) -> bool:
-    """Detect A2UI parts that contain Button components (any surfaceId).
-    Models sometimes embed suggestion buttons in surfaces other than 'suggestions'."""
-    try:
-        _root = getattr(part, 'root', None)
-        if _root and isinstance(_root, a2a_types.DataPart):
-            _data = _root.data
-            _items = _data if isinstance(_data, list) else [_data]
-            for _item in _items:
-                if isinstance(_item, dict) and 'surfaceUpdate' in _item:
-                    _su = _item['surfaceUpdate']
-                    if isinstance(_su, dict) and 'components' in _su:
-                        for _comp in _su['components']:
-                            if isinstance(_comp, dict) and 'component' in _comp:
-                                if 'Button' in _comp['component']:
-                                    return True
-    except Exception:
-        pass
-    return False
 
 def create_a2ui_part(msg):
     _healed = _heal_buttons_in_a2ui(msg)
@@ -11029,22 +11064,11 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
             else:
                 _normal_media.append(_mp)
 
-        # --- Inject "💡 Next Actions" header above suggestion chips ---
-        # GE's suggestions surface only renders Button components, silently ignoring
-        # Text/Column/Row layout in the surface. So the header must be appended to
-        # the last TextPart. GE renders text parts ABOVE data parts, so the header
-        # naturally appears right above the suggestion chips.
-        # Note: Models may use surfaceId='suggestions' OR embed buttons in other
-        # surfaces. We detect any surface containing Button components as suggestions.
-        _has_any_buttons = _suggestion_media or any(
-            _is_suggestions_part(_mp) or _has_button_components(_mp)
-            for _mp in artifact_media_parts
-        )
-        if _has_any_buttons and artifact_text_parts:
-            _last_text = artifact_text_parts[-1]
-            _ltr = getattr(_last_text, 'root', None)
-            if _ltr and hasattr(_ltr, 'text'):
-                _ltr.text = _ltr.text.rstrip() + chr(10) + chr(10) + "---" + chr(10) + chr(10) + "**💡 Next Actions**" + chr(10)
+        # Note: '💡 Next Actions' header injection was removed because GE renders
+        # text parts ABOVE all media parts, making it impossible to position the
+        # header between A2UI cards and suggestion buttons via text injection.
+        # Spacing before buttons is now handled inside A2UI component tree by
+        # _rewrite_suggestions_a2ui() which inserts a spacer Text component.
 
         artifact_parts = artifact_text_parts + _normal_media + _suggestion_media
 
