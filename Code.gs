@@ -1,3 +1,77 @@
+const SCRIPT_PROPS = PropertiesService.getScriptProperties();
+const CONFIG = {
+  PROJECT_ID: SCRIPT_PROPS.getProperty('PROJECT_ID'),
+  LOCATION: SCRIPT_PROPS.getProperty('LOCATION') || 'global',
+  MODEL: SCRIPT_PROPS.getProperty('MODEL') || 'gemini-3.5-flash',
+  GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
+  MAX_RETRIES: 3,
+  RETRY_DELAY_MS: 1000,
+  APP_VERSION: 'v10.37-public',
+  LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
+};
+
+
+
+// ===========================================
+// Web App Entry Point
+// ===========================================
+function doGet() {
+  const configError = checkConfiguration();
+  if (configError) {
+    const template = HtmlService.createTemplateFromFile('SetupError');
+    template.errorMessage = configError;
+    return template.evaluate()
+      .setTitle('Setup Required - GE Demo Generator')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+  }
+
+  const template = HtmlService.createTemplateFromFile('index');
+  
+  template.appVersion = CONFIG.APP_VERSION;
+
+  template.projectId = CONFIG.PROJECT_ID;
+  template.userEmail = Session.getActiveUser().getEmail();
+  template.generatorModel = CONFIG.MODEL || 'gemini-3.5-flash';
+  
+  
+  return template.evaluate()
+    .setTitle('GE Demo Generator')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// ===========================================
+// Performance & Logging
+// ===========================================
+
+projectId - Your Google Cloud Project ID
+ * @param {string} logSheetUrl - URL of your usage log spreadsheet (optional)
+ */
+function initializeProject(projectId, logSheetUrl) {
+  if (!projectId) {
+    throw new Error('PROJECT_ID is mandatory for initialization.');
+  }
+
+  const scriptProps = PropertiesService.getScriptProperties();
+  const currentProps = scriptProps.getProperties();
+
+  const newProps = {
+    PROJECT_ID: projectId, 
+    LOCATION: currentProps.LOCATION || 'global',
+    MODEL: currentProps.MODEL || 'gemini-3.5-flash',
+    LOG_SHEET_URL: logSheetUrl || currentProps.LOG_SHEET_URL || ''
+  };
+  
+  // Scopes detection (SpreadsheetApp)
+  // These are here so the IDE prompts for authorization.
+  try { if (newProps.LOG_SHEET_URL) SpreadsheetApp.openByUrl(newProps.LOG_SHEET_URL); } catch(e) {}
+  
+  scriptProps.setProperties(newProps);
+  console.log('Project initialized. Properties updated: ' + Object.keys(newProps).join(', '));
+  return 'Initialization complete. Properties set/merged: ' + Object.keys(newProps).join(', ');
+}
+
+
 /**
  * Returns a Data Profile configuration that holistically controls
  * table count, row density, and column strategy.
