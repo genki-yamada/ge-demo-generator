@@ -1,3 +1,66 @@
+/**
+ * GE Demo Generator — Backend (Code.gs)
+ *
+ * End-to-end generator for production-ready AI agent demo environments.
+ * Given a natural-language business goal, this Google Apps Script file
+ * produces a self-contained bash setup script that provisions and deploys
+ * a full-stack agent on Google Cloud in a single command.
+ *
+ * ── What Gets Generated ──────────────────────────────────────────────
+ *   • Synthetic business data (BigQuery tables + optional Firestore docs)
+ *   • Dual-model ADK agent (Gemini 3.1 Flash-Lite root → Pro analysis)
+ *   • MCP toolsets — BigQuery, Maps, Firestore, Google Workspace (Gmail,
+ *     Drive, Calendar, Chat, People), plus arbitrary GitHub MCP servers
+ *   • A2A (Agent-to-Agent) server with A2UI interactive components
+ *   • Imagen-powered image generation for executive-summary visuals
+ *   • Agent Engine Sandbox for secure Python code execution
+ *   • Firestore real-time Data Viewer web app (Cloud Run Functions)
+ *   • Cloud Run deployment with Secret Manager integration
+ *   • One-command cleanup (--cleanup) for all provisioned resources
+ *
+ * ── Architecture (Multi-Layer Code Generation) ───────────────────────
+ *   Layer 1  Code.gs (JavaScript / GAS)
+ *        ↓   JS template literals + string concatenation
+ *   Layer 2  Bash setup script (setup-demo-xxx.sh)
+ *        ↓   Quoted / unquoted heredocs
+ *   Layer 3  Python source (agent.py, tools.py, fast_api_app.py, …)
+ *        ↓   Runtime string operations
+ *   Layer 4  LLM system instruction (consumed by Gemini models)
+ *
+ *   See AGENTS.md §2 for mandatory escaping rules across layers.
+ *
+ * ── Web UI (index.html) ──────────────────────────────────────────────
+ *   Template gallery, company-research customization, MCP catalog,
+ *   community history/social-proof feed, and Drive-backed persistence.
+ */
+
+// ===========================================
+// Configuration
+// ===========================================
+
+/**
+ * Explicitly triggers authorization for all required services.
+ * Call this from the Google Apps Script IDE or a button to resolve permission issues.
+ */
+function forceAuthorize() {
+  const root = DriveApp.getRootFolder();
+  // Simple write test to ensure full Drive scope
+  const dummy = root.createFile('ge_auth_success.txt', 'Verification complete.');
+  dummy.setTrashed(true);
+  
+  console.log('✅ Drive Access: OK (' + root.getName() + ')');
+  
+  // Safe check for spreadsheet scope
+  try {
+    const ss = SpreadsheetApp.openByUrl(CONFIG.LOG_SHEET_URL);
+    console.log('✅ Spreadsheet Access: OK (' + ss.getName() + ')');
+  } catch (e) {
+    console.warn('⚠️ Spreadsheet Access: Authorized but URL inaccessible.');
+  }
+
+  return '✅ Authorization verified. Refresh the browser and try generating a demo!';
+}
+
 const SCRIPT_PROPS = PropertiesService.getScriptProperties();
 const CONFIG = {
   PROJECT_ID: SCRIPT_PROPS.getProperty('PROJECT_ID'),
@@ -33,18 +96,159 @@ function doGet() {
   template.userEmail = Session.getActiveUser().getEmail();
   template.generatorModel = CONFIG.MODEL || 'gemini-3.5-flash';
   
-  
   return template.evaluate()
     .setTitle('GE Demo Generator')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+/**
+ * Validates that all required script properties are set.
+ * Returns an error message if missing, or null if valid.
+ */
+function checkConfiguration() {
+  const missing = [];
+  if (!CONFIG.PROJECT_ID) missing.push('PROJECT_ID');
+  if (!CONFIG.LOG_SHEET_URL) missing.push('LOG_SHEET_URL');
+  
+  if (missing.length > 0) {
+    return 'The following mandatory Script Properties are missing: ' + missing.join(', ') + 
+           '. Please run initializeProject() from the Apps Script editor or set them manually in Project Settings.';
+  }
+  return null;
+}
+
 // ===========================================
 // Performance & Logging
 // ===========================================
 
-projectId - Your Google Cloud Project ID
+/**
+ * Ensures the Usage_Logs sheet has the correct header row.
+ * Overwrites row 1 every time to keep headers in sync with code.
+ */
+function ensureLogSheetHeaders(sheet) {
+  const HEADERS = [
+    'Timestamp', 'User Email',
+    'User Goal', 'AI Summary', 'Dataset ID',
+    'MCP Servers', 'Generation Time (s)'
+  ];
+  sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+}
+
+/**
+ * Logs usage metadata to a central Google Sheet
+ */
+function logUsageToSheet(data) {
+  try {
+    const ss = SpreadsheetApp.openByUrl(CONFIG.LOG_SHEET_URL);
+    const sheet = ss.getSheetByName('Usage_Logs');
+    if (!sheet) return { success: false, error: 'Usage_Logs sheet not found' };
+
+    ensureLogSheetHeaders(sheet);
+
+    const userEmail = Session.getActiveUser().getEmail();
+    sheet.appendRow([
+      new Date(),
+      userEmail,
+      data.userGoal || 'N/A',
+      data.aiSummary || 'N/A',
+      data.datasetId || 'N/A',
+      data.mcpServers || 'None',
+      data.generationTimeSec || 'N/A'
+    ]);
+    
+    // Auto-wrap the AI Summary column (D) for better readability
+    sheet.getRange('D2:D').setWrap(true);
+    SpreadsheetApp.flush();
+    
+    // Convert User Email cell to People Smart Chip using Advanced Service
+    try {
+      const lastRow = sheet.getLastRow();
+      const sheetId = sheet.getSheetId();
+      const spreadsheetId = ss.getId();
+      
+      const requests = [
+        {
+          updateCells: {
+            range: {
+              sheetId: sheetId,
+              startRowIndex: lastRow - 1,
+              endRowIndex: lastRow,
+              startColumnIndex: 1,
+              endColumnIndex: 2
+            },
+            rows: [
+              {
+                values: [
+                  {
+                    userEnteredValue: { stringValue: "@" },
+                    chipRuns: [
+                      {
+                        startIndex: 0,
+                        chip: {
+                          personProperties: {
+                            email: userEmail,
+                            displayFormat: "EMAIL"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            fields: "userEnteredValue,chipRuns"
+          }
+        }
+      ];
+      
+      Sheets.Spreadsheets.batchUpdate({ requests: requests }, spreadsheetId);
+    } catch (chipErr) {
+      console.warn('⚠️ Could not insert People Chip via Advanced Service:', chipErr.message);
+    }
+    
+    return { success: true };
+  } catch (e) {
+    const errorMsg = 'Logging Spreadsheet Access Failed: ' + e.message;
+    console.error(errorMsg);
+    return { success: false, error: errorMsg };
+  }
+}
+
+/**
+ * Diagnostic function to check spreadsheet status
+ */
+function checkSpreadsheet() {
+  console.log('checkSpreadsheet called');
+  try {
+    const ss = SpreadsheetApp.openByUrl(CONFIG.LOG_SHEET_URL);
+    const sheets = ss.getSheets().map(s => s.getName());
+    const mainSheet = ss.getSheetByName('Usage_Logs');
+    const rowCount = mainSheet ? mainSheet.getLastRow() : 0;
+    const dataRows = rowCount > 0 ? mainSheet.getRange(1, 1, Math.min(rowCount, 6), mainSheet.getLastColumn()).getValues() : [];
+    
+    return JSON.stringify({
+      success: true,
+      currentUser: Session.getActiveUser().getEmail(),
+      sheets: sheets,
+      usageLogsExist: !!mainSheet,
+      rowCount: rowCount,
+      headers: dataRows.length > 0 ? dataRows[0] : null,
+      sampleRows: dataRows.length > 1 ? dataRows.slice(1) : [],
+      url: CONFIG.LOG_SHEET_URL.substring(0, 30) + '...'
+    });
+  } catch (e) {
+    console.error('checkSpreadsheet failed: ' + e.message);
+    return JSON.stringify({ success: false, error: e.message });
+  }
+}
+
+
+/**
+ * One-time initialization function to set up Script Properties.
+ * Run this from the Apps Script editor after setting your values.
+ * 
+ * @param {string} projectId - Your Google Cloud Project ID
  * @param {string} logSheetUrl - URL of your usage log spreadsheet (optional)
  */
 function initializeProject(projectId, logSheetUrl) {
