@@ -4067,7 +4067,7 @@
                 console.error('UI Rendering Error:', uiErr);
               }
               
-              setTimeout(refreshHistory, 1000);
+
             }, 800);
           })
           .withFailureHandler(err => {
@@ -5452,7 +5452,6 @@
       localStorage.removeItem('ge_generator_input');
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
-        console.log('Fetching initial history...');
         
         // Run diagnostics
         google.script.run.withSuccessHandler(resRaw => {
@@ -6857,33 +6856,6 @@
       });
     }
 
-    // Fetch usage stats on page load (single call serves Stats + Ticker + Badge)
-    google.script.run
-      .withSuccessHandler(function(raw) {
-        try {
-          const stats = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          window._usageStats = stats;
-
-          // Pill badge (all-time cumulative)
-          if (stats.totalDemos > 0) {
-            animateCounter('statTotalDemosBanner', stats.totalDemos);
-            animateCounter('statTotalUsersBanner', stats.uniqueUsers);
-            if (stats.uniqueLocations > 0) {
-              animateCounter('statTotalLocationsBanner', stats.uniqueLocations);
-            }
-            document.getElementById('weeklyStatsBadge').classList.remove('hidden');
-            // Show the parent activity module container
-            const actModule = document.getElementById('activityModule');
-            if (actModule) actModule.classList.remove('hidden');
-          }
-
-          // Activity ticker (header) + Community tab badge
-          renderActivityTicker();
-        } catch(e) { console.error('Stats parse error:', e); }
-      })
-      .withFailureHandler(function(err) {
-        console.warn('Usage stats unavailable:', err);
-      })
 
   </script>
 
