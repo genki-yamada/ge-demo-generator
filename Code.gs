@@ -69,7 +69,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v10.39-public',
+  APP_VERSION: 'v10.40-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -9548,17 +9548,60 @@ def _parse_loose_json(sub_str: str):
     return None
 
 def _rewrite_suggestions_a2ui(msg):
-    """Insert a spacer component before button groups in A2UI surfaces.
-    Finds the root Column, locates the first Button or Button-Row child,
-    and inserts a blank Text spacer before it for visual separation."""
-    if not isinstance(msg, dict) or 'surfaceUpdate' not in msg:
+    """Insert spacer before button groups in A2UI surfaces.
+    Two strategies:
+    1. surfaceId='suggestions': Wrap in Column with spacer (proven v10.32 approach)
+    2. Other surfaces: Find existing Column and insert spacer before button children
+    """
+    if not isinstance(msg, dict):
         return msg
-    _su = msg['surfaceUpdate']
-    _comps = _su.get('components', [])
+
+    # --- Strategy 1: suggestions surface (flat button list) ---
+    # Wrap with a Column that has a spacer above the original root.
+    if "beginRendering" in msg:
+        _br = msg["beginRendering"]
+        if _br.get("surfaceId") == "suggestions" and _br.get("root") == "root":
+            _br["root"] = "suggestions_wrapper"
+        return msg
+
+    if "surfaceUpdate" not in msg:
+        return msg
+
+    _su = msg["surfaceUpdate"]
+    _comps = _su.get("components", [])
     if not _comps:
         return msg
 
-    # Build ID -> component map
+    if _su.get("surfaceId") == "suggestions":
+        _has_wrapper = any(c.get("id") == "suggestions_wrapper" for c in _comps)
+        if not _has_wrapper:
+            _has_root = any(c.get("id") == "root" for c in _comps)
+            if _has_root:
+                _wrapper = {
+                    "id": "suggestions_wrapper",
+                    "component": {
+                        "Column": {
+                            "children": {"explicitList": ["suggestions_spacer", "root"]},
+                            "alignment": "stretch",
+                            "distribution": "start"
+                        }
+                    }
+                }
+                _spacer = {
+                    "id": "suggestions_spacer",
+                    "component": {
+                        "Text": {
+                            "text": {"literalString": " "},
+                            "usageHint": "body"
+                        }
+                    }
+                }
+                _comps.insert(0, _wrapper)
+                _comps.insert(1, _spacer)
+        return msg
+
+    # --- Strategy 2: other surfaces (Card + buttons in same surface) ---
+    # Find the first Column and insert spacer before button children.
     _cmap = {}
     for _c in _comps:
         if isinstance(_c, dict) and _c.get('id'):
@@ -9573,7 +9616,6 @@ def _rewrite_suggestions_a2ui(msg):
             return any('Button' in _cmap.get(_r, {}).get('component', {}) for _r in _rc if _r in _cmap)
         return False
 
-    # Process first Column only (root level)
     for _c in _comps:
         _ct = _c.get('component', {})
         if 'Column' not in _ct:
@@ -9582,14 +9624,12 @@ def _rewrite_suggestions_a2ui(msg):
         if not _children or len(_children) < 2:
             break
 
-        # Find first button-group child
         _btn_start = None
         for _i, _cid in enumerate(_children):
             if _leads_to_buttons(_cid):
                 _btn_start = _i
                 break
 
-        # Only add spacer if there is content before the buttons
         if _btn_start is not None and _btn_start > 0:
             _sp_id = 'sp_' + _c.get('id', 'root')
             _children.insert(_btn_start, _sp_id)
@@ -9602,7 +9642,7 @@ def _rewrite_suggestions_a2ui(msg):
                     }
                 }
             })
-        break  # Only first Column
+        break
 
     return msg
 
