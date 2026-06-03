@@ -607,11 +607,77 @@
       transform: translateY(-1px);
     }
 
+    #catalogModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(8px);
+    }
+    #catalogModal.show { display: flex; }
+    .catalog-chip {
+      padding: 0.3rem 0.7rem;
+      border-radius: 0.6rem;
+      font-size: 10px;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: #9ca3af;
+      white-space: nowrap;
+    }
+    .catalog-chip:hover { background: rgba(255, 255, 255, 0.1); color: #e5e7eb; }
+    .catalog-chip.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: #38bdf8;
+      color: #38bdf8;
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2);
+    }
+    .catalog-chip.unavailable { opacity: 0.3; filter: grayscale(0.7); pointer-events: none; }
+
+    .catalog-toggle-group { display: flex; gap: 0.4rem; }
+    .catalog-toggle {
+      padding: 0.3rem 0.7rem;
+      border-radius: 0.6rem;
+      font-size: 10px;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: #9ca3af;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .catalog-toggle:hover { background: rgba(255, 255, 255, 0.1); color: #e5e7eb; }
+    .catalog-toggle.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+    }
+
+    #catalogDetailPanel {
+      display: none;
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 45%;
+      min-width: 340px;
+      background: rgba(15, 23, 42, 0.98);
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      overflow-y: auto;
+      z-index: 10;
+    }
+    #catalogDetailPanel.show { display: block; }
+    .catalog-grid-dimmed { opacity: 0.3; pointer-events: none; transition: opacity 0.3s; }
+
     /* History Tabs */
     .tab-btn {
       position: relative;
       padding: 0.75rem 0;
-      font-size: 0.65rem;
+      font-size: 0.65rem !important;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -619,11 +685,12 @@
       transition: all 0.2s;
     }
 
-    .tab-btn.active {
+    .tab-btn.is-active {
       color: #38bdf8;
+      background: transparent;
     }
 
-    .tab-btn.active::after {
+    .tab-btn.is-active::after {
       content: '';
       position: absolute;
       bottom: 0;
@@ -632,6 +699,52 @@
       height: 2px;
       background: #38bdf8;
       box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+    }
+
+    #demoGuideSteps {
+      grid-template-columns: 1fr !important;
+    }
+    #advancedSettingsContent.hidden,
+    #methodSelection.hidden,
+    #templateContainer.hidden,
+    #manualContainer.hidden {
+      display: none !important;
+    }
+    #advancedSettingsContent {
+      grid-template-columns: 1fr !important;
+      margin-top: 1rem;
+    }
+    #mcpRecipeCards {
+      display: grid !important;
+      grid-template-columns: 1fr !important;
+      gap: 0.75rem;
+    }
+    .mcp-catalog-cards-grid {
+      display: grid !important;
+      grid-template-columns: 1fr !important;
+      gap: 0.75rem;
+    }
+    @media (min-width: 768px) {
+      #methodSelection {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+      }
+      #externalFilesList {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+      #advancedSettingsContent {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+      .mcp-catalog-cards-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+    }
+    @media (min-width: 1024px) {
+      #catalogList {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+      }
+      #deployGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
     }
 
     /* Loading Spinner for Tabs */
@@ -1217,7 +1330,7 @@
       class="w-64 ml-6 my-6 hidden lg:flex flex-col glass rounded-3xl overflow-hidden shadow-2xl sidebar-transition z-20">
       <div class="p-6 h-full flex flex-col overflow-y-auto no-scrollbar">
         <div class="flex items-center justify-between mb-6 px-3">
-          <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Navigation</h3>
+          <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Workflow</h3>
           <button onclick="toggleLeftSidebar()" class="text-gray-500 hover:text-white transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
@@ -1225,6 +1338,8 @@
           </button>
         </div>
         <div class="space-y-4 flex-grow">
+
+        <!-- Workflow -->
         <a href="#section-step1" class="nav-item active" data-section="section-step1">
           Step 1: Define Goal
         </a>
@@ -1237,18 +1352,29 @@
         <a href="#section-step4" class="nav-item" data-section="section-step4">
           Step 4: Run Demo
         </a>
+
+        <!-- Explore -->
         <div class="px-3 mt-8 mb-4">
-          <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Support</h3>
+          <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Explore</h3>
+        </div>
+        <button onclick="openCatalog()" class="nav-item w-full text-left flex items-center">
+          <svg class="w-3.5 h-3.5 mr-1.5 inline-block text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+          Demo Library
+        </button>
+        <button onclick="openWhatsNew()" class="nav-item w-full text-left flex items-center">
+          <svg class="w-3.5 h-3.5 mr-1.5 inline-block text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          What's New
+        </button>
+
+        <!-- Resources -->
+        <div class="px-3 mt-8 mb-4">
+          <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Resources</h3>
         </div>
         <button onclick="openOnboarding()" class="nav-item w-full text-left flex items-center">
           <svg class="w-3.5 h-3.5 mr-1.5 inline-block text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
           About this toolkit
-        </button>
-        <button onclick="openWhatsNew()" class="nav-item w-full text-left flex items-center">
-          <svg class="w-3.5 h-3.5 mr-1.5 inline-block text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-          What's New
         </button>
         <a href="https://github.com/ryotat7/ge-demo-generator" target="_blank"
           class="nav-item w-full text-left flex items-center">
@@ -1258,6 +1384,7 @@
           </svg>
           GitHub
         </a>
+
 
       </div>
 
@@ -1629,26 +1756,26 @@
           </div>
 
           <!-- Method Selection Cards -->
-          <div id="methodSelection" class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 items-center mb-4">
+          <div id="methodSelection" class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 items-stretch mb-4">
             <!-- Choice A: Template Gallery -->
             <button onclick="selectMethod('template')"
-              class="relative group glass px-6 py-6 sm:py-8 lg:py-10 rounded-3xl border-2 border-sky-500/20 hover:border-sky-500/60 hover:bg-sky-500/10 transition-all text-left overflow-hidden shadow-2xl">
+              class="w-full relative group glass px-5 py-6 sm:py-8 rounded-3xl border-2 border-sky-500/20 hover:border-sky-500/60 hover:bg-sky-500/10 transition-all text-left overflow-hidden shadow-2xl">
               <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-all">
-                <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 24 24">
+                <svg class="w-20 h-20" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <div class="relative z-10 flex flex-col">
+              <div class="relative z-10 flex flex-col h-full">
                 <div
-                  class="w-12 h-12 bg-sky-500/20 rounded-2xl flex items-center justify-center text-sky-400 mb-6 group-hover:scale-110 transition-transform">
-                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  class="w-11 h-11 bg-sky-500/20 rounded-2xl flex items-center justify-center text-sky-400 mb-5 group-hover:scale-110 transition-transform">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
                 </div>
-                <h3 class="text-xl font-bold text-white mb-2">Pick from Gallery</h3>
-                <p class="text-sm text-gray-400 leading-relaxed">Choose from pre-built scenarios across 6 industries. Recommended if you are unsure where to start.</p>
-                <div class="mt-6 w-fit inline-flex items-center gap-2 bg-sky-500/20 text-sky-400 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider group-hover:bg-sky-500 group-hover:text-white transition-all">
+                <h3 class="text-lg font-bold text-white mb-2">Pick from Gallery</h3>
+                <p class="text-[13px] text-gray-400 leading-relaxed flex-1">Choose from pre-built scenarios across 12 industries. Recommended for first-time users.</p>
+                <div class="mt-5 w-fit inline-flex items-center gap-2 bg-sky-500/20 text-sky-400 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider group-hover:bg-sky-500 group-hover:text-white transition-all">
                   <span>Start with Template</span>
                   <svg class="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -1657,25 +1784,52 @@
               </div>
             </button>
 
-            <!-- Choice B: Start from Scratch -->
-            <button onclick="selectMethod('manual')"
-              class="relative group glass px-6 py-6 sm:py-8 lg:py-10 rounded-3xl border-2 border-emerald-500/20 hover:border-emerald-500/60 hover:bg-emerald-500/10 transition-all text-left overflow-hidden shadow-2xl">
+            <!-- Choice B: Demo Library -->
+            <button onclick="openCatalog()"
+              class="w-full relative group glass px-5 py-6 sm:py-8 rounded-3xl border-2 border-amber-500/20 hover:border-amber-500/60 hover:bg-amber-500/10 transition-all text-left overflow-hidden shadow-2xl">
               <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-all">
-                <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 24 24">
+                <svg class="w-20 h-20" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              </div>
+              <div class="relative z-10 flex flex-col h-full">
+                <div
+                  class="w-11 h-11 bg-amber-500/20 rounded-2xl flex items-center justify-center text-amber-400 mb-5 group-hover:scale-110 transition-transform">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                </div>
+                <h3 class="text-lg font-bold text-white mb-2">Demo Library</h3>
+                <p class="text-[13px] text-gray-400 leading-relaxed flex-1">Browse demos built by the community. Load any existing demo as your starting point and customize it.</p>
+                <div class="mt-5 w-fit inline-flex items-center gap-2 bg-amber-500/20 text-amber-400 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider group-hover:bg-amber-500 group-hover:text-white transition-all">
+                  <span>Browse Library</span>
+                  <svg class="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </div>
+              </div>
+            </button>
+
+            <!-- Choice C: Start from Scratch -->
+            <button onclick="selectMethod('manual')"
+              class="w-full relative group glass px-5 py-6 sm:py-8 rounded-3xl border-2 border-emerald-500/20 hover:border-emerald-500/60 hover:bg-emerald-500/10 transition-all text-left overflow-hidden shadow-2xl">
+              <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-all">
+                <svg class="w-20 h-20" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M11 5h2v14h-2V5zm-4 4h2v10H7V9zm8 4h2v6h-2v-6z" />
                 </svg>
               </div>
-              <div class="relative z-10 flex flex-col">
+              <div class="relative z-10 flex flex-col h-full">
                 <div
-                  class="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-400 mb-6 group-hover:scale-110 transition-transform">
-                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  class="w-11 h-11 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-400 mb-5 group-hover:scale-110 transition-transform">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                 </div>
-                <h3 class="text-xl font-bold text-white mb-2">Start from Scratch</h3>
-                <p class="text-sm text-gray-400 leading-relaxed">Describe your customer's unique challenge. Entering customer names or pasting meeting notes generates highly realistic data.</p>
-                <div class="mt-6 w-fit inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                <h3 class="text-lg font-bold text-white mb-2">Start from Scratch</h3>
+                <p class="text-[13px] text-gray-400 leading-relaxed flex-1">Describe your customer's unique challenge. Pasting meeting notes generates highly realistic data.</p>
+                <div class="mt-5 w-fit inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider group-hover:bg-emerald-500 group-hover:text-white transition-all">
                   <span>Manual Input</span>
                   <svg class="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -2085,6 +2239,12 @@
         </section>
 
         <!-- Result Section -->
+        <div id="restoreLoadingPlaceholder" class="hidden glass rounded-3xl p-10 mb-10 flex flex-col items-center justify-center text-center" style="min-height:280px">
+          <div class="w-12 h-12 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin mb-5"></div>
+          <p class="text-base font-bold text-white mb-1">Restoring demo assets...</p>
+          <p class="text-[11px] text-gray-400">Loading data, images, and agent config</p>
+        </div>
+
         <section id="resultSection" class="hidden space-y-10 fade-in mb-10">
 
           <!-- Post-Synthesis Roadmap -->
@@ -2265,7 +2425,7 @@
                 </div>
 
                 <!-- Internal User Tips Accordion -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-black/40 border border-white/10 rounded-3xl p-6 shadow-xl">
+                <div id="deployGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-black/40 border border-white/10 rounded-3xl p-6 shadow-xl">
                   <!-- Project ID Setup -->
                   <div class="space-y-4">
                     <div class="flex items-center gap-3">
@@ -2493,6 +2653,7 @@
 
   <script>
     const GENERATOR_MODEL = '<?= typeof generatorModel !== "undefined" ? generatorModel : "gemini-3.5-flash" ?>';
+    const CURRENT_USER_EMAIL = '<?= typeof userEmail !== "undefined" ? userEmail : "" ?>';
     
     function formatModelName(modelId) {
       if (!modelId) return 'Gemini 3.5 Flash';
@@ -3055,7 +3216,6 @@
     }
 
     // Tab Logic
-
 
 
     // Back from template gallery → always goes to initial two-choice screen
@@ -4060,7 +4220,6 @@
                 console.error('UI Rendering Error:', uiErr);
               }
               
-
             }, 800);
           })
           .withFailureHandler(err => {
@@ -5571,6 +5730,529 @@
         input.value = ''; // Optional: clear if disabled
       }
     }
+
+    // ================================================================
+    // Shared helpers + Demo Library (GAS-safe: no template literals,
+    // no non-ASCII in code, var only)
+    // ================================================================
+
+    function esc(str) {
+      return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function sortByNewest(arr) {
+      return arr.slice().sort(function(a, b) { return new Date(b.timestamp) - new Date(a.timestamp); });
+    }
+
+    function fmtDate(ts) {
+      var d = new Date(ts);
+      return isNaN(d.getTime()) ? 'Unknown Date' : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    function cleanTitle(goal) {
+      if (!goal) return 'Untitled demo';
+      var lines = String(goal).split(String.fromCharCode(10));
+      var first = '';
+      for (var i = 0; i < lines.length; i++) {
+        var t = lines[i].replace(/^\s+|\s+$/g, '');
+        if (t) { first = t; break; }
+      }
+      var HASH = 35, STAR = 42, TICK = 96;
+      var out = '';
+      for (var j = 0; j < first.length; j++) {
+        var code = first.charCodeAt(j);
+        if (code === HASH || code === STAR || code === TICK) continue;
+        out += first.charAt(j);
+      }
+      return out.replace(/^\s+|\s+$/g, '') || 'Untitled demo';
+    }
+
+    function flashCopied(btn) {
+      if (!btn || btn.dataset.flashing === '1') return;
+      btn.dataset.flashing = '1';
+      var original = btn.innerHTML;
+      btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied';
+      btn.classList.add('!text-emerald-400', '!border-emerald-500/30', '!bg-emerald-500/10');
+      setTimeout(function() {
+        btn.innerHTML = original;
+        btn.classList.remove('!text-emerald-400', '!border-emerald-500/30', '!bg-emerald-500/10');
+        btn.dataset.flashing = '0';
+      }, 1500);
+    }
+
+    var CATALOG_ICONS = {
+      industry: {
+        'All': '\u{1F310}', 'Retail': '\u{1F6CD}\ufe0f', 'Finance': '\u{1F4B0}', 'Healthcare': '\u{1F3E5}',
+        'Manufacturing': '\u{1F3ED}', 'Public Sector': '\u{1F3DB}\ufe0f', 'Media & Entertainment': '\u{1F3AC}',
+        'Technology': '\u{1F4BB}', 'Logistics & Supply Chain': '\u{1F69A}', 'Energy & Utilities': '\u26a1',
+        'Telecom': '\u{1F4E1}', 'Education': '\u{1F393}', 'Travel & Hospitality': '\u2708\ufe0f',
+        'Automotive': '\u{1F697}', 'Legal & Professional Services': '\u2696\ufe0f', 'Other': '\u{1F9E9}'
+      },
+      persona: {
+        'All': '\u{1F465}', 'Sales': '\u{1F91D}', 'Marketing': '\u{1F4E3}', 'Operations': '\u2699\ufe0f',
+        'Finance': '\u{1F9EE}', 'Customer Service': '\u{1F3A7}', 'Product': '\u{1F4E6}', 'HR': '\u{1F4BC}',
+        'IT / Engineering': '\u{1F6E0}\ufe0f', 'Executive': '\u{1F454}', 'Supply Chain': '\u{1F517}',
+        'Legal & Compliance': '\u2696\ufe0f', 'R&D / Research': '\u{1F52C}', 'Other': '\u{1F9E9}'
+      },
+      useCase: {
+        'All': '\u{1F5C2}\ufe0f', 'Analytics & Insights': '\u{1F4CA}', 'Process Automation': '\u{1F916}',
+        'Customer Engagement': '\u{1F4AC}', 'Forecasting & Planning': '\u{1F4C8}',
+        'Document Processing': '\u{1F4C4}', 'Knowledge Retrieval': '\u{1F50D}',
+        'Risk & Anomaly Detection': '\u{1F6A8}', 'Optimization': '\u{1F3AF}',
+        'Compliance & Audit': '\u{1F4CB}', 'Other': '\u{1F9E9}'
+      }
+    };
+
+    function catalogIcon(dim, value) {
+      return (CATALOG_ICONS[dim] && CATALOG_ICONS[dim][value]) || '';
+    }
+
+    var BADGE_CLASS = {
+      sky: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+      emerald: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      purple: 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+    };
+
+    function taxonomyBadge(label, color, dim) {
+      if (!label) return '';
+      var icon = catalogIcon(dim, label);
+      return '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider leading-none border ' + BADGE_CLASS[color] + '">' + (icon ? icon + ' ' : '') + esc(label) + '</span>';
+    }
+
+    function taxonomyBadgesRow(item) {
+      var badges = [
+        taxonomyBadge(item.industry, 'sky', 'industry'),
+        taxonomyBadge(item.persona, 'emerald', 'persona'),
+        taxonomyBadge(item.useCase, 'purple', 'useCase')
+      ].filter(Boolean).join('');
+      return badges ? '<div class="flex items-center flex-wrap gap-1.5">' + badges + '</div>' : '';
+    }
+
+    function isCustomerDemo(item) {
+      var vid = String(item.vectorId || '').replace(/^\s+|\s+$/g, '');
+      return vid !== '' && vid !== 'N/A' && vid !== 'n/a';
+    }
+
+    function authorButton(email) {
+      if (!email || !/@/.test(email)) {
+        return '<span class="text-[8px] text-gray-600 font-medium truncate max-w-[110px]">' + esc(email || 'System') + '</span>';
+      }
+      return '<a href="' + url + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="View ' + esc(email) + ' on Moma" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] font-medium text-gray-400 hover:text-sky-400 hover:border-sky-500/30 hover:bg-sky-500/10 transition-all max-w-[150px]"><svg class="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg><span class="truncate">' + esc(email) + '</span></a>';
+    }
+
+    // ---- Demo Library Modal Logic ----
+
+    var TAXONOMY = {
+      industry: ['Retail','Finance','Healthcare','Manufacturing','Public Sector','Media & Entertainment','Technology','Logistics & Supply Chain','Energy & Utilities','Telecom','Education','Travel & Hospitality','Automotive','Legal & Professional Services','Other'],
+      persona: ['Sales','Marketing','Operations','Finance','Customer Service','Product','HR','IT / Engineering','Executive','Supply Chain','Legal & Compliance','R&D / Research','Other'],
+      useCase: ['Analytics & Insights','Process Automation','Customer Engagement','Forecasting & Planning','Document Processing','Knowledge Retrieval','Risk & Anomaly Detection','Optimization','Compliance & Audit','Other']
+    };
+
+    var catalogItems = [];
+    var catalogChipsBuilt = false;
+    var catalogFilter = { industry: 'All', persona: 'All', useCase: 'All' };
+    var catalogToggle = { type: 'all', scope: 'all' };
+
+    function setCatalogToggle(group, value) {
+      catalogToggle[group] = value;
+      var btns = document.querySelectorAll('.catalog-toggle[data-filter="' + group + '"]');
+      for (var i = 0; i < btns.length; i++) {
+        if (btns[i].dataset.value === value) btns[i].classList.add('active');
+        else btns[i].classList.remove('active');
+      }
+      applyCatalogFilter();
+    }
+
+    function openCatalog() {
+      document.getElementById('catalogModal').classList.add('show');
+      if (!catalogChipsBuilt) { buildCatalogChips(); catalogChipsBuilt = true; }
+      renderCatalogSkeleton();
+      google.script.run
+        .withSuccessHandler(function(raw) {
+          catalogItems = typeof raw === 'string' ? JSON.parse(raw) : (raw || []);
+          applyCatalogFilter();
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById('catalogList').innerHTML = '<div class="col-span-full py-10 text-center text-gray-500 text-[11px]">Failed to load library: ' + esc(err.message || err) + '</div>';
+        })
+        .getCatalogDemos();
+    }
+
+    function closeCatalog() {
+      if (catalogDetailOpen) closeCatalogDetail();
+      document.getElementById('catalogModal').classList.remove('show');
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && document.getElementById('catalogModal').classList.contains('show')) {
+        if (catalogDetailOpen) { closeCatalogDetail(); }
+        else { closeCatalog(); }
+      }
+    });
+
+    function buildCatalogChips() {
+      var dims = [['industry','catalogIndustryChips'],['persona','catalogPersonaChips'],['useCase','catalogUseCaseChips']];
+      for (var d = 0; d < dims.length; d++) {
+        var dim = dims[d][0], containerId = dims[d][1];
+        var container = document.getElementById(containerId);
+        container.innerHTML = '';
+        var values = ['All'].concat(TAXONOMY[dim]);
+        for (var v = 0; v < values.length; v++) {
+          var btn = document.createElement('button');
+          btn.className = 'catalog-chip' + (values[v] === 'All' ? ' active' : '');
+          var icon = catalogIcon(dim, values[v]);
+          btn.innerText = (icon ? icon + ' ' : '') + values[v];
+          btn.dataset.dim = dim;
+          btn.dataset.value = values[v];
+          btn.onclick = (function(dd, vv) { return function() { setCatalogFacet(dd, vv); }; })(dim, values[v]);
+          container.appendChild(btn);
+        }
+      }
+    }
+
+    function setCatalogFacet(dim, value) {
+      catalogFilter[dim] = value;
+      var chips = document.querySelectorAll('.catalog-chip[data-dim="' + dim + '"]');
+      for (var c = 0; c < chips.length; c++) {
+        if (chips[c].dataset.value === value) chips[c].classList.add('active');
+        else chips[c].classList.remove('active');
+      }
+      applyCatalogFilter();
+    }
+
+    function passesToggleFilter(item) {
+      if (catalogToggle.type === 'customer' && !isCustomerDemo(item)) return false;
+      if (catalogToggle.type === 'personal' && isCustomerDemo(item)) return false;
+      var email = CURRENT_USER_EMAIL.toLowerCase();
+      if (catalogToggle.scope === 'mine' && (item.userEmail || '').toLowerCase() !== email) return false;
+      if (catalogToggle.scope === 'community' && (item.userEmail || '').toLowerCase() === email) return false;
+      return true;
+    }
+
+    function applyCatalogFilter() {
+      var input = document.getElementById('catalogSearchInput');
+      var query = (input ? input.value : '').replace(/^\s+|\s+$/g, '').toLowerCase();
+      var filtered = [];
+      for (var i = 0; i < catalogItems.length; i++) {
+        var item = catalogItems[i];
+        if (!passesToggleFilter(item)) continue;
+        if (catalogFilter.industry !== 'All' && item.industry !== catalogFilter.industry) continue;
+        if (catalogFilter.persona !== 'All' && item.persona !== catalogFilter.persona) continue;
+        if (catalogFilter.useCase !== 'All' && item.useCase !== catalogFilter.useCase) continue;
+        if (query) {
+          var hay = ((item.userGoal || '') + ' ' + (item.aiSummary || '') + ' ' + (item.datasetId || '') + ' ' + (item.userEmail || '')).toLowerCase();
+          if (hay.indexOf(query) === -1) continue;
+        }
+        filtered.push(item);
+      }
+      renderCatalogCards(filtered);
+      updateChipAvailability();
+    }
+
+    function updateChipAvailability() {
+      var input = document.getElementById('catalogSearchInput');
+      var query = (input ? input.value : '').replace(/^\s+|\s+$/g, '').toLowerCase();
+      var dims = ['industry', 'persona', 'useCase'];
+      for (var di = 0; di < dims.length; di++) {
+        var dim = dims[di];
+        var present = {};
+        for (var i = 0; i < catalogItems.length; i++) {
+          var item = catalogItems[i];
+          if (!passesToggleFilter(item)) continue;
+          var skip = false;
+          for (var dj = 0; dj < dims.length; dj++) {
+            if (dims[dj] === dim) continue;
+            if (catalogFilter[dims[dj]] !== 'All' && item[dims[dj]] !== catalogFilter[dims[dj]]) { skip = true; break; }
+          }
+          if (skip) continue;
+          if (query) {
+            var hay = ((item.userGoal || '') + ' ' + (item.aiSummary || '') + ' ' + (item.datasetId || '') + ' ' + (item.userEmail || '')).toLowerCase();
+            if (hay.indexOf(query) === -1) continue;
+          }
+          if (item[dim]) present[item[dim]] = true;
+        }
+        var chips = document.querySelectorAll('.catalog-chip[data-dim="' + dim + '"]');
+        for (var c = 0; c < chips.length; c++) {
+          var v = chips[c].dataset.value;
+          var keep = v === 'All' || v === catalogFilter[dim] || present[v];
+          if (keep) chips[c].classList.remove('unavailable');
+          else chips[c].classList.add('unavailable');
+        }
+      }
+    }
+
+    function renderCatalogSkeleton() {
+      var list = document.getElementById('catalogList');
+      list.innerHTML = '<div class="col-span-full flex flex-col items-center justify-center gap-3 py-16"><div class="w-10 h-10 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div><p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Loading demos...</p></div>';
+      document.getElementById('catalogCount').textContent = '';
+    }
+
+    function renderCatalogCards(items) {
+      var list = document.getElementById('catalogList');
+      document.getElementById('catalogCount').textContent = items.length + ' demo' + (items.length === 1 ? '' : 's');
+      if (!items.length) {
+        list.innerHTML = '<div class="col-span-full py-12 text-center text-gray-500 text-[11px]">No demos match these filters.</div>';
+        return;
+      }
+      var sorted = sortByNewest(items);
+      var html = [];
+      for (var i = 0; i < sorted.length; i++) {
+        var item = sorted[i];
+        var dsId = item.datasetId || '';
+        var custBadge = isCustomerDemo(item)
+          ? '<span class="flex-shrink-0 px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider leading-none border bg-amber-500/10 text-amber-400 border-amber-500/20">Customer</span>'
+          : '';
+        html.push(
+          '<div class="demo-card p-4 rounded-xl flex flex-col gap-3 cursor-pointer" onclick="event.stopPropagation();openCatalogDetail(this.dataset.dsid)" data-dsid="' + dsId + '">' +
+            '<div class="flex items-start justify-between gap-2">' +
+              '<h4 class="text-[11px] font-bold text-gray-200 line-clamp-2 leading-tight">' + esc(cleanTitle(item.userGoal)) + '</h4>' +
+              custBadge +
+            '</div>' +
+            taxonomyBadgesRow(item) +
+            '<p class="text-[10px] text-gray-400 leading-relaxed opacity-80 line-clamp-3 flex-1">' + esc(item.aiSummary || 'No summary available.') + '</p>' +
+            '<div class="pt-2 border-t border-white/5 space-y-2">' +
+              '<div class="flex items-center justify-between gap-2">' +
+                authorButton(item.userEmail) +
+                '<span class="text-[8px] text-gray-500 font-mono uppercase whitespace-nowrap">' + fmtDate(item.timestamp) + '</span>' +
+              '</div>' +
+              '<div class="flex items-center gap-2">' +
+                '<button onclick="event.stopPropagation();loadDemoFromCatalog(\'' + dsId + '\')" class="flex-1 px-3 py-1.5 rounded-lg bg-sky-500/10 text-sky-400 text-[10px] font-bold hover:bg-sky-500 hover:text-white transition-all uppercase tracking-widest border border-sky-500/20">Load Demo</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        );
+      }
+      list.innerHTML = html.join('');
+    }
+
+    function loadDemoFromCatalog(datasetId) {
+      closeCatalog();
+      var placeholder = document.getElementById('restoreLoadingPlaceholder');
+      document.getElementById('resultSection').classList.add('hidden');
+      placeholder.classList.remove('hidden');
+      setTimeout(function() { placeholder.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 200);
+
+      google.script.run
+        .withSuccessHandler(function(resRaw) {
+          placeholder.classList.add('hidden');
+          var res = typeof resRaw === 'string' ? JSON.parse(resRaw) : resRaw;
+          if (res && res.success) {
+            showFinalResult(res);
+            document.getElementById('resultSection').classList.remove('hidden');
+            setTimeout(function() { document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' }); }, 100);
+          } else {
+            showToast('Failed to restore: ' + (res ? res.error : 'Unknown error'), 6000);
+          }
+        })
+        .withFailureHandler(function(err) {
+          placeholder.classList.add('hidden');
+          showToast('Server Error: ' + (err.message || err), 6000);
+        })
+    }
+
+    // ---- Demo Library Detail Preview Panel (slide-in drawer) ----
+
+    var catalogDetailOpen = false;
+
+    function openCatalogDetail(datasetId) {
+      var panel = document.getElementById('catalogDetailPanel');
+      var grid = document.getElementById('catalogGridWrapper');
+
+      // Find the already-loaded catalog item (instant data, no server call)
+      var item = null;
+      for (var i = 0; i < catalogItems.length; i++) {
+        if (catalogItems[i].datasetId === datasetId) { item = catalogItems[i]; break; }
+      }
+
+      panel.classList.add('show');
+      panel.scrollTop = 0;
+      grid.classList.add('catalog-grid-dimmed');
+      catalogDetailOpen = true;
+
+      // 1) Render the core instantly from catalog data (userGoal, taxonomy,
+      //    author, summary, MCP) -- no waiting on Drive.
+      renderCatalogDetailCore(item || { datasetId: datasetId });
+
+      // 2) Lazy-load the heavy details (tables + demo prompts) from the Drive
+      //    backup via restoreDemo, into the placeholder section.
+      google.script.run
+        .withSuccessHandler(function(resRaw) {
+          var res = typeof resRaw === 'string' ? JSON.parse(resRaw) : resRaw;
+          // Ignore if the user already closed or switched panels
+          if (!catalogDetailOpen) return;
+          var extra = document.getElementById('catalogDetailExtra');
+          if (!extra) return;
+          if (res && res.success) {
+            renderCatalogDetailExtra(res);
+          } else {
+            extra.innerHTML = '<p class="text-[9px] text-gray-600 italic">Detailed data unavailable.</p>';
+          }
+        })
+        .withFailureHandler(function() {
+          var extra = document.getElementById('catalogDetailExtra');
+          if (extra) extra.innerHTML = '<p class="text-[9px] text-gray-600 italic">Detailed data unavailable.</p>';
+        })
+    }
+
+    function closeCatalogDetail() {
+      var panel = document.getElementById('catalogDetailPanel');
+      var grid = document.getElementById('catalogGridWrapper');
+      panel.classList.remove('show');
+      grid.classList.remove('catalog-grid-dimmed');
+      catalogDetailOpen = false;
+    }
+
+    // Instant render from the catalog list item (no server round-trip).
+    function renderCatalogDetailCore(item) {
+      var content = document.getElementById('catalogDetailContent');
+      var dsId = item.datasetId || '';
+      var parts = [];
+
+      // Header with close button
+      parts.push(
+        '<div class="flex items-center justify-between mb-4">' +
+          '<h3 class="text-sm font-bold text-white uppercase tracking-wider">Demo Details</h3>' +
+          '<button onclick="closeCatalogDetail()" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all">' +
+            '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' +
+          '</button>' +
+        '</div>'
+      );
+
+      // Title
+      parts.push('<h2 class="text-base font-bold text-gray-100 mb-2 leading-tight">' + esc(cleanTitle(item.userGoal)) + '</h2>');
+
+      // Demo ID (subtle badge)
+      if (dsId) {
+        parts.push('<div class="mb-3"><span class="inline-flex items-center px-1.5 py-0.5 rounded bg-white/5 text-[8px] text-gray-500 font-mono leading-none border border-white/5">' + esc(String(dsId).replace(/^demo_/, '')) + '</span></div>');
+      }
+
+      // Customer Demo + Opportunity badge
+      if (isCustomerDemo(item)) {
+        parts.push(
+          '<div class="flex items-center gap-2 mb-3">' +
+            '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider leading-none border bg-amber-500/10 text-amber-400 border-amber-500/20">Customer Demo</span>' +
+            '<a href="' + oppUrl + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider leading-none border bg-violet-500/10 text-violet-400 border-violet-500/20 hover:bg-violet-500/20 transition-all">' +
+              '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>' +
+              'Open Opportunity' +
+            '</a>' +
+          '</div>'
+        );
+      }
+
+      // Taxonomy
+      var badges = taxonomyBadgesRow(item);
+      if (badges) parts.push('<div class="mb-3">' + badges + '</div>');
+
+      // Author + date
+      parts.push(
+        '<div class="flex items-center justify-between gap-3 mb-4">' +
+          authorButton(item.userEmail || '') +
+          '<span class="text-[8px] text-gray-500 font-mono uppercase whitespace-nowrap">' + fmtDate(item.timestamp) + '</span>' +
+        '</div>'
+      );
+
+      // Full userGoal (Markdown rendered) -- available instantly from catalog data
+      if (item.userGoal) {
+        parts.push(
+          '<div class="mb-4">' +
+            '<p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">Business Scenario</p>' +
+            '<div class="bg-black/30 border border-white/5 rounded-xl p-4 text-[11px] text-gray-300 leading-relaxed max-h-[300px] overflow-y-auto no-scrollbar">' +
+              simpleMarkdownToHtml(item.userGoal) +
+            '</div>' +
+          '</div>'
+        );
+      }
+
+      // MCP servers (instant from catalog data)
+      if (item.mcpServers && item.mcpServers !== 'None') {
+        parts.push(
+          '<div class="mb-4">' +
+            '<p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">External Data (MCP)</p>' +
+            '<p class="text-[10px] text-gray-400">' + esc(item.mcpServers) + '</p>' +
+          '</div>'
+        );
+      }
+
+      // Placeholder for lazy-loaded heavy details (tables + demo prompts)
+      parts.push(
+        '<div id="catalogDetailExtra" class="mb-4">' +
+          '<div class="flex items-center gap-2 text-[9px] text-gray-500 py-2">' +
+            '<div class="w-3.5 h-3.5 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>' +
+            'Loading tables and prompts...' +
+          '</div>' +
+        '</div>'
+      );
+
+      // Action buttons (instant -- only need datasetId)
+      parts.push(
+        '<div class="flex items-center gap-2 pt-4 border-t border-white/5">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>' +
+            'Share' +
+          '</button>' +
+          '<button onclick="loadDemoFromCatalog(\'' + dsId + '\')" class="flex-1 px-3 py-2 rounded-lg bg-sky-500/10 text-sky-400 text-[10px] font-bold hover:bg-sky-500 hover:text-white transition-all uppercase tracking-widest border border-sky-500/20">' +
+            'Load Demo' +
+          '</button>' +
+        '</div>'
+      );
+
+      content.innerHTML = parts.join('');
+    }
+
+    // Fill the lazy-loaded section with tables + demo prompts from restoreDemo.
+    function renderCatalogDetailExtra(res) {
+      var extra = document.getElementById('catalogDetailExtra');
+      if (!extra) return;
+      var parts = [];
+
+      // Data tables
+      if (res.dataPreview && res.dataPreview.length > 0) {
+        var tableRows = '';
+        for (var i = 0; i < res.dataPreview.length; i++) {
+          var t = res.dataPreview[i];
+          var rowCount = t.totalRows || (t.rows ? t.rows.length : 0);
+          tableRows +=
+            '<div class="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">' +
+              '<span class="text-[10px] text-sky-400 font-mono font-bold">' + esc(t.tableName) + '</span>' +
+              '<span class="text-[9px] text-gray-500">' + rowCount + ' rows</span>' +
+            '</div>';
+        }
+        parts.push(
+          '<div class="mb-4">' +
+            '<p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">Data Tables (' + res.dataPreview.length + ')</p>' +
+            '<div class="bg-black/30 border border-white/5 rounded-xl p-3">' + tableRows + '</div>' +
+          '</div>'
+        );
+      }
+
+      // Demo guide prompts (all of them, scrollable)
+      if (res.demoGuide && res.demoGuide.length > 0) {
+        var promptsHtml = '';
+        for (var j = 0; j < res.demoGuide.length; j++) {
+          var step = res.demoGuide[j];
+          var title = step.title || ('Scenario ' + (j + 1));
+          var prompt = typeof step === 'object' ? step.prompt : step;
+          promptsHtml +=
+            '<div class="py-2 border-b border-white/5 last:border-0">' +
+              '<div class="flex items-start gap-2 mb-1">' +
+                '<span class="flex-shrink-0 text-[9px] font-bold text-emerald-400 bg-emerald-500/10 w-4 h-4 rounded flex items-center justify-center leading-none">' + (j + 1) + '</span>' +
+                '<p class="text-[9px] font-bold text-emerald-400 leading-tight">' + esc(title) + '</p>' +
+              '</div>' +
+              '<p class="text-[10px] text-gray-400 leading-relaxed whitespace-pre-wrap break-words">' + esc(prompt) + '</p>' +
+            '</div>';
+        }
+        parts.push(
+          '<div>' +
+            '<p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">Demo Guide (' + res.demoGuide.length + ' prompts)</p>' +
+            '<div class="bg-black/30 border border-white/5 rounded-xl p-3 max-h-[320px] overflow-y-auto no-scrollbar">' + promptsHtml + '</div>' +
+          '</div>'
+        );
+      }
+
+      extra.innerHTML = parts.length ? parts.join('') : '<p class="text-[9px] text-gray-600 italic">No additional details.</p>';
+    }
+
   </script>
 
   <div id="onboardingModal" onclick="closeOnboarding()">
@@ -5649,6 +6331,72 @@
         class="w-full bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-sky-500/20 active:scale-[0.98] text-[11px] uppercase tracking-wider">
         Start Building Demo
       </button>
+    </div>
+  </div>
+
+  <!-- Demo Library Modal -->
+  <div id="catalogModal" onclick="closeCatalog()">
+    <div class="glass w-full max-w-5xl rounded-3xl border border-white/10 shadow-2xl flex flex-col max-h-[88vh] relative overflow-hidden" onclick="if(catalogDetailOpen){closeCatalogDetail();}event.stopPropagation();">
+      <div class="flex items-start justify-between gap-4 p-6 pb-4 border-b border-white/5">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+            Demo Library
+          </h2>
+          <p class="text-gray-400 text-xs mt-1">Browse demos by industry, persona, and use case. Load any demo as a starting template.</p>
+        </div>
+        <button onclick="closeCatalog()" class="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all flex-shrink-0" title="Close">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="px-6 py-4 space-y-3 border-b border-white/5">
+        <div class="flex items-center gap-6">
+          <div>
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Type</p>
+            <div class="catalog-toggle-group">
+              <button class="catalog-toggle active" data-filter="type" data-value="all" onclick="setCatalogToggle('type','all')">All</button>
+              <button class="catalog-toggle" data-filter="type" data-value="customer" onclick="setCatalogToggle('type','customer')">Customer Demo</button>
+              <button class="catalog-toggle" data-filter="type" data-value="personal" onclick="setCatalogToggle('type','personal')">Personal Learning</button>
+            </div>
+          </div>
+          <div>
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Scope</p>
+            <div class="catalog-toggle-group">
+              <button class="catalog-toggle active" data-filter="scope" data-value="all" onclick="setCatalogToggle('scope','all')">All</button>
+              <button class="catalog-toggle" data-filter="scope" data-value="mine" onclick="setCatalogToggle('scope','mine')">My Demos</button>
+              <button class="catalog-toggle" data-filter="scope" data-value="community" onclick="setCatalogToggle('scope','community')">Community</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">Industry</p>
+          <div id="catalogIndustryChips" class="flex flex-wrap gap-1.5"></div>
+        </div>
+        <div>
+          <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">Persona</p>
+          <div id="catalogPersonaChips" class="flex flex-wrap gap-1.5"></div>
+        </div>
+        <div>
+          <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-2">Use Case</p>
+          <div id="catalogUseCaseChips" class="flex flex-wrap gap-1.5"></div>
+        </div>
+        <div class="flex items-center gap-3 pt-1">
+          <div class="relative flex-1">
+            <svg class="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <input id="catalogSearchInput" type="text" oninput="applyCatalogFilter()" placeholder="Search demos..." class="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-[11px] text-gray-200 placeholder-gray-500 focus:outline-none focus:border-sky-500/50">
+          </div>
+          <span id="catalogCount" class="text-[10px] text-gray-500 font-medium whitespace-nowrap" style="font-variant-numeric:tabular-nums"></span>
+        </div>
+      </div>
+      <div class="p-6 overflow-y-auto no-scrollbar flex-1" id="catalogGridWrapper">
+        <div id="catalogList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      </div>
+
+      <!-- Detail preview drawer (slides in from right) -->
+      <div id="catalogDetailPanel" class="no-scrollbar" onclick="event.stopPropagation()">
+        <div id="catalogDetailContent" class="p-6"></div>
+      </div>
+
     </div>
   </div>
 
@@ -5733,7 +6481,7 @@
           <span class="feature-badge">🚀 Major Update</span>
         </div>
         <h2 class="text-xl font-bold text-white mb-1">What's New</h2>
-        <p class="text-gray-400 text-xs">4 powerful capabilities to elevate your demos</p>
+        <p class="text-gray-400 text-xs">3 powerful capabilities to elevate your demos</p>
       </div>
 
       <!-- Scrollable Content Wrapper -->
@@ -5749,8 +6497,8 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h4 class="text-sm font-bold text-white mb-0.5">Agentic Workflow</h4>
-            <p class="text-[11px] text-gray-200 leading-relaxed">Instantly generate highly tailored <span class="font-bold text-amber-400">agentic workflows</span> using unstructured documents (images/PDFs). The synthesized demo lets your agent read fuzzy documents, self-correct ambiguities against BigQuery master tables, and present smart A2UI dropdown recommendations for direct approval. <span class="text-amber-400/80">Win your customer pitches by demonstrating advanced Human-in-the-loop autonomous operations in minutes. Just describe your scenario — the generator builds the data, custom business documents, DB tables, and agent instructions instantly with zero coding.</span></p>
+            <h4 class="text-sm font-bold text-white mb-0.5">Agentic Workflow with Interactive A2UI</h4>
+            <p class="text-[11px] text-gray-200 leading-relaxed">Instantly generate highly tailored <span class="font-bold text-amber-400">agentic workflows</span> that seamlessly integrate autonomous execution with rich, interactive user interfaces (A2UI). Your agent can now process unstructured documents, auto-correct data against enterprise databases, and present dynamic UI components (cards, forms, approval flows) for real-time human-in-the-loop decisions. <span class="text-amber-400/80">Accelerate sales cycles and spark immediate "I want this" moments by showcasing complete, visually compelling business operations built instantly with zero coding.</span></p>
           </div>
         </div>
         <!-- Agentic Workflow Inline Dynamic SVG Animation (ULTRA ENLARGED VERTICAL STACK - width 100% to fill 672px modal) -->
@@ -5981,44 +6729,31 @@
         </div>
       </div>
 
-      <!-- Feature 2: A2UI -->
+      <!-- Feature 2: Gemini 3.1 Flash Lite Support -->
       <div class="feature-card mb-3">
         <div class="flex gap-3">
-          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-fuchsia-500/15 to-violet-500/15 flex items-center justify-center text-fuchsia-400 border border-fuchsia-500/20">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/15 to-teal-500/15 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h4 class="text-sm font-bold text-white mb-0.5">A2UI Interactive Demos</h4>
-            <p class="text-[11px] text-gray-400 leading-relaxed">Bring demos to life with rich UI components — cards, forms, approval flows & more. <span class="text-fuchsia-400/80">Accelerate customer decisions and spark immediate "I want this" moments.</span></p>
+            <h4 class="text-sm font-bold text-white mb-0.5">Gemini 3.1 Flash Lite Support</h4>
+            <p class="text-[11px] text-gray-200 leading-relaxed">Easily select the highly efficient <span class="font-bold text-emerald-400">Gemini 3.1 Flash Lite</span> model as your root agent directly within the interactive setup script. <span class="text-emerald-400/80">Dramatically reduce latency in your demo environments, allowing you to deliver lightning-fast and highly responsive client presentations.</span></p>
           </div>
         </div>
       </div>
 
       <!-- Feature 3: Custom MCP Server Import -->
-      <div class="feature-card mb-3">
+      <div class="feature-card mb-1">
         <div class="flex gap-3">
           <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/15 to-cyan-500/15 flex items-center justify-center text-sky-400 border border-sky-500/20">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
           </div>
           <div class="flex-1 min-w-0">
             <h4 class="text-sm font-bold text-white mb-0.5">Custom MCP Server Import</h4>
-            <p class="text-[11px] text-gray-400 leading-relaxed">Just paste a GitHub URL to auto-analyze & integrate any MCP server. <span class="text-sky-400/80">Instantly connect to customer-specific data sources for compelling, tailored demos.</span></p>
+            <p class="text-[11px] text-gray-200 leading-relaxed">Simply paste a GitHub URL to automatically analyze and integrate any <span class="font-bold text-sky-400">Model Context Protocol (MCP)</span> server into your demo. <span class="text-sky-400/80">Instantly connect your demo agent to live, customer-specific data sources and tools, allowing you to build hyper-personalized scenarios that address exact customer pain points on the fly.</span></p>
           </div>
         </div>
       </div>
-
-      <!-- Feature 4: Autonomous Workflow Operator -->
-      <div class="feature-card mb-1">
-        <div class="flex gap-3">
-          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/15 flex items-center justify-center text-amber-400 border border-amber-500/20">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <h4 class="text-sm font-bold text-white mb-0.5">Autonomous Workflow Operator</h4>
-            <p class="text-[11px] text-gray-400 leading-relaxed">Multi-step dependent workflows with automatic pipeline execution — scan, classify, process & audit. <span class="text-amber-400/80">The agent proactively proposes and executes operational tasks on behalf of users.</span></p>
-          </div>
-        </div>
-      </div> <!-- Closes Feature 4 feature-card -->
       </div> <!-- Closes modal-scrollable-inner -->
           <!-- Spacer to allow scrolling past the bottom fade -->
           <div class="h-6 flex-shrink-0"></div>
@@ -6043,7 +6778,7 @@
   </div>
 
   <script>
-    const FEATURE_NOTIFY_KEY = 'feature_v3_whats_new_dismissed';
+    const FEATURE_NOTIFY_KEY = 'feature_v4_whats_new_dismissed';
 
     function maybeShowFeatureNotify() {
       if (localStorage.getItem(FEATURE_NOTIFY_KEY)) return;
@@ -6200,7 +6935,7 @@
 
         // Cards container
         const cards = document.createElement('div');
-        cards.className = 'grid grid-cols-1 md:grid-cols-2 gap-3';
+        cards.className = 'mcp-catalog-cards-grid';
         
         filtered.forEach(server => {
           staggerIdx++;
@@ -6848,7 +7583,6 @@
         copyToClipboard(url);
       });
     }
-
 
   </script>
 

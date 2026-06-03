@@ -69,8 +69,46 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v10.40-public',
+  APP_VERSION: 'v10.44-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
+};
+
+
+// ===========================================
+// Demo Taxonomy (controlled vocabulary)
+// ===========================================
+
+/**
+ * Controlled vocabulary used to classify every generated demo so the
+ * catalog can be faceted by industry / persona / use case.
+ *
+ * Values are ALWAYS recorded in English regardless of the user's input
+ * language: a userGoal written in Japanese (or any language) still maps
+ * to the English enum values below. `Other` is the hybrid fallback — when
+ * none of the enum members fit, the closest free-form English label is
+ * stored separately (in the Drive backup JSON only) as a candidate for
+ * future promotion into these enums.
+ *
+ * NOTE: This list is mirrored in index.html (TAXONOMY) for the catalog
+ * facet chips. Keep the two in sync when editing.
+ */
+const TAXONOMY = {
+  industry: [
+    'Retail', 'Finance', 'Healthcare', 'Manufacturing', 'Public Sector',
+    'Media & Entertainment', 'Technology', 'Logistics & Supply Chain',
+    'Energy & Utilities', 'Telecom', 'Education', 'Travel & Hospitality',
+    'Automotive', 'Legal & Professional Services', 'Other'
+  ],
+  persona: [
+    'Sales', 'Marketing', 'Operations', 'Finance', 'Customer Service',
+    'Product', 'HR', 'IT / Engineering', 'Executive', 'Supply Chain',
+    'Legal & Compliance', 'R&D / Research', 'Other'
+  ],
+  useCase: [
+    'Analytics & Insights', 'Process Automation', 'Customer Engagement',
+    'Forecasting & Planning', 'Document Processing', 'Knowledge Retrieval',
+    'Risk & Anomaly Detection', 'Optimization', 'Compliance & Audit', 'Other'
+  ]
 };
 
 
@@ -133,6 +171,10 @@ function ensureLogSheetHeaders(sheet) {
     'MCP Servers', 'Generation Time (s)'
   ];
   sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+  // Catalog taxonomy headers in N/O/P (columns 14-16). Columns J-M are left
+  // untouched on purpose: J holds the location, and
+  // K-M are reserved as a buffer.
+  sheet.getRange(1, 14, 1, 3).setValues([['Industry', 'Persona', 'Use Case']]);
 }
 
 /**
@@ -156,7 +198,17 @@ function logUsageToSheet(data) {
       data.mcpServers || 'None',
       data.generationTimeSec || 'N/A'
     ]);
-    
+
+    // Write catalog taxonomy into N/O/P (columns 14-16) on the row we just
+    // appended. Done as a separate write (not part of appendRow) so we never
+    // overwrite the location formula in column J or the J-M buffer.
+    const appendedRow = sheet.getLastRow();
+    sheet.getRange(appendedRow, 14, 1, 3).setValues([[
+      data.industry || 'Other',
+      data.persona || 'Other',
+      data.useCase || 'Other'
+    ]]);
+
     // Auto-wrap the AI Summary column (D) for better readability
     sheet.getRange('D2:D').setWrap(true);
     SpreadsheetApp.flush();
@@ -275,6 +327,104 @@ function initializeProject(projectId, logSheetUrl) {
   return 'Initialization complete. Properties set/merged: ' + Object.keys(newProps).join(', ');
 }
 
+
+
+/**
+ * Backfills catalog taxonomy (N/O/P) for existing Usage_Logs rows that
+ * predate taxonomy. Run MANUALLY from the Apps Script editor; processes up
+ * to BACKFILL_BATCH rows per invocation to stay under the 6-minute limit.
+ * Re-run until "remaining" reaches 0. Idempotent: rows that already have any
+ * taxonomy value are skipped.
+ */
+function backfillTaxonomy() {
+  const BACKFILL_BATCH = 150;
+  const ss = SpreadsheetApp.openByUrl(CONFIG.LOG_SHEET_URL);
+  const sheet = ss.getSheetByName('Usage_Logs');
+  if (!sheet) { console.error('[BACKFILL] Usage_Logs sheet not found'); return; }
+
+  ensureLogSheetHeaders(sheet);
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) { console.log('[BACKFILL] No data rows.'); return; }
+
+  // Read all data rows once: columns A-P (1-16) give us goal/summary plus the
+  // current N/O/P taxonomy values.
+  const data = sheet.getRange(2, 1, lastRow - 1, 16).getValues();
+
+  let processed = 0;
+  let remaining = 0;
+  const otherCounts = { industry: 0, persona: 0, useCase: 0 };
+  const otherLabels = [];
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0] || !row[1]) continue; // skip empty spreadsheet rows
+
+    const alreadyClassified = String(row[13] || '').trim() ||
+      String(row[14] || '').trim() || String(row[15] || '').trim();
+    if (alreadyClassified) continue; // idempotent
+
+    if (processed >= BACKFILL_BATCH) { remaining++; continue; }
+
+    const rowNumber = i + 2; // +1 for header, +1 for 1-based rows
+    // userGoal = column E (index 4), aiSummary = column F (index 5).
+    const tax = classifyDemoTaxonomy_(row[4], row[5]);
+    sheet.getRange(rowNumber, 14, 1, 3).setValues([[tax.industry, tax.persona, tax.useCase]]);
+
+    if (tax.industry === 'Other') { otherCounts.industry++; if (tax.industryOther) otherLabels.push('industry:' + tax.industryOther); }
+    if (tax.persona === 'Other') { otherCounts.persona++; if (tax.personaOther) otherLabels.push('persona:' + tax.personaOther); }
+    if (tax.useCase === 'Other') { otherCounts.useCase++; if (tax.useCaseOther) otherLabels.push('useCase:' + tax.useCaseOther); }
+    processed++;
+  }
+
+  SpreadsheetApp.flush();
+  console.log('[BACKFILL] Processed ' + processed + ' row(s) this run. Remaining unclassified: ' + remaining);
+  console.log('[BACKFILL] Other counts -> industry: ' + otherCounts.industry + ', persona: ' + otherCounts.persona + ', useCase: ' + otherCounts.useCase);
+  if (otherLabels.length) console.log('[BACKFILL] Other free-form label candidates (review for enum promotion): ' + otherLabels.join(' | '));
+
+  if (remaining > 0) {
+    console.log('[BACKFILL] ' + remaining + ' rows left. Will auto-continue if trigger is active.');
+  } else {
+    console.log('[BACKFILL] All rows classified! Removing auto-trigger if present.');
+    stopBackfillAuto_();
+  }
+}
+
+/**
+ * Starts an automatic backfill loop using a time-based trigger.
+ * Runs backfillTaxonomy() every 5 minutes until all rows are classified,
+ * then auto-deletes the trigger. Run this once from the editor.
+ */
+function startBackfillAuto() {
+  stopBackfillAuto_();
+  ScriptApp.newTrigger('backfillTaxonomy')
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+  console.log('[BACKFILL-AUTO] Trigger created. backfillTaxonomy will run every 5 minutes until complete.');
+  backfillTaxonomy();
+}
+
+/**
+ * Manually stop the automatic backfill loop. Run from the editor to cancel.
+ */
+function stopBackfillAuto() {
+  stopBackfillAuto_();
+}
+
+/**
+ * Removes any existing backfillTaxonomy triggers. Called automatically
+ * when backfill completes, or manually to stop early.
+ */
+function stopBackfillAuto_() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'backfillTaxonomy') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      console.log('[BACKFILL-AUTO] Removed existing trigger.');
+    }
+  }
+}
 
 /**
  * Returns a Data Profile configuration that holistically controls
@@ -401,6 +551,9 @@ function generateDemo(userGoal, options = {}) {
     result.appliedFactors = planResult.appliedFactors || {};
     result.agentShortName = planResult.agentShortName || '';
     result.oneSentenceSummary = planResult.oneSentenceSummary || '';
+    result.firestore = planResult.firestore || null;
+    result.importedMcpList = options.importedMcpList || null;
+    result.metadata = planResult.metadata || null;
 
     result.setupScript = generateSetupScript({
       datasetId: datasetId,
@@ -421,7 +574,20 @@ function generateDemo(userGoal, options = {}) {
     result.steps.push({ step: 4, status: 'completed', message: 'Generation complete' });
     
     result.success = true;
-    
+
+    // Classify the demo into the catalog taxonomy (always English output,
+    // even when userGoal was written in another language). Best-effort: a
+    // failure here defaults to 'Other' and never blocks generation.
+    const taxonomy = classifyDemoTaxonomy_(userGoal, planResult.oneSentenceSummary, planResult.businessInstruction);
+    result.industry = taxonomy.industry;
+    result.persona = taxonomy.persona;
+    result.useCase = taxonomy.useCase;
+    // Free-form English labels (only set when the value is 'Other') — persisted
+    // in the Drive backup JSON only, as candidates for future enum promotion.
+    result.industryOther = taxonomy.industryOther;
+    result.personaOther = taxonomy.personaOther;
+    result.useCaseOther = taxonomy.useCaseOther;
+
     // Unified Save Object
     const historyEntry = {
       timestamp: new Date().toISOString(),
@@ -437,6 +603,9 @@ function generateDemo(userGoal, options = {}) {
         return names.length > 0 ? names.join(', ') : 'None';
       })(),
       generationTimeSec: ((Date.now() - startTime) / 1000).toFixed(1),
+      industry: taxonomy.industry,
+      persona: taxonomy.persona,
+      useCase: taxonomy.useCase,
     };
 
     try {
@@ -12517,6 +12686,162 @@ function executeWithRetry(fn) {
     try { return fn(); } catch (error) { lastError = error; Utilities.sleep(CONFIG.RETRY_DELAY_MS * attempt); }
   }
   throw lastError;
+}
+
+
+// ===========================================
+// Demo Taxonomy Classification
+// ===========================================
+
+/**
+ * Classifies a demo into the controlled TAXONOMY (industry / persona / useCase).
+ *
+ * Single source of truth for classification — used both by generateDemo
+ * (at creation time) and by backfillTaxonomy (for existing rows).
+ *
+ * Guarantees:
+ *  - Output is ALWAYS English, regardless of the input language. A Japanese
+ *    userGoal still yields English enum values (and an English free-form
+ *    label when the result is 'Other').
+ *  - 'Other' is minimized: any field that comes back 'Other' on the first
+ *    pass is re-classified with a forced-choice prompt that removes 'Other'
+ *    from the allowed values, so 'Other' only survives when nothing fits
+ *    even under forced choice.
+ *
+ * @param {string} userGoal - The business goal (any language).
+ * @param {string} aiSummary - One-sentence summary of the demo (any language).
+ * @param {string} [businessInstruction] - Extra context to improve accuracy.
+ * @returns {{industry:string, persona:string, useCase:string,
+ *            industryOther:string, personaOther:string, useCaseOther:string}}
+ */
+function classifyDemoTaxonomy_(userGoal, aiSummary, businessInstruction) {
+  const fallback = {
+    industry: 'Other', persona: 'Other', useCase: 'Other',
+    industryOther: '', personaOther: '', useCaseOther: ''
+  };
+
+  try {
+    // Pass 1: full enums (Other allowed).
+    const first = callTaxonomyModel_(userGoal, aiSummary, businessInstruction, {
+      industry: TAXONOMY.industry,
+      persona: TAXONOMY.persona,
+      useCase: TAXONOMY.useCase
+    });
+
+    // Pass 2 (forced choice): re-run only the fields that landed on 'Other',
+    // this time with 'Other' removed from the allowed values.
+    const forceAllowed = {};
+    ['industry', 'persona', 'useCase'].forEach(function (k) {
+      if (first[k] === 'Other') {
+        forceAllowed[k] = TAXONOMY[k].filter(function (v) { return v !== 'Other'; });
+      }
+    });
+
+    if (Object.keys(forceAllowed).length > 0) {
+      const forced = callTaxonomyModel_(userGoal, aiSummary, businessInstruction, forceAllowed);
+      Object.keys(forceAllowed).forEach(function (k) {
+        if (forced[k] && forced[k] !== 'Other') first[k] = forced[k];
+      });
+    }
+
+    return {
+      industry: first.industry || 'Other',
+      persona: first.persona || 'Other',
+      useCase: first.useCase || 'Other',
+      // Keep the English free-form label only when the value is still 'Other'.
+      industryOther: first.industry === 'Other' ? (first.industryOther || '') : '',
+      personaOther: first.persona === 'Other' ? (first.personaOther || '') : '',
+      useCaseOther: first.useCase === 'Other' ? (first.useCaseOther || '') : ''
+    };
+  } catch (e) {
+    console.warn('[TAXONOMY] Classification failed, defaulting to Other:', e.message);
+    return fallback;
+  }
+}
+
+/**
+ * One structured Gemini call that maps a demo to a set of allowed values.
+ *
+ * @param {string} userGoal
+ * @param {string} aiSummary
+ * @param {string} businessInstruction
+ * @param {Object} allowed - Map of field name -> array of allowed enum values.
+ *                           Only the keys present are requested and returned.
+ * @returns {Object} Parsed JSON keyed by the requested fields (+ *Other when
+ *                   'Other' is among the allowed values for that field).
+ * @private
+ */
+function callTaxonomyModel_(userGoal, aiSummary, businessInstruction, allowed) {
+  const location = CONFIG.LOCATION || 'global';
+  const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
+  const model = 'gemini-3.1-flash-lite';
+  const url = `https://${host}/v1/projects/${CONFIG.PROJECT_ID}/locations/${location}/publishers/google/models/${model}:generateContent`;
+
+  const fields = Object.keys(allowed); // subset of ['industry','persona','useCase']
+  const allowsOther = fields.some(function (k) { return allowed[k].indexOf('Other') !== -1; });
+
+  // English definitions + mapping hints to steer the model toward a real value.
+  const DEFINITIONS = {
+    industry: 'The customer industry/sector the demo targets. Hints: bank/insurance/credit/accounting platform -> Finance; hospital/clinic/pharma -> Healthcare; factory/production line -> Manufacturing; government/municipal/public services -> Public Sector; shipping/warehouse/3PL -> Logistics & Supply Chain; software/SaaS/cloud -> Technology; car/vehicle/dealer/OEM -> Automotive; law firm/legal office/consulting/tax accountant/CPA -> Legal & Professional Services.',
+    persona: 'The primary job function the agent is built for (its end user). Hints: store manager/floor ops/plant ops -> Operations; credit/accounting/treasury -> Finance; support/contact center/helpdesk -> Customer Service; CxO/leadership reporting -> Executive; demand/inventory/procurement -> Supply Chain; lawyer/paralegal/compliance officer/regulatory -> Legal & Compliance; scientist/researcher/lab/R&D engineer -> R&D / Research.',
+    useCase: 'The core capability the agent demonstrates. Hints: dashboards/KPIs/reporting -> Analytics & Insights; automating a multi-step workflow -> Process Automation; chatbots/personalization/outreach -> Customer Engagement; demand or sales forecasting/planning -> Forecasting & Planning; OCR/parsing forms or invoices -> Document Processing; RAG/search over documents -> Knowledge Retrieval; fraud/defect/outlier detection -> Risk & Anomaly Detection; routing/scheduling/allocation -> Optimization; regulatory compliance checking/audit trail/policy enforcement -> Compliance & Audit.'
+  };
+  const LABELS = { industry: 'INDUSTRY', persona: 'PERSONA', useCase: 'USE CASE' };
+
+  const criteria = fields.map(function (k) {
+    return `- ${LABELS[k]}: ${DEFINITIONS[k]}\n  Allowed values (choose EXACTLY one, verbatim): ${allowed[k].join(' | ')}`;
+  }).join('\n');
+
+  const otherRule = allowsOther
+    ? 'Use "Other" ONLY when none of the allowed values reasonably fit — this must be extremely rare. When in doubt, pick the single closest value.'
+    : 'You MUST pick the single closest allowed value. "Other" is NOT permitted.';
+
+  const prompt =
+`You are a precise classifier for a catalog of AI agent demos.
+Classify the demo described below into the requested dimensions.
+
+CRITICAL OUTPUT RULES:
+1. The input may be written in ANY language (e.g. Japanese). Your output values MUST ALWAYS be in ENGLISH.
+2. For each dimension, return one of the allowed values EXACTLY as written.
+3. ${otherRule}
+${allowsOther ? '4. When (and only when) you return "Other" for a dimension, also provide a short English free-form label for it in the matching *Other field (e.g. industryOther). Otherwise leave the *Other field empty.' : ''}
+
+DIMENSIONS:
+${criteria}
+
+DEMO:
+- Goal: ${userGoal || 'N/A'}
+- Summary: ${aiSummary || 'N/A'}
+${businessInstruction ? '- Business context: ' + String(businessInstruction).substring(0, 1500) : ''}`;
+
+  // Build a responseSchema limited to the requested fields.
+  const props = {};
+  fields.forEach(function (k) {
+    props[k] = { type: 'STRING', enum: allowed[k] };
+    if (allowed[k].indexOf('Other') !== -1) props[k + 'Other'] = { type: 'STRING' };
+  });
+
+  const requestBody = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: 'application/json',
+      responseSchema: { type: 'OBJECT', properties: props, required: fields }
+    }
+  };
+
+  return executeWithRetry(function () {
+    const response = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+      payload: JSON.stringify(requestBody),
+      muteHttpExceptions: true
+    });
+    if (response.getResponseCode() !== 200) throw new Error('Taxonomy AI Error: ' + response.getContentText());
+    const text = JSON.parse(response.getContentText()).candidates[0].content.parts[0].text;
+    return JSON.parse(text);
+  });
 }
 
 
