@@ -1265,6 +1265,7 @@
           <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Explore</h3>
         </div>
         <button onclick="openWhatsNew()" class="nav-item w-full text-left flex items-center">
+
           <svg class="w-3.5 h-3.5 mr-1.5 inline-block text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
           What's New
         </button>
@@ -1658,7 +1659,7 @@
           </div>
 
           <!-- Method Selection Cards -->
-          <div id="methodSelection" class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 items-stretch mb-4" style="grid-template-columns: repeat(2, 1fr)">
+          <div id="methodSelection" class="grid grid-cols-1 md:grid-cols-2" style="grid-template-columns: repeat(2, 1fr) gap-4 sm:gap-5 items-stretch mb-4">
             <!-- Choice A: Template Gallery -->
             <button onclick="selectMethod('template')"
               class="w-full relative group glass px-5 py-6 sm:py-8 rounded-3xl border-2 border-sky-500/20 hover:border-sky-500/60 hover:bg-sky-500/10 transition-all text-left overflow-hidden shadow-2xl">
@@ -3092,7 +3093,6 @@
     }
 
     // Tab Logic
-
 
 
     // Back from template gallery → always goes to initial two-choice screen
@@ -5658,6 +5658,511 @@
         btn.dataset.flashing = '0';
       }, 1500);
     }
+
+  </script>
+
+  <div id="onboardingModal" onclick="closeOnboarding()">
+    <div class="glass max-w-xl w-full rounded-3xl p-8 border border-white/10 shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar" onclick="event.stopPropagation()">
+      <div class="text-center mb-6">
+        <div
+          class="w-12 h-12 bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-3 shadow-lg shadow-sky-500/20">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+        </div>
+        <h2 class="text-lg font-bold text-white mb-1">Build Your AI Demo in Minutes</h2>
+        <p class="text-gray-400 text-xs">Create highly tailored, highly contextual Gemini agent demos instantly.</p>
+      </div>
+
+      <div class="space-y-5 mb-7">
+        <!-- 1. Core Value -->
+        <div class="flex gap-3">
+          <div
+            class="flex-shrink-0 w-8 h-8 rounded-xl bg-sky-500/10 flex items-center justify-center text-sm font-bold text-sky-400 border border-sky-500/20">
+            🎯</div>
+          <div>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">Core Value: Highly Tailored Custom Demos</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              Instantly generate <span class="text-sky-400 font-semibold">highly tailored, highly contextual demos</span>. The tool automatically synthesizes realistic sample data (e.g., handwritten FAXes, order forms, and BigQuery master tables) and custom agent instructions specifically matching each customer's unique business and operational challenges.
+            </p>
+          </div>
+        </div>
+
+        <!-- 2. Business Value -->
+        <div class="flex gap-3">
+          <div
+            class="flex-shrink-0 w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-sm font-bold text-emerald-400 border border-emerald-500/20">
+            💎</div>
+          <div>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">Business Value: Win Pitches with A2UI</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              Show, don't tell. Demonstrate the <span class="text-emerald-400 font-semibold">ultimate value of Gemini Enterprise</span> using <span class="text-emerald-400 font-semibold">A2UI (Agent-to-User Interface)</span>: the agent dynamically renders interactive buttons, custom data cards, and editable forms on the fly, providing a highly responsive, state-of-the-art Agentic AI UX for seamless human validation and approval.
+            </p>
+          </div>
+        </div>
+
+        <!-- 3. The Tech Behind the Scene -->
+        <div class="flex gap-3">
+          <div
+            class="flex-shrink-0 w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center text-sm font-bold text-purple-400 border border-purple-500/20">
+            ⚙️</div>
+          <div>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">Behind the Scene: Real Tech Stack</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              This is not a mockup. The generator spins up a fully-functioning cloud environment:
+            </p>
+            <ul class="list-disc list-inside mt-1 text-[10.5px] text-gray-400 space-y-0.5 pl-1">
+              <li><span class="text-gray-300 font-medium">Gemini & ADK:</span> Advanced multi-step reasoning and tool orchestration.</li>
+              <li><span class="text-gray-300 font-medium">Rich MCP Ecosystem:</span> Live connections to BigQuery, Google Maps, and Google Workspace.</li>
+              <li><span class="text-gray-300 font-medium">Interactive Data Viewer:</span> A Flask Web UI to visually track documents and database changes.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 4. Deployment -->
+        <div class="flex gap-3">
+          <div
+            class="flex-shrink-0 w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-sm font-bold text-amber-400 border border-amber-500/20">
+            🚀</div>
+          <div>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">How to Deploy: Automatic Cloud Provisioning</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              This tool generates a local setup script. Simply run it in <span class="text-amber-400 font-semibold">your own Google Cloud Shell</span> to automatically provision all demo resources (Cloud Run, BigQuery, Firestore) directly inside your Google Cloud project. All data remains securely within your own project boundary.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="closeOnboarding()"
+        class="w-full bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-sky-500/20 active:scale-[0.98] text-[11px] uppercase tracking-wider">
+        Start Building Demo
+      </button>
+    </div>
+  </div>
+
+
+
+  <script>
+    function openOnboarding() {
+      document.getElementById('onboardingModal').classList.add('show');
+    }
+
+    function closeOnboarding() {
+      document.getElementById('onboardingModal').classList.remove('show');
+      localStorage.setItem('onboarding_seen', 'true');
+      // Chain: show feature notification after onboarding closes
+      setTimeout(() => maybeShowFeatureNotify(), 400);
+    }
+  </script>
+
+  <!-- Universal Document Preview Modal (PDF / Excel / Image 統合プレビューワー) -->
+  <div id="docPreviewModal" class="fixed inset-0 z-50 hidden items-center justify-center p-6 bg-black/85 backdrop-blur-sm transition-all duration-300 opacity-0" onclick="closeDocModal()">
+    <!-- Modal Card: Responsive max-w-5xl wide canvas for documents -->
+    <div class="relative max-w-5xl w-full h-[85vh] flex flex-col rounded-2xl overflow-hidden border border-white/10 bg-slate-950/95 shadow-2xl cursor-default" onclick="event.stopPropagation()">
+      <!-- Header -->
+      <div class="w-full p-4 flex items-center justify-between border-b border-white/5 bg-slate-950 z-10">
+        <div class="flex items-center gap-2.5">
+          <span id="docPreviewIcon" class="text-lg">📄</span>
+          <h4 id="docPreviewTitle" class="text-xs font-bold text-gray-300 font-mono break-all pr-4">document.pdf</h4>
+        </div>
+        <button onclick="closeDocModal()" aria-label="Close Preview" class="text-gray-400 hover:text-white focus:outline-none rounded-lg p-1 transition-colors hover:bg-white/5 border border-white/5 cursor-pointer">
+          <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      
+      <!-- Content Viewports -->
+      <div class="flex-1 w-full overflow-hidden relative flex flex-col">
+        <!-- 1. Image Viewport -->
+        <div id="previewContainerImage" class="hidden w-full h-full items-center justify-center bg-black/30">
+          <img id="imagePreviewSrc" src="" class="max-w-full max-h-[75vh] object-contain block" alt="Image Preview"/>
+        </div>
+        
+        <!-- 2. PDF Viewport (Embedded Interactive Chrome PDF Reader with robust dynamic spinner) -->
+        <div id="previewContainerPDF" class="hidden flex-1 w-full h-full p-3 bg-slate-900/40 relative flex flex-col items-center justify-center">
+          <!-- Dedicated PDF Loading Spinner (Visible during server-side generation and iframe loading) -->
+          <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 z-20 rounded-xl gap-3.5">
+            <div class="w-10 h-10 rounded-full border-4 border-sky-500/20 border-t-sky-500 spinner-loader"></div>
+            <span class="text-[10px] font-bold text-sky-400 uppercase tracking-widest animate-pulse">Generating High-Fidelity PDF... Please Wait</span>
+          </div>
+          <!-- PDF Frame: Calls window.onPdfFrameLoad() when rendering is fully complete -->
+          <iframe id="pdfPreviewFrame" src="" class="w-full h-full rounded-xl border border-white/10 hidden" style="background: #1e293b;" onload="window.onPdfFrameLoad()"></iframe>
+          <!-- High-Fidelity Simulated HTML PDF Viewer (Avoids Chrome sandboxed iframe blob blockages) -->
+          <div id="pdfPreviewHTML" class="w-full h-full rounded-xl border border-white/10 overflow-y-auto hidden p-6" style="background: #1e293b;"></div>
+        </div>
+        
+        <!-- 3. Excel / CSV Viewport (Stylized High-Fidelity Data Table) -->
+        <div id="previewContainerExcel" class="hidden w-full h-full overflow-auto p-5 bg-slate-950/40">
+          <div class="overflow-x-auto rounded-xl border border-white/5 bg-slate-900/20 shadow-inner no-scrollbar">
+            <table id="excelPreviewTable" class="w-full border-collapse text-left text-[10.5px] font-mono text-gray-300">
+              <thead id="excelPreviewHead" class="bg-slate-900/80 sticky top-0 border-b border-white/10 text-gray-400 uppercase tracking-wider">
+                <!-- Headers injected here -->
+              </thead>
+              <tbody id="excelPreviewBody" class="divide-y divide-white/5">
+                <!-- Rows injected here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature Notification Modal -->
+  <div id="featureNotifyModal">
+    <div class="glass max-w-2xl w-full rounded-3xl p-7 border border-white/10 shadow-2xl fade-in relative flex flex-col max-h-[90vh]">
+      <!-- Close Button -->
+      <button onclick="closeFeatureNotify(false)" aria-label="Close" class="absolute top-5 right-5 text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 rounded-lg p-1 transition-colors z-10">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+      <!-- Header -->
+      <div class="text-center mb-6 flex-shrink-0">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-sky-500 flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-violet-500/25" style="animation: featureShimmer 4s ease-in-out infinite; background-size: 200% auto;">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+        </div>
+        <div class="flex items-center justify-center gap-2 mb-2">
+          <span class="feature-badge">🚀 Major Update</span>
+        </div>
+        <h2 class="text-xl font-bold text-white mb-1">What's New</h2>
+        <p class="text-gray-400 text-xs">3 powerful capabilities to elevate your demos</p>
+      </div>
+
+      <!-- Scrollable Content Wrapper -->
+      <div class="relative flex-1 min-h-0 flex flex-col mb-6">
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto pr-1 modal-scrollable-content pt-3 premium-mask-fade">
+          <div class="modal-scrollable-inner">
+
+      <!-- Feature 1: Agentic Workflow -->
+      <div class="feature-card mb-4">
+        <div class="flex gap-3 mb-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/15 flex items-center justify-center text-amber-400 border border-amber-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-bold text-white mb-0.5">Agentic Workflow with Interactive A2UI</h4>
+            <p class="text-[11px] text-gray-200 leading-relaxed">Instantly generate highly tailored <span class="font-bold text-amber-400">agentic workflows</span> that seamlessly integrate autonomous execution with rich, interactive user interfaces (A2UI). Your agent can now process unstructured documents, auto-correct data against enterprise databases, and present dynamic UI components (cards, forms, approval flows) for real-time human-in-the-loop decisions. <span class="text-amber-400/80">Accelerate sales cycles and spark immediate "I want this" moments by showcasing complete, visually compelling business operations built instantly with zero coding.</span></p>
+          </div>
+        </div>
+        <!-- Agentic Workflow Inline Dynamic SVG Animation (ULTRA ENLARGED VERTICAL STACK - width 100% to fill 672px modal) -->
+        <div class="mt-3 rounded-xl overflow-hidden relative group">
+          <svg viewBox="0 0 600 260" class="w-full h-auto bg-slate-950/70 rounded-xl border border-amber-500/20 p-4" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <!-- Colors and Gradients -->
+              <linearGradient id="sparkleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#f59e0b" />
+                <stop offset="100%" stop-color="#d97706" />
+              </linearGradient>
+              <linearGradient id="dbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#38bdf8" />
+                <stop offset="100%" stop-color="#0284c7" />
+              </linearGradient>
+              <linearGradient id="activeHeaderGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.02"/>
+                <stop offset="50%" stop-color="#fbbf24" stop-opacity="0.15"/>
+                <stop offset="100%" stop-color="#fbbf24" stop-opacity="0.02"/>
+              </linearGradient>
+              
+              <!-- CSS Animation -->
+              <style>
+                @keyframes flowDot {
+                  0% { stroke-dashoffset: 40; }
+                  100% { stroke-dashoffset: 0; }
+                }
+                @keyframes dbPulse {
+                  0%, 76%, 91%, 100% { fill-opacity: 0.15; stroke: #475569; filter: none; }
+                  77%, 90% { fill-opacity: 0.4; stroke: #38bdf8; filter: drop-shadow(0 0 6px #38bdf8); }
+                }
+                @keyframes highlightFocus {
+                  0%, 100% { stroke: #334155; }
+                  50% { stroke: #fbbf24; filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.35)); }
+                }
+                
+                /* Mega Timeline: Cursor path movement & clicking (10s loop) */
+                @keyframes cursorMove {
+                  0%, 10%, 100% { transform: translate(300px, 170px) scale(1); }
+                  18% { transform: translate(90px, 100px) scale(1); }
+                  20% { transform: translate(90px, 100px) scale(0.82); } /* Click Chip A */
+                  22%, 28% { transform: translate(90px, 100px) scale(1); }
+                  35% { transform: translate(165px, 144px) scale(1); }
+                  37% { transform: translate(165px, 144px) scale(0.82); } /* Click Qty TextField */
+                  40%, 48% { transform: translate(165px, 144px) scale(1); }
+                  56% { transform: translate(240px, 100px) scale(1); }
+                  58% { transform: translate(240px, 100px) scale(0.82); } /* Click Chip B */
+                  60%, 68% { transform: translate(240px, 100px) scale(1); }
+                  76% { transform: translate(170px, 184px) scale(1); }
+                  78% { transform: translate(170px, 184px) scale(0.82); } /* Click Approve Button */
+                  82%, 90% { transform: translate(170px, 184px) scale(1); }
+                }
+
+                /* Button A (Standard SKU) States */
+                @keyframes buttonAState {
+                  0%, 19%, 58%, 100% { fill: #1e293b; stroke: #475569; stroke-width: 1; filter: none; }
+                  20%, 57% { fill: rgba(251, 191, 36, 0.12); stroke: #fbbf24; stroke-width: 1.5; filter: drop-shadow(0 2px 6px rgba(251,191,36,0.15)); }
+                }
+                @keyframes textAState {
+                  0%, 19%, 58%, 100% { fill: #64748b; font-weight: normal; }
+                  20%, 57% { fill: #fbbf24; font-weight: bold; }
+                }
+                @keyframes checkAState {
+                  0%, 19%, 58%, 100% { opacity: 0; }
+                  20%, 57% { opacity: 1; }
+                }
+
+                /* Button B (Premium SKU) States */
+                @keyframes buttonBState {
+                  0%, 19%, 58%, 100% { fill: rgba(251, 191, 36, 0.12); stroke: #fbbf24; stroke-width: 1.5; filter: drop-shadow(0 2px 6px rgba(251,191,36,0.15)); }
+                  20%, 57% { fill: #1e293b; stroke: #475569; stroke-width: 1; filter: none; }
+                }
+                @keyframes textBState {
+                  0%, 19%, 58%, 100% { fill: #fbbf24; font-weight: bold; }
+                  20%, 57% { fill: #64748b; font-weight: normal; }
+                }
+                @keyframes checkBState {
+                  0%, 19%, 58%, 100% { opacity: 1; }
+                  20%, 57% { opacity: 0; }
+                }
+
+                /* Qty Value Text States: AI Mismatched Qty (720) vs Human Corrected Qty (120) */
+                @keyframes qtyErrState {
+                  0%, 36% { opacity: 1; }
+                  37%, 100% { opacity: 0; }
+                }
+                @keyframes qtyOkState {
+                  0%, 36% { opacity: 0; }
+                  37%, 100% { opacity: 1; }
+                }
+
+                /* Approve Button Clicking State */
+                @keyframes approveBtnState {
+                  0%, 77%, 82%, 100% { fill: #1e3a8a; stroke: #3b82f6; }
+                  78%, 81% { fill: #1d4ed8; stroke: #60a5fa; filter: drop-shadow(0 0 4px #3b82f6); }
+                }
+
+                .anim-cursor {
+                  animation: cursorMove 8s infinite ease-in-out;
+                  transform-origin: 0 0;
+                }
+                .anim-btn-a { animation: buttonAState 8s infinite ease-in-out; }
+                .anim-txt-a { animation: textAState 8s infinite ease-in-out; }
+                .anim-chk-a { animation: checkAState 8s infinite ease-in-out; }
+                
+                .anim-btn-b { animation: buttonBState 8s infinite ease-in-out; }
+                .anim-txt-b { animation: textBState 8s infinite ease-in-out; }
+                .anim-chk-b { animation: checkBState 8s infinite ease-in-out; }
+
+                .anim-qty-err { animation: qtyErrState 8s infinite ease-in-out; }
+                .anim-qty-ok { animation: qtyOkState 8s infinite ease-in-out; }
+                .anim-btn-approve { animation: approveBtnState 8s infinite ease-in-out; }
+
+                .anim-flow {
+                  stroke-dasharray: 8, 8;
+                  animation: flowDot 2s infinite linear;
+                }
+                .anim-db {
+                  animation: dbPulse 8s infinite ease-in-out;
+                }
+                .anim-card-focus {
+                  animation: highlightFocus 4s infinite ease-in-out;
+                }
+              </style>
+            </defs>
+
+            <!-- Background Grid Patterns (Tech Vibe) -->
+            <g opacity="0.02">
+              <path d="M0 40 H600 M0 80 H600 M0 120 H600 M0 160 H600 M0 200 H600 M0 240 H600" stroke="#fff" stroke-width="1"/>
+              <path d="M100 0 V280 M200 0 V280 M300 0 V280 M400 0 V280 M500 0 V280" stroke="#fff" stroke-width="1"/>
+            </g>
+
+            <!-- ================= LEFT: UNSTRUCTURED INPUT (Highly Minimized - Centered on Y=125) ================= -->
+            <g transform="translate(15, 65)" opacity="0.35">
+              <rect x="0" y="0" width="70" height="110" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+              <path d="M12 20 H58 M12 35 H45 M12 50 H52" stroke="#64748b" stroke-width="3" stroke-linecap="round"/>
+              <!-- handwritten qty in document -->
+              <path d="M12 70 Q25 65, 35 72 T58 68" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+              <!-- Original Quantity Label -->
+              <text x="35" y="92" text-anchor="middle" fill="#f59e0b" font-size="9" font-family="monospace" font-weight="bold">"Qty: 120"</text>
+              <rect x="40" y="98" width="20" height="20" rx="3" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+              <path d="M45 108 L48 112 L54 104" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="35" y="123" text-anchor="middle" fill="#64748b" font-size="9" font-weight="bold" font-family="sans-serif">RAW DOC</text>
+            </g>
+
+            <!-- ================= MIDDLE: AGENTIC INTERACTION (MEGA ENLARGED CARD & CENTER-ALIGNED) ================= -->
+            <g transform="translate(130, 20)">
+              <!-- Card Container with breathing focus border -->
+              <rect class="anim-card-focus" x="0" y="0" width="340" height="215" rx="16" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+              
+              <!-- Center-Aligned Header -->
+              <rect x="1" y="1" width="338" height="30" rx="15" fill="url(#activeHeaderGrad)"/>
+              <text x="170" y="19" text-anchor="middle" fill="#fbbf24" font-size="9" font-weight="bold" font-family="sans-serif" letter-spacing="0.8">AI PROPOSED SKU (A2UI)</text>
+              <line x1="0" y1="31" x2="340" y2="31" stroke="#334155" stroke-width="1"/>
+              
+              <!-- 1. Raw Text Box (Centered) -->
+              <text x="170" y="48" text-anchor="middle" fill="#94a3b8" font-size="8.5" font-family="sans-serif">Original Handwritten Value</text>
+              <text x="170" y="61" text-anchor="middle" fill="#cbd5e1" font-size="11" font-weight="bold" font-family="monospace">"Prod-B / Qty: 120"</text>
+              
+              <!-- Process Flow Downward Arrow (Perfect Center Align) -->
+              <path d="M170 68 V78" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M166 74 L170 78 L174 74" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+              <!-- 2. Single-Select Multi-Button Chips (AI Proposals - Large & Center-Aligned) -->
+              <g transform="translate(0, 84)">
+                <!-- Unselected Option (Standard SKU) -->
+                <g transform="translate(25, 0)">
+                  <rect class="anim-btn-a" x="0" y="0" width="140" height="32" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+                  <text class="anim-txt-a" x="70" y="19" text-anchor="middle" fill="#64748b" font-size="8.5" font-family="sans-serif"><tspan class="anim-chk-a" fill="#fbbf24" font-weight="bold">✓ </tspan>PRD-A: Standard (350ml)</text>
+                </g>
+                
+                <!-- Selected Active Option (AI Recommended Premium SKU - Highlighted & Checked) -->
+                <g transform="translate(175, 0)">
+                  <rect class="anim-btn-b" x="0" y="0" width="140" height="32" rx="8" fill="#fbbf24" fill-opacity="0.15" stroke="#fbbf24" stroke-width="1.5" filter="drop-shadow(0 2px 6px rgba(251,191,36,0.15))"/>
+                  <text class="anim-txt-b" x="70" y="19" text-anchor="middle" fill="#fbbf24" font-size="8.5" font-weight="bold" font-family="sans-serif"><tspan class="anim-chk-b" fill="#fbbf24" font-weight="bold">✓ </tspan>PRD-B: Premium (500ml)</text>
+                </g>
+              </g>
+
+              <!-- 3. Editable Qty Field (Centered with AI Mismatch [720] ➔ Human Corrected [120] Story) -->
+              <g transform="translate(0, 128)">
+                <!-- Label & Input Box centered together -->
+                <text x="115" y="18" text-anchor="end" fill="#94a3b8" font-size="9" font-family="sans-serif">AI Recognized Qty:</text>
+                <rect x="125" y="4" width="50" height="20" rx="5" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+                
+                <!-- Dynamic Qty value switching (720 in Red ➔ 120 in Blue) -->
+                <text class="anim-qty-err" x="150" y="18" text-anchor="middle" fill="#f87171" font-size="11" font-weight="bold" font-family="monospace">720</text>
+                <text class="anim-qty-ok" x="150" y="18" text-anchor="middle" fill="#38bdf8" font-size="11" font-weight="bold" font-family="monospace">120</text>
+                
+                <text x="182" y="18" fill="#64748b" font-size="8" font-family="sans-serif">(AI Mismatch ➔ Click to Edit)</text>
+              </g>
+
+              <!-- 4. Giant Approve Button (Centered) -->
+              <g transform="translate(20, 168)">
+                <rect class="anim-btn-approve" x="0" y="0" width="300" height="32" rx="8" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.2))"/>
+                <text x="150" y="20" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold" font-family="sans-serif" letter-spacing="0.5">⚡ APPROVE & EXECUTE ACTION</text>
+              </g>
+              
+              <!-- Dynamic Mouse Cursor Overlay (カチカチ切り替えアニメーション) -->
+              <g class="anim-cursor">
+                <path d="M0 0 L0 16 L4.5 12 L8.5 19 L10 18 L6.5 11.5 L11 11 Z" fill="white" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>
+              </g>
+            </g>
+
+            <!-- ================= RIGHT: ENTERPRISE DATABASE (Minimized - Centered on Y=125) ================= -->
+            <g transform="translate(515, 65)" opacity="0.35">
+              <g class="anim-db">
+                <ellipse cx="30" cy="20" rx="18" ry="6" fill="#0284c7" stroke="#38bdf8" stroke-width="1"/>
+                <path d="M12 20 V65 A 18 6 0 0 0 48 65 V20" fill="#0284c7" fill-opacity="0.15" stroke="#38bdf8" stroke-width="1"/>
+                <ellipse cx="30" cy="38" rx="18" ry="6" stroke="#38bdf8" stroke-dasharray="2,2" stroke-width="0.8"/>
+                <ellipse cx="30" cy="52" rx="18" ry="6" stroke="#38bdf8" stroke-dasharray="2,2" stroke-width="0.8"/>
+                <text x="30" y="95" text-anchor="middle" fill="#38bdf8" font-size="9" font-family="monospace" font-weight="bold">Enterprise DB</text>
+              </g>
+            </g>
+
+            <!-- ================= COMPACT FLOW CONNECTORS (Aligned on Y=120) ================= -->
+            <path d="M90 120 H120" stroke="#475569" stroke-dasharray="3,3" stroke-width="1.2"/>
+            <path class="anim-flow" d="M90 120 H120" stroke="#f59e0b" stroke-width="2" opacity="0.8"/>
+
+            <path d="M480 120 H510" stroke="#475569" stroke-dasharray="3,3" stroke-width="1.2"/>
+            <path class="anim-flow" d="M480 120 H510" stroke="#38bdf8" stroke-width="2" opacity="0.8"/>
+
+            <rect x="88" y="98" width="36" height="13" rx="3" fill="#1e293b" stroke="#f59e0b" stroke-opacity="0.3" stroke-width="1"/>
+            <text x="106" y="107" text-anchor="middle" fill="#f59e0b" font-size="7" font-weight="bold" font-family="sans-serif">1. Input</text>
+
+            <rect x="476" y="98" width="36" height="13" rx="3" fill="#1e293b" stroke="#38bdf8" stroke-opacity="0.3" stroke-width="1"/>
+            <text x="494" y="107" text-anchor="middle" fill="#38bdf8" font-size="7" font-weight="bold" font-family="sans-serif">2. Commit</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Feature 2: Gemini 3.1 Flash Lite Support -->
+      <div class="feature-card mb-3">
+        <div class="flex gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/15 to-teal-500/15 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-bold text-white mb-0.5">Gemini 3.1 Flash Lite Support</h4>
+            <p class="text-[11px] text-gray-200 leading-relaxed">Easily select the highly efficient <span class="font-bold text-emerald-400">Gemini 3.1 Flash Lite</span> model as your root agent directly within the interactive setup script. <span class="text-emerald-400/80">Dramatically reduce latency in your demo environments, allowing you to deliver lightning-fast and highly responsive client presentations.</span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 3: Custom MCP Server Import -->
+      <div class="feature-card mb-1">
+        <div class="flex gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/15 to-cyan-500/15 flex items-center justify-center text-sky-400 border border-sky-500/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-bold text-white mb-0.5">Custom MCP Server Import</h4>
+            <p class="text-[11px] text-gray-200 leading-relaxed">Simply paste a GitHub URL to automatically analyze and integrate any <span class="font-bold text-sky-400">Model Context Protocol (MCP)</span> server into your demo. <span class="text-sky-400/80">Instantly connect your demo agent to live, customer-specific data sources and tools, allowing you to build hyper-personalized scenarios that address exact customer pain points on the fly.</span></p>
+          </div>
+        </div>
+      </div>
+      </div> <!-- Closes modal-scrollable-inner -->
+          <!-- Spacer to allow scrolling past the bottom fade -->
+          <div class="h-6 flex-shrink-0"></div>
+        </div>
+      </div> <!-- End Scrollable Content Wrapper -->
+
+      <!-- Footer (Fixed) -->
+      <div class="flex-shrink-0">
+        <!-- CTA Button -->
+        <button onclick="closeFeatureNotify(true)"
+          class="w-full feature-shimmer-btn text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-sky-500/20 active:scale-[0.98] mb-3 text-base tracking-wide">
+          🎉 LET'S GO!
+        </button>
+
+        <!-- Don't show again checkbox -->
+        <label class="flex items-center justify-center gap-2 cursor-pointer group">
+          <input type="checkbox" id="featureNotifyDontShow" class="w-3 h-3 rounded border-white/15 text-sky-500/60 focus:ring-sky-500/20 bg-white/5 cursor-pointer opacity-50 hover:opacity-80 transition-opacity">
+          <span class="text-[11px] text-gray-500 group-hover:text-gray-400 transition-colors select-none">Don't show this again</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const FEATURE_NOTIFY_KEY = 'feature_v4_whats_new_dismissed';
+
+    function maybeShowFeatureNotify() {
+      if (localStorage.getItem(FEATURE_NOTIFY_KEY)) return;
+      const modal = document.getElementById('featureNotifyModal');
+      if (modal) {
+        setTimeout(() => modal.classList.add('show'), 200);
+      }
+    }
+
+    function closeFeatureNotify(fromButton) {
+      const modal = document.getElementById('featureNotifyModal');
+      if (modal) modal.classList.remove('show');
+      const dontShow = document.getElementById('featureNotifyDontShow');
+      if (dontShow && dontShow.checked) {
+        localStorage.setItem(FEATURE_NOTIFY_KEY, 'true');
+      }
+    }
+
+    function openWhatsNew() {
+      const modal = document.getElementById('featureNotifyModal');
+      if (modal) modal.classList.add('show');
+    }
+
+    // Close on ESC
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('featureNotifyModal');
+        if (modal && modal.classList.contains('show')) closeFeatureNotify(false);
+      }
+    });
+
+    // Close on backdrop click
+    document.getElementById('featureNotifyModal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('featureNotifyModal')) closeFeatureNotify(false);
+    });
+
+  </script>
+
+
+  <script>
+    let cachedImportedMcpList = [];
+    let lastAnalyzedMcp = null;
 
     // ========== MCP CATALOG DATA ==========
     const MCP_CATALOG = {
