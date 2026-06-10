@@ -69,7 +69,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v10.44-public',
+  APP_VERSION: 'v10.72-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -975,7 +975,7 @@ function getTechnicalInstruction_() {
     "}\n" +
     "]\n\n" +
     
-    "11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar using surfaceId 'suggestions' and root='root' containing a Row of 3-4 Buttons with sendText actions. NEVER write any plain text or markdown headers (like \"Next Actions\", \"💡 Next Actions\", or other localized header equivalent) before the suggestions block; the system will automatically render the appropriate header. " +
+    "11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar using surfaceId 'suggestions' and root='root' containing a Row of 3-4 Buttons with sendText actions. The chip block MUST be COMPLETE: a single <a2ui-json> block containing BOTH the beginRendering message AND the surfaceUpdate message with all Button components — never emit beginRendering alone. NEVER write any plain text or markdown headers (like \"Next Actions\", \"💡 Next Actions\", or other localized header equivalent) before the suggestions block; the system will automatically render the appropriate header. " +
     "**BUTTON SCHEMA CONFORMANCE (CRITICAL)**: NEVER nest components inside a Button's 'child' property. 'child' MUST always be a flat string pointing to the ID of a separately defined Text component.\n" +
     "**A2UI CARD INTERACTION EXCEPTION (STRICT RULE)**: When your response already contains a major interactive A2UI card featuring its own control buttons " +
     "(such as the Welcome Card onboarding buttons, or the Workflow Execution Plan mode selection buttons like Immediate/Background/Scheduled), " +
@@ -987,7 +987,8 @@ function getTechnicalInstruction_() {
     
     "12. **WELCOME CARD (FIRST INTERACTION)**: When the user sends an initial greeting (e.g., 'Hi', 'Hello'), you **MUST NOT** call any tools, databases, or BigQuery under any circumstances. " +
     "Calling tools on the first greeting turn completely hides and breaks the onboarding card rendering. " +
-    "You MUST immediately respond in the very first turn with the rich A2UI onboarding card using surfaceId 'welcome-card' and NO suggestion chips at the bottom (the card's own buttons are sufficient). " +
+    "You MUST immediately respond in the very first turn by writing ONE short line of plain-text greeting in the user's language FIRST, and THEN the rich A2UI onboarding card using surfaceId 'welcome-card' and NO suggestion chips at the bottom (the card's own buttons are sufficient). " +
+    "The one-line plain-text greeting is MANDATORY and must appear in addition to the card: a UI-only response (an A2UI card with NO accompanying plain text) is NOT rendered by the client and shows a blank turn. " +
     "Never execute queries or tool calls until the user explicitly requests analysis. The onboarding card must include your role title, a Divider, a List of key capabilities with Lucide icons, " +
     "a Divider, and exactly 3 action Buttons.\n" +
     "**BUTTON SCHEMA CONFORMANCE (CRITICAL)**: When generating A2UI JSON payloads, you MUST ALWAYS use strict standard JSON syntax. " +
@@ -2343,7 +2344,7 @@ HTML_TEMPLATE = """
             const sharedFont = { family: "'Inter', sans-serif" };
             chart1 = new Chart(document.getElementById('chart1'), {
                 type: 'doughnut',
-                data: { labels: ['Flagged', 'Resolved', 'Pending'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#EA580C', '#2563EB', '#D97706'], borderWidth: 0, borderRadius: 3 }] },
+                data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 0, borderRadius: 3 }] },
                 options: { maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 12, ...sharedFont } } }, tooltip: { callbacks: { label: function(c) { let t = c.dataset.data.reduce((a,b) => a+b, 0); let p = t > 0 ? Math.round(c.raw / t * 100) : 0; return c.label + ': ' + c.raw + ' (' + p + '%)'; } } } } }
             });
             chart2 = new Chart(document.getElementById('chart2'), {
@@ -2354,9 +2355,9 @@ HTML_TEMPLATE = """
         }
 
         function getStatusClass(s) {
-            s = s ? s.toLowerCase() : '';
-            if (s.includes('resolve') || s.includes('success') || s.includes('clear')) return 'resolved';
-            if (s.includes('flag') || s.includes('error') || s.includes('high')) return 'flagged';
+            s = s ? String(s).toLowerCase() : '';
+            if (s.includes('resolve') || s.includes('success') || s.includes('clear') || s.includes('approv') || s.includes('complete') || s.includes('done') || s.includes('closed') || s.includes('archiv') || s.includes('paid') || s.includes('fulfil')) return 'resolved';
+            if (s.includes('flag') || s.includes('error') || s.includes('alert') || s.includes('fail') || s.includes('reject') || s.includes('overdue') || s.includes('urgent') || s.includes('critical') || s.includes('block') || s.includes('high')) return 'flagged';
             return 'pending';
         }
 
@@ -2424,7 +2425,7 @@ HTML_TEMPLATE = """
                     document.getElementById('kpi-1').textContent = '0';
                     document.getElementById('kpi-2').textContent = '0';
                     document.getElementById('kpi-3').textContent = '0';
-                    if (chart1) { chart1.data.datasets[0].data = [0, 0, 0]; chart1.update(); }
+                    if (chart1) { chart1.data.labels = []; chart1.data.datasets[0].data = []; chart1.data.datasets[0].backgroundColor = []; chart1.update(); }
                     if (chart2) { chart2.data.datasets[0].data = [0, 0, 0]; chart2.update(); }
                     isFirstLoad = false;
                     return;
@@ -2434,13 +2435,15 @@ HTML_TEMPLATE = """
 
                 let currentIds = new Set();
                 let counts = { flagged: 0, resolved: 0, pending: 0 };
+                let statusCounts = {};
                 let priorityCounts = { High: 0, Medium: 0, Low: 0 };
 
                 data.forEach(doc => {
                     currentIds.add(doc.id);
-                    let statusStr = doc.data.status || doc.data.Status || 'Pending';
+                    let statusStr = String(doc.data.status || doc.data.Status || 'Pending');
                     let bClass = getStatusClass(statusStr);
                     counts[bClass]++;
+                    statusCounts[statusStr] = (statusCounts[statusStr] || 0) + 1;
                     let priority = doc.data.priority || doc.data.Priority || 'Medium';
                     if (priorityCounts.hasOwnProperty(priority)) priorityCounts[priority]++;
 
@@ -2595,7 +2598,14 @@ HTML_TEMPLATE = """
                 document.getElementById('kpi-1').textContent = data.length;
                 document.getElementById('kpi-2').textContent = counts.flagged + counts.pending;
                 document.getElementById('kpi-3').textContent = counts.resolved;
-                if (chart1) { chart1.data.datasets[0].data = [counts.flagged, counts.resolved, counts.pending]; chart1.update(); }
+                if (chart1) {
+                    let statusLabels = Object.keys(statusCounts).sort(function(a, b) { return statusCounts[b] - statusCounts[a]; });
+                    let palette = ['#4F46E5', '#7C3AED', '#2563EB', '#0891B2', '#059669', '#D97706', '#EA580C', '#DC2626', '#DB2777', '#64748B'];
+                    chart1.data.labels = statusLabels;
+                    chart1.data.datasets[0].data = statusLabels.map(function(l) { return statusCounts[l]; });
+                    chart1.data.datasets[0].backgroundColor = statusLabels.map(function(l, i) { return palette[i % palette.length]; });
+                    chart1.update();
+                }
                 if (chart2) { chart2.data.datasets[0].data = [priorityCounts.High, priorityCounts.Medium, priorityCounts.Low]; chart2.update(); }
             } catch (e) { console.error('Fetch error:', e); }
         }
@@ -2939,12 +2949,49 @@ HTML_TEMPLATE = """
 def index():
     return HTML_TEMPLATE
 
+_FS_SCALAR_KEYS = ("stringValue", "booleanValue", "timestampValue", "bytesValue", "referenceValue", "geoPointValue")
+
+def _decode_fs_value(v):
+    # Records may be written with raw Firestore REST typed-value wrappers
+    # (e.g. {"stringValue": "X"}) stored literally as map fields. Unwrap them to
+    # native values so the dashboard never receives an object where it expects a
+    # scalar (which would otherwise abort rendering and freeze the KPIs/charts).
+    if isinstance(v, dict):
+        ks = list(v.keys())
+        if len(ks) == 1:
+            k = ks[0]
+            inner = v[k]
+            if k in _FS_SCALAR_KEYS:
+                return inner
+            if k == "nullValue":
+                return None
+            if k == "integerValue":
+                try:
+                    return int(inner)
+                except Exception:
+                    return inner
+            if k == "doubleValue":
+                try:
+                    return float(inner)
+                except Exception:
+                    return inner
+            if k == "mapValue":
+                fields = (inner or {}).get("fields", {}) if isinstance(inner, dict) else {}
+                return {kk: _decode_fs_value(vv) for kk, vv in (fields or {}).items()}
+            if k == "arrayValue":
+                vals = (inner or {}).get("values", []) if isinstance(inner, dict) else []
+                return [_decode_fs_value(x) for x in (vals or [])]
+        return {kk: _decode_fs_value(vv) for kk, vv in v.items()}
+    if isinstance(v, list):
+        return [_decode_fs_value(x) for x in v]
+    return v
+
 @app.route('/api/data')
 def get_data():
     docs = db.collection(COLLECTION).stream()
     data = []
     for doc in docs:
-        doc_dict = doc.to_dict()
+        doc_dict = _decode_fs_value(doc.to_dict() or {})
         if "updated_at" not in doc_dict or not doc_dict["updated_at"]:
             try:
                 doc_dict["updated_at"] = doc.update_time.isoformat()
@@ -3131,8 +3178,10 @@ __VIEWER_REQ__\n`;
     firestoreCommands += `  done\n`;
     firestoreCommands += `  echo ""\n`;
     firestoreCommands += `  wait \$VIEWER_PID || true\n`;
-    firestoreCommands += `  VIEWER_EXIT=\$?\n`;
-    firestoreCommands += `  if [ \$VIEWER_EXIT -eq 0 ]; then\n`;
+    // NOTE: don't trust the exit code here — the deploy runs in the background and
+    // `wait ... || true` always yields 0. Verify the function actually exists instead
+    // (same source of truth as the final summary), so we never print a false success.
+    firestoreCommands += `  if gcloud functions describe ${dirName}-viewer --gen2 --region=us-central1 --project="$PROJECT_ID" >/dev/null 2>&1; then\n`;
     firestoreCommands += `    echo "    ✅ Cloud Run Function deployed."\n`;
     firestoreCommands += `  else\n`;
     firestoreCommands += `    echo "    ⚠️ WARNING: Failed to deploy Firestore Data Viewer. Build log:"\n`;
@@ -3476,14 +3525,17 @@ echo "The following steps require manual interaction in the Google Cloud Console
   echo "   Copy and paste the following scopes all at once:"
   echo "https://www.googleapis.com/auth/gmail.readonly"
   echo "https://www.googleapis.com/auth/gmail.compose"
+  echo "https://www.googleapis.com/auth/gmail.modify"
   echo "https://www.googleapis.com/auth/drive.readonly"
   echo "https://www.googleapis.com/auth/drive.file"
   echo "https://www.googleapis.com/auth/calendar.calendarlist.readonly"
   echo "https://www.googleapis.com/auth/calendar.events.freebusy"
   echo "https://www.googleapis.com/auth/calendar.events.readonly"
+  echo "https://www.googleapis.com/auth/calendar.events"
   echo "https://www.googleapis.com/auth/chat.spaces.readonly"
   echo "https://www.googleapis.com/auth/chat.memberships.readonly"
   echo "https://www.googleapis.com/auth/chat.messages.readonly"
+  echo "https://www.googleapis.com/auth/chat.messages.create"
   echo "https://www.googleapis.com/auth/chat.users.readstate.readonly"
   echo "https://www.googleapis.com/auth/directory.readonly"
   echo "https://www.googleapis.com/auth/userinfo.profile"
@@ -3497,17 +3549,16 @@ echo "The following steps require manual interaction in the Google Cloud Console
   echo "     - https://vertexaisearch.cloud.google.com/static/oauth/oauth.html"
   echo "   Enter a name, and copy the Client ID and Client Secret."
   echo ""
-  echo "3. Configure the Chat app (if you want to use Chat MCP):"
+  echo "3. Configure the Chat app (required for Chat MCP):"
+  echo "   Reference: https://developers.google.com/workspace/guides/configure-mcp-servers#configure-chat-app"
   echo "   URL: https://console.cloud.google.com/apis/api/chat.googleapis.com/hangouts-chat?project=\$PROJECT_ID"
-  echo "   Follow these steps in the console:"
-  echo "     - Click 'Manage' -> 'Configuration'."
-  echo "     - Clear 'Build this Chat app as a Google Workspace add-on'."
+  echo "   In 'Google Chat API' -> 'Manage' -> 'Configuration', set:"
   echo "     - App name: 'Chat MCP'"
   echo "     - Avatar URL: https://developers.google.com/chat/images/quickstart-app-avatar.png"
   echo "     - Description: 'Chat MCP server'"
-  echo "     - Turn off 'Enable interactive features'."
-  echo "     - Select 'Make this Chat app available to specific people and groups in your domain' and enter your email."
-  echo "     - Select 'Log errors to Logging'."
+  echo "     - Disable 'Enable interactive features'."
+  echo "     - Under 'Visibility', make the app available to yourself (enter your email or your domain)."
+  echo "     - Under 'Logs', select 'Log errors to Logging'."
   echo "     - Click 'Save'."
   echo ""
   read -p "Press [Enter] after you have completed these steps and copied your Client ID/Secret..."
@@ -3532,7 +3583,7 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -H "X-Goog-User-Project: \$PROJECT_ID" \
   "https://discoveryengine.googleapis.com/v1alpha/projects/\$PROJECT_ID/locations/global/authorizations?authorizationId=\$AUTH_ID" \
-  -d '{ "name": "projects/'"\$PROJECT_ID"'/locations/global/authorizations/'"\$AUTH_ID"'", "serverSideOauth2": { "clientId": "'"\$OAUTH_CLIENT_ID"'", "clientSecret": "'"\$OAUTH_CLIENT_SECRET"'", "authorizationUri": "https://accounts.google.com/o/oauth2/v2/auth?access_type=offline&prompt=consent&response_type=code&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.compose%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.file%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.calendarlist.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.events.freebusy%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.events.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fchat.spaces.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fchat.memberships.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fchat.messages.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fchat.users.readstate.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdirectory.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcontacts.readonly&client_id='"\$OAUTH_CLIENT_ID"'&redirect_uri=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Foauth-redirect", "tokenUri": "https://oauth2.googleapis.com/token" } }'
+  -d '{ "name": "projects/'"\$PROJECT_ID"'/locations/global/authorizations/'"\$AUTH_ID"'", "serverSideOauth2": { "clientId": "'"\$OAUTH_CLIENT_ID"'", "clientSecret": "'"\$OAUTH_CLIENT_SECRET"'", "authorizationUri": "https://accounts.google.com/o/oauth2/v2/auth?access_type=offline&prompt=consent&response_type=code&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.compose%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.modify%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.file%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.calendarlist.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.events.freebusy%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.events.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.events%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fchat.spaces.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fchat.memberships.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fchat.messages.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fchat.messages.create%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fchat.users.readstate.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdirectory.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcontacts.readonly&client_id='"\$OAUTH_CLIENT_ID"'&redirect_uri=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Foauth-redirect", "tokenUri": "https://oauth2.googleapis.com/token" } }'
 
 `;
   }
@@ -4318,6 +4369,13 @@ ENV PORT 8080
 ENV GOOGLE_GENAI_USE_VERTEXAI=1
 ENV PYTHONUNBUFFERED=1
 ENV ADK_ENABLE_MCP_GRACEFUL_ERROR_HANDLING=1
+# ADK 2.x: JSON_SCHEMA_FOR_FUNC_DECL (default ON) sends raw MCP JSON Schemas
+# via parameters_json_schema, bypassing _to_gemini_schema and the
+# _safe_dereference_schema patch. Recursive custom-MCP schemas (e.g. LINE
+# flex messages) then hit Vertex's server-side flattener limit: deterministic
+# 500 "Limits exceeded while trying to flatten schema" on EVERY call.
+# Disabling restores the sanitized legacy conversion path.
+ENV ADK_DISABLE_JSON_SCHEMA_FOR_FUNC_DECL=1
 ENV OTEL_SDK_DISABLED=true
 __DOCKER_TAIL_EOF__
 ${ (params.importedMcpList && params.importedMcpList.filter(m => m.type !== 'remote').length > 0) ? `echo 'CMD ["/bin/bash", "/app/start_mcp.sh"]' >> Dockerfile` : `echo 'CMD ["uvicorn", "adk_agent.app.fast_api_app:app", "--host", "0.0.0.0", "--port", "8080"]' >> Dockerfile` }
@@ -4445,6 +4503,7 @@ MAPS_API_KEY="$API_KEY"
 PYTHONUNBUFFERED=1
 GRPC_ENABLE_FORK_SUPPORT=1
 ADK_ENABLE_MCP_GRACEFUL_ERROR_HANDLING=1
+ADK_DISABLE_JSON_SCHEMA_FOR_FUNC_DECL=1
 AGENT_MODEL="$AGENT_MODEL"
 AGENT_MODEL_LITE="$AGENT_MODEL_LITE"
 __ENV_EOF__
@@ -4690,6 +4749,62 @@ except Exception as e:
     import logging; logging.warning(f"Stability patches not applied: {e}")
 
 # =============================================================================
+# 3. Deterministic-5xx Fast-Fail (v10.71)
+# Vertex returns 500 INTERNAL "Limits exceeded while trying to flatten
+# schema. Schema is too complex to process." when a tool declaration cannot
+# be compiled server-side (e.g. a recursive custom-MCP schema reached the
+# API raw). The error is DETERMINISTIC for a given toolset, yet
+# HttpRetryOptions treats every 500 as transient: tenacity burns attempts=8
+# (~4 min) per LLM call, and the synth-salvage repeats it 3 more times --
+# a ~16-minute hang ending in ServerError (confirmed 2026-06-10,
+# demo-demand-inventor + line-bot-mcp-server).
+# Patching at the google.genai errors layer (not httpx) is transport-
+# agnostic: it works whether the SDK picks aiohttp or httpx. Demoting the
+# status to 400 takes it out of the retriable code set ([429, 500, 503]),
+# so the call fails in ~1s and the executor's salvage path takes over.
+# The original error message is preserved inside response_json for logs.
+# =============================================================================
+try:
+    from google.genai import errors as _genai_errors
+
+    _DETERMINISTIC_5XX_MARKERS = (
+        "flatten schema",
+        "Schema is too complex",
+    )
+
+    def _is_deterministic_5xx(status_code, response_json):
+        try:
+            if not (500 <= int(status_code or 0) < 600):
+                return False
+        except Exception:
+            return False
+        try:
+            _msg = str((response_json or {}).get("error", {}).get("message", ""))
+        except Exception:
+            _msg = str(response_json)
+        return any(_m in _msg for _m in _DETERMINISTIC_5XX_MARKERS)
+
+    _orig_raise_error = _genai_errors.APIError.raise_error.__func__
+    _orig_raise_error_async = _genai_errors.APIError.raise_error_async.__func__
+
+    @classmethod
+    def _patched_raise_error(cls, status_code, response_json, response):
+        if _is_deterministic_5xx(status_code, response_json):
+            raise _genai_errors.ClientError(400, response_json, response)
+        _orig_raise_error(cls, status_code, response_json, response)
+
+    @classmethod
+    async def _patched_raise_error_async(cls, status_code, response_json, response):
+        if _is_deterministic_5xx(status_code, response_json):
+            raise _genai_errors.ClientError(400, response_json, response)
+        await _orig_raise_error_async(cls, status_code, response_json, response)
+
+    _genai_errors.APIError.raise_error = _patched_raise_error
+    _genai_errors.APIError.raise_error_async = _patched_raise_error_async
+except Exception as e:
+    import logging; logging.warning(f"Deterministic-5xx fast-fail patch not applied: {e}")
+
+# =============================================================================
 # 🔧 MCP Toolset Configuration
 # =============================================================================
 def get_maps_mcp_url():
@@ -4720,14 +4835,19 @@ def get_bigquery_mcp_toolset():
     ))
 
 def get_firestore_mcp_toolset():
-    """Creates a Firestore MCP toolset."""
+    """Creates a Firestore MCP toolset (data ops only; DB/index admin excluded
+    to reduce the agent's function-declaration count -- admin ops are handled by
+    the setup script, never by the runtime agent)."""
     project_id = get_project_id()
     url = get_firestore_mcp_url()
     return McpToolset(connection_params=StreamableHTTPConnectionParams(
-        url=url, 
+        url=url,
         headers={"x-goog-user-project": project_id},
         timeout=300
-    ))
+    ), tool_filter=[
+        'get_document', 'add_document', 'update_document', 'delete_document',
+        'list_documents', 'list_collections',
+    ])
 
 def get_maps_mcp_toolset():
     """Creates a Google Maps MCP toolset."""
@@ -4956,6 +5076,7 @@ def _workspace_header_provider(context) -> dict:
 _GMAIL_SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.modify",
 ]
 _DRIVE_SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",
@@ -4965,13 +5086,21 @@ _CALENDAR_SCOPES = [
     "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
     "https://www.googleapis.com/auth/calendar.events.freebusy",
     "https://www.googleapis.com/auth/calendar.events.readonly",
+    "https://www.googleapis.com/auth/calendar.events",
 ]
 _PEOPLE_SCOPES = [
     "https://www.googleapis.com/auth/directory.readonly",
     "https://www.googleapis.com/auth/userinfo.profile",
     "https://www.googleapis.com/auth/contacts.readonly",
 ]
-_ALL_WORKSPACE_SCOPES = _GMAIL_SCOPES + _DRIVE_SCOPES + _CALENDAR_SCOPES + _PEOPLE_SCOPES
+_CHAT_SCOPES = [
+    "https://www.googleapis.com/auth/chat.spaces.readonly",
+    "https://www.googleapis.com/auth/chat.memberships.readonly",
+    "https://www.googleapis.com/auth/chat.messages.readonly",
+    "https://www.googleapis.com/auth/chat.messages.create",
+    "https://www.googleapis.com/auth/chat.users.readstate.readonly",
+]
+_ALL_WORKSPACE_SCOPES = _GMAIL_SCOPES + _DRIVE_SCOPES + _CALENDAR_SCOPES + _PEOPLE_SCOPES + _CHAT_SCOPES
 
 def _get_workspace_auth_kwargs() -> dict:
     """Returns auth_scheme/auth_credential kwargs for MCP OAuth authentication.
@@ -5014,7 +5143,7 @@ def get_gmail_mcp_toolset():
             httpx_client_factory=_create_workspace_httpx_client_factory(url, _GMAIL_SCOPES),
         ),
         header_provider=_workspace_header_provider,
-        tool_filter=['create_draft', 'create_label', 'get_thread', 'label_message', 'label_thread', 'list_drafts', 'list_labels', 'search_threads', 'unlabel_message', 'unlabel_thread'],
+        tool_filter=['create_draft', 'create_label', 'update_label', 'delete_label', 'get_thread', 'label_message', 'label_thread', 'list_drafts', 'list_labels', 'search_threads', 'unlabel_message', 'unlabel_thread'],
         **_get_workspace_auth_kwargs()
     )
 
@@ -5028,7 +5157,7 @@ def get_drive_mcp_toolset():
             httpx_client_factory=_create_workspace_httpx_client_factory(url, _DRIVE_SCOPES),
         ),
         header_provider=_workspace_header_provider,
-        tool_filter=['create_file', 'download_file_content', 'get_file_metadata', 'get_file_permissions', 'list_recent_files', 'read_file_content', 'search_files'],
+        tool_filter=['create_file', 'copy_file', 'download_file_content', 'get_file_metadata', 'get_file_permissions', 'list_recent_files', 'read_file_content', 'search_files'],
         **_get_workspace_auth_kwargs()
     )
 
@@ -5048,15 +5177,24 @@ def get_calendar_mcp_toolset():
 
 def get_chat_mcp_toolset():
     """Creates a Google Chat MCP toolset.
-    
-    DISABLED: Chat MCP causes persistent 'Duplicate function declaration' errors
-    in the Gemini API, even when filtering to a single tool. This appears to be
-    an ADK/MCP interaction issue where tool declarations are duplicated during
-    registration. Returning None to skip Chat MCP and unblock other Workspace tools.
+
+    NOTE: 'search_messages' is intentionally excluded from tool_filter. Its input
+    schema uses \$defs/\$ref (nested SearchParameters), which the ADK->Gemini
+    function-declaration conversion expands into duplicate declarations, causing
+    'Duplicate function declaration' errors. The remaining tools use flat schemas.
+    Requires Chat app configuration (see setup script guidance).
     """
-    import logging
-    logging.getLogger('workspace_mcp').warning("get_chat_mcp_toolset: DISABLED - returning None to avoid duplicate function declaration errors")
-    return None
+    url = "https://chatmcp.googleapis.com/mcp/v1"
+    return McpToolset(
+        connection_params=StreamableHTTPConnectionParams(
+            url=url,
+            timeout=300,
+            httpx_client_factory=_create_workspace_httpx_client_factory(url, _CHAT_SCOPES),
+        ),
+        header_provider=_workspace_header_provider,
+        tool_filter=['list_messages', 'search_conversations', 'send_message'],
+        **_get_workspace_auth_kwargs()
+    )
 
 def get_people_mcp_toolset():
     """Creates a People API MCP toolset with MCP OAuth support."""
@@ -5299,6 +5437,26 @@ def register_background_task(
                        "Execute operations directly using data tools (get_document, update_document, list_documents, execute_sql, etc.).",
         }
 
+    # --- F1 (v10.64): block the inline deep_analysis specialist from escalating ---
+    # deep_analysis_agent runs INLINE. It sometimes self-escalates a long analysis
+    # into a background task and then polls it, so the inline turn NEVER returns
+    # (the user sees a permanent "thinking" hang). It is the inline EXECUTOR, not a
+    # scheduler: forbid background registration from this agent.
+    _caller_agent = getattr(tool_context, 'agent_name', None) or ''
+    if not _caller_agent:
+        try:
+            _caller_agent = tool_context._invocation_context.agent.name
+        except Exception:
+            _caller_agent = ''
+    if _caller_agent == 'deep_analysis_agent':
+        return {
+            "status": "blocked",
+            "message": "deep_analysis_agent runs INLINE and must NOT register background tasks. "
+                       "Complete the analysis directly with data tools and deliver the FINAL report "
+                       "in THIS turn. Do not call register_background_task, get_task_result, or "
+                       "list_background_tasks.",
+        }
+
     _task_id = str(_task_uuid.uuid4())[:8]
     _now = _task_dt.datetime.now(_task_dt.timezone.utc)
     _now_iso = _now.isoformat()
@@ -5339,6 +5497,14 @@ def register_background_task(
     # --- Duplicate task guard ---
     # Block registration if an ACTIVE task with the same task_name exists.
     # This prevents button-spam from creating duplicate tasks.
+    # Names are NORMALIZED (lowercased, all non-alphanumerics stripped) before
+    # comparison so cosmetic variants are treated as the SAME task. The model
+    # sometimes emits register_background_task twice in one turn with names that
+    # differ only in case/separators (e.g. "Apex_Contract_Health_Analysis" vs
+    # "apex_contract_health_analysis"), which an exact-match guard let through.
+    def _norm_task_name(_s):
+        return "".join(_c for _c in str(_s).lower() if _c.isalnum())
+    _norm_new_name = _norm_task_name(task_name)
     try:
         _active_statuses = ("submitted", "working")
         _existing_execs = _fs.collection(_demo_id + "_task_executions").where(
@@ -5352,7 +5518,7 @@ def register_background_task(
                     _def_ref = _fs.collection(_demo_id + "_task_definitions").document(_existing_def_id).get()
                     if _def_ref.exists:
                         _def_data = _def_ref.to_dict()
-                        if _def_data.get("task_name") == task_name:
+                        if _norm_task_name(_def_data.get("task_name")) == _norm_new_name:
                             _bg_logger.warning(
                                 "register_background_task: BLOCKED duplicate task_name=%s (existing task_id=%s status=%s)",
                                 task_name, _edata.get("task_id", "?"), _edata.get("status", "?")
@@ -5828,6 +5994,43 @@ def write_operational_alert(
         return {"status": "error", "message": f"Failed to record alert: {str(e)}"}
 
 
+_FS_REST_SCALAR_KEYS = ("stringValue", "booleanValue", "timestampValue", "bytesValue", "referenceValue", "geoPointValue")
+
+def _normalize_rest_values(v):
+    # The agent is instructed to use Firestore REST typed-value format
+    # (e.g. {"stringValue": "X"}) for the Firestore MCP. When that same format is
+    # passed to this SDK-based tool it would be stored literally as a map field,
+    # breaking downstream consumers (e.g. the Data Viewer). Unwrap to native values.
+    if isinstance(v, dict):
+        ks = list(v.keys())
+        if len(ks) == 1:
+            k = ks[0]
+            inner = v[k]
+            if k in _FS_REST_SCALAR_KEYS:
+                return inner
+            if k == "nullValue":
+                return None
+            if k == "integerValue":
+                try:
+                    return int(inner)
+                except Exception:
+                    return inner
+            if k == "doubleValue":
+                try:
+                    return float(inner)
+                except Exception:
+                    return inner
+            if k == "mapValue":
+                fields = (inner or {}).get("fields", {}) if isinstance(inner, dict) else {}
+                return {kk: _normalize_rest_values(vv) for kk, vv in (fields or {}).items()}
+            if k == "arrayValue":
+                vals = (inner or {}).get("values", []) if isinstance(inner, dict) else []
+                return [_normalize_rest_values(x) for x in (vals or [])]
+        return {kk: _normalize_rest_values(vv) for kk, vv in v.items()}
+    if isinstance(v, list):
+        return [_normalize_rest_values(x) for x in v]
+    return v
+
 def save_document_to_db(
     collection_name: str,
     document_id: str,
@@ -5860,7 +6063,11 @@ def save_document_to_db(
             
         if not isinstance(data, dict):
             return {"status": "error", "message": "JSON body must represent a key-value dictionary."}
-        
+
+        # Defensively unwrap any Firestore REST typed-value wrappers so they are
+        # stored as native scalars rather than literal {"stringValue": ...} maps.
+        data = _normalize_rest_values(data)
+
         # Automatically inject ISO-8601 timestamp representing last update time for dynamic sorting in Data Viewer
         import datetime
         data["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -7468,6 +7675,152 @@ cat <<'__CHIPS_EOF__' > adk_agent/app/examples/0.8/suggestion_chips.json
 ]
 __CHIPS_EOF__
 
+cat <<'__CHAT_COMPOSE_EOF__' > adk_agent/app/examples/0.8/chat_compose.json
+[
+  { "beginRendering": { "surfaceId": "chat-compose", "root": "root" } },
+  { "dataModelUpdate": { "surfaceId": "chat-compose", "path": "/form", "contents": [{ "key": "space", "valueMap": [{ "key": "0", "valueString": "Engineering" }] }, { "key": "message", "valueString": "Heads up: shelf alert #4821 has been resolved." }] } },
+  { "surfaceUpdate": { "surfaceId": "chat-compose", "components": [
+    { "id": "root", "component": { "Card": { "child": "col" } } },
+    { "id": "col", "component": { "Column": { "children": { "explicitList": ["title", "div1", "choiceSpace", "fieldMsg", "div2", "actions"] }, "distribution": "start", "alignment": "stretch" } } },
+    { "id": "title", "component": { "Text": { "text": { "literalString": "💬 Send Chat Message" }, "usageHint": "h2" } } },
+    { "id": "div1", "component": { "Divider": {} } },
+    { "id": "choiceSpace", "component": { "MultipleChoice": { "selections": { "path": "/form/space" }, "options": [{ "label": { "literalString": "Engineering" }, "value": "Engineering" }, { "label": { "literalString": "Operations" }, "value": "Operations" }, { "label": { "literalString": "Store Managers" }, "value": "Store Managers" }], "maxAllowedSelections": 1, "variant": "chips" } } },
+    { "id": "fieldMsg", "component": { "TextField": { "label": { "literalString": "Message" }, "text": { "path": "/form/message" }, "textFieldType": "longText" } } },
+    { "id": "div2", "component": { "Divider": {} } },
+    { "id": "actions", "component": { "Row": { "children": { "explicitList": ["btnSend", "btnCancel"] }, "distribution": "spaceEvenly", "alignment": "center" } } },
+    { "id": "btnSend", "component": { "Button": { "child": "lblSend", "primary": true, "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Send this chat message to the selected space:" } }, { "key": "space", "value": { "path": "/form/space" } }, { "key": "message", "value": { "path": "/form/message" } }] } } } },
+    { "id": "lblSend", "component": { "Text": { "text": { "literalString": "📤 Send" }, "usageHint": "body" } } },
+    { "id": "btnCancel", "component": { "Button": { "child": "lblCancel", "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Cancel sending the chat message" } }] } } } },
+    { "id": "lblCancel", "component": { "Text": { "text": { "literalString": "🚫 Cancel" }, "usageHint": "body" } } }
+  ] } }
+]
+__CHAT_COMPOSE_EOF__
+
+cat <<'__CAL_COMPOSE_EOF__' > adk_agent/app/examples/0.8/calendar_event_compose.json
+[
+  { "beginRendering": { "surfaceId": "event-compose", "root": "root" } },
+  { "dataModelUpdate": { "surfaceId": "event-compose", "path": "/form", "contents": [{ "key": "title", "valueString": "Inventory Review" }, { "key": "start", "valueString": "2024-09-17T14:00:00" }, { "key": "end", "valueString": "2024-09-17T15:00:00" }, { "key": "location", "valueString": "Main Office" }, { "key": "attendees", "valueString": "team@example.com" }] } },
+  { "surfaceUpdate": { "surfaceId": "event-compose", "components": [
+    { "id": "root", "component": { "Card": { "child": "col" } } },
+    { "id": "col", "component": { "Column": { "children": { "explicitList": ["title", "div1", "fTitle", "dStart", "dEnd", "fLoc", "fAtt", "div2", "actions"] }, "distribution": "start", "alignment": "stretch" } } },
+    { "id": "title", "component": { "Text": { "text": { "literalString": "📅 Create Calendar Event" }, "usageHint": "h2" } } },
+    { "id": "div1", "component": { "Divider": {} } },
+    { "id": "fTitle", "component": { "TextField": { "label": { "literalString": "Title" }, "text": { "path": "/form/title" }, "textFieldType": "shortText" } } },
+    { "id": "dStart", "component": { "DateTimeInput": { "value": { "path": "/form/start" }, "enableDate": true, "enableTime": true } } },
+    { "id": "dEnd", "component": { "DateTimeInput": { "value": { "path": "/form/end" }, "enableDate": true, "enableTime": true } } },
+    { "id": "fLoc", "component": { "TextField": { "label": { "literalString": "Location" }, "text": { "path": "/form/location" }, "textFieldType": "shortText" } } },
+    { "id": "fAtt", "component": { "TextField": { "label": { "literalString": "Attendees (comma-separated)" }, "text": { "path": "/form/attendees" }, "textFieldType": "shortText" } } },
+    { "id": "div2", "component": { "Divider": {} } },
+    { "id": "actions", "component": { "Row": { "children": { "explicitList": ["btnCreate", "btnCancel"] }, "distribution": "spaceEvenly", "alignment": "center" } } },
+    { "id": "btnCreate", "component": { "Button": { "child": "lblCreate", "primary": true, "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Create this calendar event:" } }, { "key": "title", "value": { "path": "/form/title" } }, { "key": "start", "value": { "path": "/form/start" } }, { "key": "end", "value": { "path": "/form/end" } }, { "key": "location", "value": { "path": "/form/location" } }, { "key": "attendees", "value": { "path": "/form/attendees" } }] } } } },
+    { "id": "lblCreate", "component": { "Text": { "text": { "literalString": "✅ Create" }, "usageHint": "body" } } },
+    { "id": "btnCancel", "component": { "Button": { "child": "lblCancel", "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Cancel creating the event" } }] } } } },
+    { "id": "lblCancel", "component": { "Text": { "text": { "literalString": "🚫 Cancel" }, "usageHint": "body" } } }
+  ] } }
+]
+__CAL_COMPOSE_EOF__
+
+cat <<'__EMAIL_COMPOSE_EOF__' > adk_agent/app/examples/0.8/email_compose.json
+[
+  { "beginRendering": { "surfaceId": "email-compose", "root": "root" } },
+  { "dataModelUpdate": { "surfaceId": "email-compose", "path": "/form", "contents": [{ "key": "to", "valueString": "supplier@example.com" }, { "key": "subject", "valueString": "Restock Request" }, { "key": "body", "valueString": "Hello,\\n\\nPlease restock the following items at your earliest convenience.\\n\\nThanks." }] } },
+  { "surfaceUpdate": { "surfaceId": "email-compose", "components": [
+    { "id": "root", "component": { "Card": { "child": "col" } } },
+    { "id": "col", "component": { "Column": { "children": { "explicitList": ["title", "div1", "fTo", "fSubject", "fBody", "div2", "actions"] }, "distribution": "start", "alignment": "stretch" } } },
+    { "id": "title", "component": { "Text": { "text": { "literalString": "✉️ Compose Email Draft" }, "usageHint": "h2" } } },
+    { "id": "div1", "component": { "Divider": {} } },
+    { "id": "fTo", "component": { "TextField": { "label": { "literalString": "To" }, "text": { "path": "/form/to" }, "textFieldType": "shortText" } } },
+    { "id": "fSubject", "component": { "TextField": { "label": { "literalString": "Subject" }, "text": { "path": "/form/subject" }, "textFieldType": "shortText" } } },
+    { "id": "fBody", "component": { "TextField": { "label": { "literalString": "Body" }, "text": { "path": "/form/body" }, "textFieldType": "longText" } } },
+    { "id": "div2", "component": { "Divider": {} } },
+    { "id": "actions", "component": { "Row": { "children": { "explicitList": ["btnSave", "btnCancel"] }, "distribution": "spaceEvenly", "alignment": "center" } } },
+    { "id": "btnSave", "component": { "Button": { "child": "lblSave", "primary": true, "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Create a Gmail draft with these details:" } }, { "key": "to", "value": { "path": "/form/to" } }, { "key": "subject", "value": { "path": "/form/subject" } }, { "key": "body", "value": { "path": "/form/body" } }] } } } },
+    { "id": "lblSave", "component": { "Text": { "text": { "literalString": "💾 Save Draft" }, "usageHint": "body" } } },
+    { "id": "btnCancel", "component": { "Button": { "child": "lblCancel", "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Cancel the email draft" } }] } } } },
+    { "id": "lblCancel", "component": { "Text": { "text": { "literalString": "🚫 Cancel" }, "usageHint": "body" } } }
+  ] } }
+]
+__EMAIL_COMPOSE_EOF__
+
+cat <<'__DRIVE_COMPOSE_EOF__' > adk_agent/app/examples/0.8/drive_file_compose.json
+[
+  { "beginRendering": { "surfaceId": "file-compose", "root": "root" } },
+  { "dataModelUpdate": { "surfaceId": "file-compose", "path": "/form", "contents": [{ "key": "name", "valueString": "Weekly Inventory Report" }, { "key": "type", "valueMap": [{ "key": "0", "valueString": "Document" }] }, { "key": "content", "valueString": "Summary of this week's inventory reconciliation." }] } },
+  { "surfaceUpdate": { "surfaceId": "file-compose", "components": [
+    { "id": "root", "component": { "Card": { "child": "col" } } },
+    { "id": "col", "component": { "Column": { "children": { "explicitList": ["title", "div1", "fName", "choiceType", "fContent", "div2", "actions"] }, "distribution": "start", "alignment": "stretch" } } },
+    { "id": "title", "component": { "Text": { "text": { "literalString": "📄 Create Drive File" }, "usageHint": "h2" } } },
+    { "id": "div1", "component": { "Divider": {} } },
+    { "id": "fName", "component": { "TextField": { "label": { "literalString": "File name" }, "text": { "path": "/form/name" }, "textFieldType": "shortText" } } },
+    { "id": "choiceType", "component": { "MultipleChoice": { "selections": { "path": "/form/type" }, "options": [{ "label": { "literalString": "Document" }, "value": "Document" }, { "label": { "literalString": "Spreadsheet" }, "value": "Spreadsheet" }, { "label": { "literalString": "Presentation" }, "value": "Presentation" }, { "label": { "literalString": "Folder" }, "value": "Folder" }], "maxAllowedSelections": 1, "variant": "chips" } } },
+    { "id": "fContent", "component": { "TextField": { "label": { "literalString": "Content" }, "text": { "path": "/form/content" }, "textFieldType": "longText" } } },
+    { "id": "div2", "component": { "Divider": {} } },
+    { "id": "actions", "component": { "Row": { "children": { "explicitList": ["btnCreate", "btnCancel"] }, "distribution": "spaceEvenly", "alignment": "center" } } },
+    { "id": "btnCreate", "component": { "Button": { "child": "lblCreate", "primary": true, "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Create this Drive file:" } }, { "key": "name", "value": { "path": "/form/name" } }, { "key": "type", "value": { "path": "/form/type" } }, { "key": "content", "value": { "path": "/form/content" } }] } } } },
+    { "id": "lblCreate", "component": { "Text": { "text": { "literalString": "✅ Create" }, "usageHint": "body" } } },
+    { "id": "btnCancel", "component": { "Button": { "child": "lblCancel", "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Cancel creating the file" } }] } } } },
+    { "id": "lblCancel", "component": { "Text": { "text": { "literalString": "🚫 Cancel" }, "usageHint": "body" } } }
+  ] } }
+]
+__DRIVE_COMPOSE_EOF__
+
+cat <<'__CHAT_LIST_EOF__' > adk_agent/app/examples/0.8/chat_conversation_list.json
+[
+  { "beginRendering": { "surfaceId": "chat-conversations", "root": "root" } },
+  { "surfaceUpdate": { "surfaceId": "chat-conversations", "components": [
+    { "id": "root", "component": { "Card": { "child": "col" } } },
+    { "id": "col", "component": { "Column": { "children": { "explicitList": ["title", "div1", "row1", "row2", "row3"] }, "distribution": "start", "alignment": "stretch" } } },
+    { "id": "title", "component": { "Text": { "text": { "literalString": "💬 Your Chat Conversations" }, "usageHint": "h2" } } },
+    { "id": "div1", "component": { "Divider": {} } },
+    { "id": "row1", "component": { "Row": { "children": { "explicitList": ["t1", "b1"] }, "distribution": "spaceEvenly", "alignment": "center" } } },
+    { "id": "t1", "component": { "Text": { "text": { "literalString": "Engineering (Space)" }, "usageHint": "body" } } },
+    { "id": "b1", "component": { "Button": { "child": "b1l", "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Send a message to the Engineering space" } }] } } } },
+    { "id": "b1l", "component": { "Text": { "text": { "literalString": "📤 Send here" }, "usageHint": "body" } } },
+    { "id": "row2", "component": { "Row": { "children": { "explicitList": ["t2", "b2"] }, "distribution": "spaceEvenly", "alignment": "center" } } },
+    { "id": "t2", "component": { "Text": { "text": { "literalString": "Operations (Space)" }, "usageHint": "body" } } },
+    { "id": "b2", "component": { "Button": { "child": "b2l", "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Send a message to the Operations space" } }] } } } },
+    { "id": "b2l", "component": { "Text": { "text": { "literalString": "📤 Send here" }, "usageHint": "body" } } },
+    { "id": "row3", "component": { "Row": { "children": { "explicitList": ["t3", "b3"] }, "distribution": "spaceEvenly", "alignment": "center" } } },
+    { "id": "t3", "component": { "Text": { "text": { "literalString": "Store Managers (Space)" }, "usageHint": "body" } } },
+    { "id": "b3", "component": { "Button": { "child": "b3l", "action": { "name": "sendText", "context": [{ "key": "text", "value": { "literalString": "Send a message to the Store Managers space" } }] } } } },
+    { "id": "b3l", "component": { "Text": { "text": { "literalString": "📤 Send here" }, "usageHint": "body" } } }
+  ] } }
+]
+__CHAT_LIST_EOF__
+
+cat <<'__DRIVE_LIST_EOF__' > adk_agent/app/examples/0.8/drive_file_list.json
+[
+  { "beginRendering": { "surfaceId": "drive-files", "root": "root" } },
+  { "surfaceUpdate": { "surfaceId": "drive-files", "components": [
+    { "id": "root", "component": { "Card": { "child": "col" } } },
+    { "id": "col", "component": { "Column": { "children": { "explicitList": ["title", "div1", "f1", "f1m", "f2", "f2m"] }, "distribution": "start", "alignment": "stretch" } } },
+    { "id": "title", "component": { "Text": { "text": { "literalString": "📁 Drive Files" }, "usageHint": "h2" } } },
+    { "id": "div1", "component": { "Divider": {} } },
+    { "id": "f1", "component": { "Text": { "text": { "literalString": "[Weekly Inventory Report](https://drive.google.com/file/d/EXAMPLE1)" }, "usageHint": "body" } } },
+    { "id": "f1m", "component": { "Text": { "text": { "literalString": "Document - modified 2024-09-15" }, "usageHint": "body" } } },
+    { "id": "f2", "component": { "Text": { "text": { "literalString": "[Q3 Sales Data](https://drive.google.com/file/d/EXAMPLE2)" }, "usageHint": "body" } } },
+    { "id": "f2m", "component": { "Text": { "text": { "literalString": "Spreadsheet - modified 2024-09-10" }, "usageHint": "body" } } }
+  ] } }
+]
+__DRIVE_LIST_EOF__
+
+cat <<'__CONTACT_LIST_EOF__' > adk_agent/app/examples/0.8/contact_list.json
+[
+  { "beginRendering": { "surfaceId": "contacts", "root": "root" } },
+  { "surfaceUpdate": { "surfaceId": "contacts", "components": [
+    { "id": "root", "component": { "Card": { "child": "col" } } },
+    { "id": "col", "component": { "Column": { "children": { "explicitList": ["title", "div1", "c1n", "c1e", "div2", "c2n", "c2e"] }, "distribution": "start", "alignment": "stretch" } } },
+    { "id": "title", "component": { "Text": { "text": { "literalString": "👤 Contacts" }, "usageHint": "h2" } } },
+    { "id": "div1", "component": { "Divider": {} } },
+    { "id": "c1n", "component": { "Text": { "text": { "literalString": "Kenta Takahashi - Operations" }, "usageHint": "body" } } },
+    { "id": "c1e", "component": { "Text": { "text": { "literalString": "kenta@example.com" }, "usageHint": "body" } } },
+    { "id": "div2", "component": { "Divider": {} } },
+    { "id": "c2n", "component": { "Text": { "text": { "literalString": "Aiko Sato - Store Manager" }, "usageHint": "body" } } },
+    { "id": "c2e", "component": { "Text": { "text": { "literalString": "aiko@example.com" }, "usageHint": "body" } } }
+  ] } }
+]
+__CONTACT_LIST_EOF__
+
 cat <<'__AGENT_EOF__' > adk_agent/app/agent.py
 import os
 import dotenv
@@ -7552,20 +7905,65 @@ def _safe_dereference_schema(schema: dict) -> dict:
 
     def _ensure_types(node):
         """Walk schema tree and inject 'type' where missing.
-        
+
         Gemini API rejects functionDeclarations when any property schema
         lacks an explicit 'type' field. This handles:
         - Empty schemas {} within properties
         - Schemas with description/enum/items but no type
-        - anyOf/oneOf (unsupported by Gemini) — flatten to first variant
+        - allOf (zod4 wraps described $refs in allOf) — merge members
+        - anyOf/oneOf (unsupported by Gemini) — flatten to first variant,
+          or to a permissive object for rich discriminated unions
         """
         if not isinstance(node, dict):
             return node
+        # Merge allOf members into the node (v10.72). zod4's toJSONSchema wraps
+        # a .describe()d $ref as {"description": ..., "allOf": [{"$ref": ...}]}.
+        # Previously allOf was IGNORED here: the node fell through to the
+        # description->string default below, the Gemini conversion dropped the
+        # unsupported allOf key, and the field was declared as a bare STRING.
+        # Under FunctionCallingConfigMode.VALIDATED that FORCES the model to
+        # emit a string where the MCP server expects an object (confirmed:
+        # LINE flex header/body/footer -> zod invalid_type on every send).
+        # Empirically scoped: BigQuery/Firestore/Maps managed-MCP inputSchemas
+        # contain no allOf at all, so this branch is a no-op for them.
+        if "allOf" in node and isinstance(node["allOf"], list):
+            _members = [m for m in node["allOf"] if isinstance(m, dict)]
+            del node["allOf"]
+            for _m in _members:
+                for _mk, _mv in _m.items():
+                    node.setdefault(_mk, _mv)
         # Flatten anyOf/oneOf to first non-null variant (Gemini doesn't support these)
         for key in ("anyOf", "oneOf"):
             if key in node and isinstance(node[key], list):
                 variants = [v for v in node[key] if isinstance(v, dict) and v.get("type") != "null"]
-                if variants:
+                _obj_variants = [v for v in variants if v.get("type") == "object" or "properties" in v]
+                if len(_obj_variants) >= 3:
+                    # Rich discriminated union (v10.72), e.g. a recursive UI
+                    # component union with many object variants. Forcing the
+                    # FIRST variant under VALIDATED decoding makes the model
+                    # emit that one shape everywhere (for LINE flex the first
+                    # variant is 'separator' — never a valid header). Declare a
+                    # permissive object instead and name the alternatives in
+                    # the description so the model uses its own knowledge of
+                    # the format; the MCP server still validates server-side.
+                    # 2-variant unions (incl. "X or null") keep the existing
+                    # first-variant behavior, so this only changes schemas
+                    # that were already being declared unusably.
+                    _names = []
+                    for _v in _obj_variants:
+                        _c = (((_v.get("properties") or {}).get("type")) or {})
+                        if isinstance(_c, dict) and _c.get("const"):
+                            _names.append(str(_c["const"]))
+                    del node[key]
+                    _desc = node.get("description", "")
+                    if _names:
+                        _desc = (_desc + " " if _desc else "") + "JSON object; one of types: " + ", ".join(_names[:12])
+                    node["type"] = "object"
+                    node.pop("properties", None)
+                    node.pop("required", None)
+                    if _desc:
+                        node["description"] = _desc
+                elif variants:
                     chosen = variants[0].copy()
                     del node[key]
                     # Preserve description from parent
@@ -7650,7 +8048,38 @@ You are an autonomous business operations agent. Your mission is DUAL:
 When the user gives a task, determine whether it is an ANALYSIS request or an EXECUTION request (or both), and act accordingly.
 
 --- GREETING & ONBOARDING UI GUARDRAIL (MANDATORY) ---
-When the user sends an initial greeting or open-ended first message (e.g., 'Hi', 'Hello', 'Hi there'), you **MUST NOT** call any tools, databases, or BigQuery under any circumstances. Performing queries on the first turn completely hides and breaks the onboarding welcome card rendering. You MUST immediately respond in the very first turn with the rich A2UI onboarding welcome card (using surfaceId 'welcome-card') and NO suggestion chips at the bottom (the card's own buttons are sufficient). Focus ONLY on welcome onboarding. Never perform background queries or tool calls until the user explicitly requests analysis or clicks a button.
+When the user sends an initial greeting or open-ended first message (e.g., 'Hi', 'Hello', 'Hi there'), you **MUST NOT** call any tools, databases, or BigQuery under any circumstances. Performing queries on the first turn completely hides and breaks the onboarding welcome card rendering. You MUST immediately respond in the very first turn by first writing ONE short line of plain-text greeting in the user's language, and THEN the rich A2UI onboarding welcome card (using surfaceId 'welcome-card') and NO suggestion chips at the bottom (the card's own buttons are sufficient). The one-line plain-text greeting is MANDATORY and must accompany the card: a response that contains ONLY an A2UI card with no plain text does NOT render in the client and the user sees a blank turn. Focus ONLY on welcome onboarding. Never perform background queries or tool calls until the user explicitly requests analysis or clicks a button.
+
+WELCOME CARD STRUCTURE (MANDATORY): The 'welcome-card' MUST contain, in this exact order inside its main Column: (1) a title Text (h2), (2) a Divider, (3) a List of 3 capabilities (each a Row of an Icon + a Text), (4) a Divider, and (5) EXACTLY 3 action Buttons wired into the Column's children. The 3 action Buttons are REQUIRED — never omit them and never replace them with a link. Each Button's 'child' MUST be a flat string id pointing to a SEPARATELY-defined Text component (never an inline object), and each Button's action MUST be a sendText action whose text is a concrete follow-up request. Localize every label to the user's language.
+CRITICAL: The "Open Dashboard" / "Operations Console" link is an OPTIONAL extra. It is NOT an action Button and is NOT a substitute for the 3 required Buttons. If you include the link, it MUST be IN ADDITION to the 3 Buttons, never instead of them. A welcome card without 3 Buttons is INVALID.
+Follow this exact structure (replace the [bracketed] placeholders with real, localized content):
+<a2ui-json>[
+{"beginRendering": {"surfaceId": "welcome-card", "root": "root"}},
+{"surfaceUpdate": {"surfaceId": "welcome-card", "components": [
+{"id": "root", "component": {"Card": {"child": "mainCol"}}},
+{"id": "mainCol", "component": {"Column": {"children": {"explicitList": ["title", "div1", "caps", "div2", "actions"]}, "distribution": "start", "alignment": "stretch"}}},
+{"id": "title", "component": {"Text": {"text": {"literalString": "[Agent role title]"}, "usageHint": "h2"}}},
+{"id": "div1", "component": {"Divider": {}}},
+{"id": "caps", "component": {"List": {"children": {"explicitList": ["cap1", "cap2", "cap3"]}, "direction": "vertical", "alignment": "start"}}},
+{"id": "cap1", "component": {"Row": {"children": {"explicitList": ["i1", "t1"]}, "alignment": "center"}}},
+{"id": "i1", "component": {"Icon": {"name": {"literalString": "notifications"}}}},
+{"id": "t1", "component": {"Text": {"text": {"literalString": "[Capability 1]"}, "usageHint": "body"}}},
+{"id": "cap2", "component": {"Row": {"children": {"explicitList": ["i2", "t2"]}, "alignment": "center"}}},
+{"id": "i2", "component": {"Icon": {"name": {"literalString": "edit"}}}},
+{"id": "t2", "component": {"Text": {"text": {"literalString": "[Capability 2]"}, "usageHint": "body"}}},
+{"id": "cap3", "component": {"Row": {"children": {"explicitList": ["i3", "t3"]}, "alignment": "center"}}},
+{"id": "i3", "component": {"Icon": {"name": {"literalString": "search"}}}},
+{"id": "t3", "component": {"Text": {"text": {"literalString": "[Capability 3]"}, "usageHint": "body"}}},
+{"id": "div2", "component": {"Divider": {}}},
+{"id": "actions", "component": {"Row": {"children": {"explicitList": ["b1", "b2", "b3"]}, "distribution": "spaceEvenly", "alignment": "center"}}},
+{"id": "b1", "component": {"Button": {"child": "b1l", "action": {"name": "sendText", "context": [{"key": "text", "value": {"literalString": "[Action 1 request]"}}]}}}},
+{"id": "b1l", "component": {"Text": {"text": {"literalString": "[Action 1 label]"}, "usageHint": "body"}}},
+{"id": "b2", "component": {"Button": {"child": "b2l", "action": {"name": "sendText", "context": [{"key": "text", "value": {"literalString": "[Action 2 request]"}}]}}}},
+{"id": "b2l", "component": {"Text": {"text": {"literalString": "[Action 2 label]"}, "usageHint": "body"}}},
+{"id": "b3", "component": {"Button": {"child": "b3l", "action": {"name": "sendText", "context": [{"key": "text", "value": {"literalString": "[Action 3 request]"}}]}}}},
+{"id": "b3l", "component": {"Text": {"text": {"literalString": "[Action 3 label]"}, "usageHint": "body"}}}
+]}}
+]</a2ui-json>
 
 --- WORKFLOW EXECUTION MODE (CRITICAL) ---
 When the user requests an operational action (e.g., "process all pending items", "resolve flagged anomalies",
@@ -7789,7 +8218,8 @@ Help the user answer questions by strategically combining insights from BigQuery
 
 [GENERATED_SYSTEM_INSTRUCTION]
 
-- REFERENCE DATE: The current date for this demo is [REFERENCE_DATE]. Use this for absolute time references (e.g., 'today', 'last month').
+- REFERENCE DATE (DEMO DATA ONLY): The synthetic demo data (BigQuery/Firestore) is anchored to [REFERENCE_DATE]. Use [REFERENCE_DATE] ONLY when querying or reasoning about the demo dataset (e.g., 'sales last month' in BigQuery/Firestore).
+- ACTUAL CURRENT DATE (REAL-WORLD / WORKSPACE ACTIONS): Today's real date is [CURRENT_REAL_DATE]. You MUST use [CURRENT_REAL_DATE] for any real-world or Google Workspace action (creating Calendar events, drafting Gmail, scheduling tasks). When the user says 'today', 'tomorrow', or 'at 2pm today' for such an action, resolve the date against [CURRENT_REAL_DATE], NOT the demo reference date.
 
 2. **Maps Toolset**: Real-world location analysis.
    - Available Tools: \\\`compute_routes\\\`, \\\`get_place\\\`, \\\`search_places\\\`, \\\`geocode\\\`, \\\`reverse_geocode\\\`.
@@ -7842,13 +8272,19 @@ ${ enableWorkspaceMcp ? `
 * **Workspace MCP Toolset**: Access Google Workspace data (Gmail, Drive, Calendar, Chat, People).
    - Available Tools: Dynamically discovered at runtime.
    - Use this toolset for queries that require accessing or creating emails, files, calendar events, or chat messages.
+   - GOOGLE CHAT (send_message): Messages can be sent to INTERNAL-ONLY named spaces only. (1) Direct messages (DMs) are NOT supported by the Google Chat API and fail with a permission error. (2) Named spaces that allow external users (externalUserAllowed=true) are BLOCKED by the Chat MCP server and fail with "The caller does not have permission" even though you have access — this is a Chat MCP data-governance guardrail, not a recoverable error, so do NOT retry. IMPORTANT: you CANNOT tell whether a space is internal-only from its name or from search_conversations results — the external-user setting is not exposed there, and space names do NOT necessarily contain words like "internal". So never assume/claim a space is internal-only based on its name, and never silently pick a space hoping it will work. Just attempt the send to the space the user named; if it fails with a permission error, do not assume an auth problem — explain that the target is likely a DM or an external-user-allowed space (which the Chat MCP cannot post to), and ask the user to choose or confirm an internal-only named space (one with external sharing turned OFF). When asked to message a person, send to a named space the user specifies (DMs are unavailable).
+   - A2UI CARDS FOR WORKSPACE (MANDATORY): For Workspace MCP operations you MUST render the matching A2UI card from the example library, never plain text.
+     * WRITE actions: render an EDITABLE compose card FIRST, pre-filled with your proposed values via dataModelUpdate, then WAIT for the user to press Send/Create (the card Button returns the values via sendText). Do NOT call the tool until the user submits the card. Mapping: send_message -> the chat-compose card; create_event / update_event -> the event-compose card; create_draft -> the email-compose card; create_file -> the file-compose card.
+     * CALL EACH WRITE TOOL EXACTLY ONCE per user submission. One Send/Create press = exactly one tool call. NEVER emit the same write call (e.g. send_message) two or three times in the same turn and NEVER issue parallel/duplicate write calls — that creates duplicate messages/events/files. If a write succeeds, do not call it again.
+     * READ results: render the matching list card. chat conversations (search_conversations / list_messages) -> the chat-conversations card; calendar events (list_events) -> the event list card; drive files (search_files / list_recent_files) -> the drive-files card; contacts / directory people (search_contacts / search_directory_people) -> the contacts card.
+     * The editable compose card IS the confirmation step; do NOT additionally ask for confirmation in plain text.
 ` : '' }
 ---------------------------------------------------
 CRITICAL OPERATIONAL RULES:
 - A2UI_MANDATORY_OUTPUT (HIGHEST PRIORITY — NEVER SKIP):
     * EVERY response that contains an analysis result, data summary, ranking, comparison, entity profile, action plan, OR a confirmation request MUST use A2UI interactive cards wrapped in <a2ui-json> tags. Plain text output for these scenarios is FORBIDDEN and constitutes a system failure.
     * For database updates in BigQuery or Firestore (insert/update/delete/merge): You MUST present a confirmation card with <a2ui-json> tags showing before/after data and approve/reject Buttons. NEVER ask for confirmation in plain text.
-    * At the END of EVERY response, you MUST append suggestion chips in a separate <a2ui-json> block with surfaceId "suggestions" containing 3-4 contextual follow-up Buttons. NEVER write any plain text or markdown headers (like "Next Actions", "💡 Next Actions", or other localized header equivalent) before the suggestions block; the system will automatically render the appropriate header. NEVER nest components inside a Button's 'child' property; 'child' MUST always be a flat string pointing to the ID of a separately defined Text component.
+    * At the END of EVERY response, you MUST append suggestion chips in a separate <a2ui-json> block with surfaceId "suggestions" containing 3-4 contextual follow-up Buttons. The chip block MUST be COMPLETE: include BOTH the beginRendering message AND the surfaceUpdate message with all Button components in the SAME block — never emit beginRendering alone. NEVER write any plain text or markdown headers (like "Next Actions", "💡 Next Actions", or other localized header equivalent) before the suggestions block; the system will automatically render the appropriate header. NEVER nest components inside a Button's 'child' property; 'child' MUST always be a flat string pointing to the ID of a separately defined Text component.
     * If you are unsure whether to use A2UI, USE IT. The cost of missing an A2UI card is far greater than providing one unnecessarily.
     * CONTEXT-AWARE ELEMENT SELECTION (CRITICAL): Choose the most appropriate A2UI element for each piece of content. Refer to the A2UI schema examples provided in your system prompt. General guidelines:
       - Tabular data (query results, comparisons, rankings): Use DataTable or structured cards with rows and columns. Never dump raw text tables.
@@ -7873,7 +8309,7 @@ CRITICAL OPERATIONAL RULES:
     * Incorrect Usage: ![Cymbal Logo](https://storage.googleapis.com/...)
     * TURN SPLITTING FOR ANALYSIS & IMAGES (CRITICAL): When requested to perform an analysis AND generate a visual asset (like an infographic or chart via \\\`generate_image\\\` tool):
         1. In the first turn, you MUST provide the full, comprehensive text analysis in your response *along with* the tool call to \\\`generate_image\\\`. Do NOT wait for the tool to complete to provide the main analysis text.
-        2. In the follow-up turn (after the tool returns success), provide only a brief confirmation (e.g., "Here is the generated visualization.") and let the system automatically attach the image.
+        2. After the tool returns success, let the system automatically attach the image. Your FINAL response for the turn MUST still contain the complete deliverable — the analysis report text and/or its A2UI cards, PLUS the suggestion chips — so the auto-attached image appears together with the report (a brief confirmation alone is only acceptable if the full analysis was already delivered in step 1). You MUST NEVER end the turn with only a progress/working note (e.g. "executing...", "analyzing...", or its localized equivalent); such filler is NOT a valid final response and causes the report to be dropped. If you have generated an image, you MUST go on to produce the full report, A2UI cards, and suggestion chips in the same turn — never stop immediately after the image.
     * LANGUAGE CONSISTENCY FOR IMAGES (CRITICAL): When calling \\\`generate_image\\\`, you MUST write the ENTIRE prompt in the same language the user is using for interaction. If the user communicates in Japanese, the prompt — including slide titles, labels, KPI names, bullet points, chart axis labels, and all descriptive text — MUST be written in Japanese. Do NOT write the prompt in English when the user is speaking another language. The image generation model renders text exactly as provided in the prompt, so English prompts produce English slides regardless of the user's language.
     * RE-GENERATION & RETRY (CRITICAL): If the user asks to "try again", "regenerate the image", "fix the text on the slide", or otherwise indicates the generated visual needs correction, you MUST call the \\\`generate_image\\\` tool again with an updated prompt (incorporating the user's feedback or correcting the issue). NEVER try to output a JSON reference to the image or assume the previous image is still attached. You MUST trigger a new \\\`generate_image\\\` tool call.
     * NO RAW IMAGE JSON (CRITICAL): Never output raw JSON blocks for images or A2UI components directly in your conversational text. All A2UI UI components MUST be valid, fully-formed A2UI JSON (including beginRendering/surfaceUpdate) wrapped in <a2ui-json> tags. NEVER write partial or loose JSON objects like \\\`{"image": ...}\\\` or \\\`{"Image": ...}\\\` in your text response.
@@ -7895,7 +8331,9 @@ CRITICAL OPERATIONAL RULES:
       - Firestore: Verify your collection_id parameter exactly matches \\\`[COLLECTION_ID]\\\` (DO NOT use \\\`list_collections\\\` to discover collections). Check path format (parent vs collection_id separation).
       - Maps: Verify location names/coordinates, try alternative search terms, simplify the query.
       - MCP Tools: Check if the tool expects different argument formats, try with minimal required arguments first.
-- DATA DISCOVERY & ACCURACY (HIGHEST PRIORITY): 
+    * EMPTY (NON-ERROR) RESULTS ARE NOT A FAILURE TO RETRY AROUND: A search, lookup, or list tool that returns successfully but with NO matching results (or only results you already have) has NOT failed. You may retry such a search with adjusted parameters AT MOST ONCE. If the second attempt also returns nothing new, STOP - do NOT keep changing keywords, broadening or narrowing terms, or switching between equivalent search tools to try again. Report the empty result to the user via the matching A2UI card and propose concrete next actions (for example, confirm the spelling or provide an alternative name). NEVER enter a loop of repeated no-result searches.
+    * THIS DOES NOT LIMIT LEGITIMATE ITERATION: Calls that each make real progress are expected and allowed - paginating through results with a page token, reading distinct files or records, or running distinct queries that each return new data. The stop condition above applies ONLY to repeated searches that keep yielding no new information.
+- DATA DISCOVERY & ACCURACY (HIGHEST PRIORITY):
     * ADAPTIVE DISCOVERY: Use \\\`get_table_info\\\` only when necessary to confirm schemas for a specific query. 
     * DO NOT ASSUME column names (e.g., 'region', 'category', 'prefecture') exist without checking. Hallucinating columns causes fatal errors.
     * SQL ERROR RECOVERY: If a SQL query fails, output a status message, re-run \\\`get_table_info\\\` to verify schema, explore values with \\\`SELECT DISTINCT\\\`, and fix the query yourself. Be relentless in finding the correct data.
@@ -7929,11 +8367,15 @@ gen_instruction = r"""
 ${rawInstruction}
 """
 
+import datetime as _ge_real_dt
+_ge_real_today = _ge_real_dt.datetime.now(_ge_real_dt.timezone.utc).strftime("%Y-%m-%d")
+
 instruction = base_instruction\
     .replace("[PROJECT_ID]", PROJECT_ID)\
     .replace("[DATASET_ID]", "${datasetId}")\
     .replace("[COLLECTION_ID]", "${fsCollection}")\
     .replace("[REFERENCE_DATE]", "${referenceDate}")\
+    .replace("[CURRENT_REAL_DATE]", _ge_real_today)\
     .replace("[PUBLIC_DATASET_INFO]", public_info.replace("[PUBLIC_DATASET_ID]", "${publicDatasetId || ''}"))\
     .replace("[GENERATED_SYSTEM_INSTRUCTION]", gen_instruction)
 
@@ -8062,7 +8504,7 @@ async def inject_image_callback(callback_context: adk_callback_context.CallbackC
                 return None # Sandbox code execution pending; hold image pop
         
     image_bytes = callback_context.session.state.pop('pending_generated_image', None)
-    
+
     if image_bytes and llm_response and llm_response.content:
         llm_response.content.parts.append(
             types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
@@ -8070,7 +8512,7 @@ async def inject_image_callback(callback_context: adk_callback_context.CallbackC
         if not hasattr(llm_response, 'custom_metadata') or llm_response.custom_metadata is None:
             llm_response.custom_metadata = {}
         llm_response.custom_metadata["a2a:response"] = True
-        
+
     return None # Allow other callbacks to run
 
 async def a2ui_metadata_callback(callback_context: adk_callback_context.CallbackContext, llm_response: adk_llm_response.LlmResponse) -> adk_llm_response.LlmResponse | None:
@@ -8131,6 +8573,36 @@ async def _enforce_task_result_text(callback_context: adk_callback_context.Callb
             llm_response.content = types.Content(parts=[_result_part], role='model')
     return None
 
+# --- Before-Model Callback: strip unsupported part_metadata ---
+# Files uploaded via the Gemini Enterprise frontend arrive as genai Parts that
+# carry a part_metadata field (original_filename, sheet_name, etc.). When the
+# agent calls Gemini in Vertex / GE Agent Platform mode (GOOGLE_GENAI_USE_VERTEXAI=1),
+# the google-genai SDK rejects this field in _Part_to_vertex with:
+#   ValueError: part_metadata parameter is only supported in Gemini Developer
+#   API mode, not in Gemini Enterprise Agent Platform mode.
+# ADK surfaces this as error_code="ValueError", which fails the turn -- and
+# because the offending Part persists in session history, every subsequent turn
+# fails too (e.g. a plain "try again"). We run immediately upstream of the
+# failing conversion and remove the field from the fully-assembled request
+# (history + new message) on every call. The file's name/sheet/content also live
+# in the message text, so nothing the model needs is lost. Defensive by design:
+# any unexpected shape just returns None, leaving behavior no worse than before.
+def _strip_part_metadata(callback_context, llm_request):
+    try:
+        _contents = getattr(llm_request, 'contents', None)
+        if not _contents:
+            return None
+        for _content in _contents:
+            _parts = getattr(_content, 'parts', None)
+            if not _parts:
+                continue
+            for _part in _parts:
+                if getattr(_part, 'part_metadata', None) is not None:
+                    _part.part_metadata = None
+    except Exception:
+        pass
+    return None
+
 # --- Shared tools list ---
 _all_tools = [t for t in ${ enableWorkspaceMcp ? `[maps_toolset, bigquery_toolset, firestore_toolset, tools.generate_image, slack_mcp_toolset] + custom_mcp_toolsets + [tools.get_gmail_mcp_toolset(), tools.get_drive_mcp_toolset(), tools.get_calendar_mcp_toolset(), tools.get_chat_mcp_toolset(), tools.get_people_mcp_toolset()]` : `[maps_toolset, bigquery_toolset, firestore_toolset, tools.generate_image, slack_mcp_toolset] + custom_mcp_toolsets` } if t is not None]
 
@@ -8185,6 +8657,71 @@ def _inject_completed_tasks(callback_context):
     except Exception as _e:
         _logging.error("Failed to inject task results: " + str(_e))
         callback_context.state["_bg_task_results"] = ""
+    return None
+
+# =============================================================================
+# Before Tool Callback — suppress duplicate Workspace write calls
+# Gemini replays the same write tool across consecutive turns (each with a new
+# Function Call ID) even after the first call succeeded. This creates N
+# identical messages/events/files from a single user action. Guard against it
+# by recording each successful write's (tool_name, args_hash) + timestamp in
+# session state and blocking identical calls within a cooldown window.
+# =============================================================================
+_WORKSPACE_WRITE_TOOLS = frozenset((
+    'send_message', 'create_message',
+    'create_event', 'update_event', 'delete_event',
+    'create_draft', 'update_draft', 'send_draft',
+    'create_file', 'copy_file', 'create_folder', 'update_file',
+))
+_WS_WRITE_COOLDOWN_SEC = 120
+
+def _dedup_workspace_writes(tool, args, tool_context):
+    """Block duplicate Workspace write calls within the cooldown window."""
+    _name = getattr(tool, 'name', '')
+    if _name not in _WORKSPACE_WRITE_TOOLS:
+        return None
+    import json as _dj, hashlib as _dh, time as _dtm
+    try:
+        _hash = _dh.md5(
+            _dj.dumps(args, sort_keys=True, default=str).encode('utf-8')).hexdigest()
+    except Exception:
+        return None
+    _key = _name + ':' + _hash
+    _now = _dtm.time()
+    _seen = tool_context.state.get('_ws_write_seen') or {}
+    _prev = _seen.get(_key, 0)
+    if _prev and (_now - _prev) < _WS_WRITE_COOLDOWN_SEC:
+        return {
+            'status': 'duplicate_suppressed',
+            'message': 'This exact ' + _name + ' call already succeeded '
+                       + str(int(_now - _prev)) + 's ago. Suppressed to '
+                       'avoid a duplicate. Report the original success to '
+                       'the user and do NOT retry.',
+        }
+    return None
+
+def _record_workspace_write(tool, args, tool_context, tool_response):
+    """After a Workspace write succeeds, record it for dedup."""
+    _name = getattr(tool, 'name', '')
+    if _name not in _WORKSPACE_WRITE_TOOLS:
+        return None
+    if isinstance(tool_response, dict) and tool_response.get('error'):
+        return None
+    if isinstance(tool_response, dict) and tool_response.get('status') == 'duplicate_suppressed':
+        return None
+    import json as _dj, hashlib as _dh, time as _dtm
+    try:
+        _hash = _dh.md5(
+            _dj.dumps(args, sort_keys=True, default=str).encode('utf-8')).hexdigest()
+    except Exception:
+        return None
+    _key = _name + ':' + _hash
+    _seen = dict(tool_context.state.get('_ws_write_seen') or {})
+    _seen[_key] = _dtm.time()
+    if len(_seen) > 200:
+        _cutoff = _dtm.time() - _WS_WRITE_COOLDOWN_SEC
+        _seen = {k: v for k, v in _seen.items() if v > _cutoff}
+    tool_context.state['_ws_write_seen'] = _seen
     return None
 
 # =============================================================================
@@ -8360,6 +8897,35 @@ deep reasoning that the coordinator cannot provide. Take the time needed to:
 - Use the Code Execution sandbox for statistical analysis when raw SQL is insufficient
 Do NOT produce a shallow summary — the user explicitly requested deep analysis.
 
+0. INTENT CONFIRMATION (MANDATORY FIRST CHECK — PREVENTS WRONG-ANALYSIS BUGS):
+   Before doing ANY work, identify the SPECIFIC analysis the user actually
+   requested from the recent conversation (e.g. the exact topic restated in the
+   delegating message, such as "equipment-failure trend analysis"). Anchor every
+   query and the final report to THAT intent.
+   - If the delegated intent is clear, proceed and keep your work strictly on that
+     topic.
+   - If the intent is MISSING or AMBIGUOUS (e.g. you only received a bare "Run
+     Inline" / "User action triggered." with no analysis topic anywhere in the
+     recent turns), you MUST NOT invent a task and MUST NOT scan the operational
+     database to pick an arbitrary pending task (e.g. a hand-written form task) to
+     work on. Instead, ask the user ONE short clarifying question naming what you
+     need, then stop. Silently switching to an unrelated task is a critical failure.
+
+0.5 INLINE EXECUTOR CONTRACT (MANDATORY — PREVENTS HANGS):
+   You run INLINE (synchronous chat) and MUST deliver the final analysis report
+   in THIS turn. Therefore:
+   - NEVER call register_background_task, and NEVER poll task status
+     (get_task_result / list_background_tasks). You are the EXECUTOR, not a
+     scheduler — escalating to a background task here makes the turn hang forever
+     (the registration is structurally blocked anyway).
+   - HARD TOOL BUDGET: finish within about 12 tool calls. Prefer a few
+     pre-aggregated BigQuery queries (GROUP BY / window functions) over many raw
+     SELECTs. When you approach the budget, STOP gathering and synthesize the
+     report from what you already have rather than running more queries.
+   - SCHEMA FIRST (avoid retry storms): before writing SQL, confirm the exact
+     column names with get_table_info ONCE per table and reuse them. After an
+     "Unrecognized name" / "not found" error, do NOT keep guessing column names —
+     fix the query from the confirmed schema or proceed with available columns.
 
 1. ANALYSIS RIGOR (MANDATORY):
    a. EVIDENCE FIRST: Every claim or recommendation MUST be backed by
@@ -8641,8 +9207,10 @@ in the Data Viewer Tasks tab if available.
     tools=_all_tools,
     code_executor=_code_executor,
     generate_content_config=_validated_generate_config,
+    before_model_callback=_strip_part_metadata,
     after_model_callback=[inject_image_callback, a2ui_metadata_callback, _enforce_task_result_text],
-    after_tool_callback=_log_bq_activity,
+    before_tool_callback=_dedup_workspace_writes,
+    after_tool_callback=[_record_workspace_write, _log_bq_activity],
     disallow_transfer_to_parent=False,
     disallow_transfer_to_peers=False,
 )
@@ -8713,6 +9281,18 @@ Turn 1 (Proposal Turn — DO NOT CALL TOOLS):
 4. Present exactly two A2UI suggestion chips:
    - "🚀 Run in Background" (Recommended)
    - "💬 Run Inline"
+   CRITICAL — INTENT-CARRYING CHIPS (PREVENTS WRONG-ANALYSIS BUGS): The sendText
+   action of EACH chip MUST carry the FULL, verbatim analysis request in its
+   action context "text" value — NOT a generic label like "Run Inline" or
+   "Run in Background". Copy the exact analysis items you just proposed (the
+   same VERBATIM ANALYSIS ITEMS you would put in a task_prompt). Prefix the
+   text so the execution mode is unambiguous, e.g.:
+     - Run Inline chip  -> context text: "Run Inline: <full verbatim analysis request>"
+     - Background chip   -> context text: "Run in Background: <full verbatim analysis request>"
+   The visible chip LABEL stays short ("💬 Run Inline" / "🚀 Run in Background"),
+   but the context text is the complete intent. This guarantees the chosen
+   analysis intent survives session healing/compaction and concurrent-request
+   recovery, so the executor never falls back to an unrelated pending task.
 5. End your response and wait for the user's choice.
 
 Turn 2 (Execution Turn — After User Responds):
@@ -8722,7 +9302,15 @@ Turn 2 (Execution Turn — After User Responds):
   3. **MANDATORY SUGGESTION CHIPS**: In the suggestion chips (surfaceId: "suggestions"), you MUST include a button labeled "📊 Check Task Status". The action for this button MUST be a sendText action with the text "Check progress of task <task_id>" (replace <task_id> with the actual ticket ID).
   4. If DATA_VIEWER_URL is available, also include a suggestion chip labeled "🖥️ Open Operations Console" with an openUrl action pointing to the viewer URL.
 - If the user chooses "Run Inline":
-  1. Call transfer_to_deep_analysis_agent to hand over the task.
+  1. The user's message carries the FULL analysis intent (from the intent-carrying
+     chip above). Before transferring, restate that exact intent in ONE short
+     sentence so it is explicit in the conversation (e.g. "Proceeding inline with:
+     <verbatim analysis request>."). If, for any reason, the intent is missing or
+     ambiguous (e.g. the message is only a bare "Run Inline" with no analysis
+     described anywhere in the recent conversation), DO NOT guess and DO NOT pick
+     an unrelated pending task from the operational database — ask the user a
+     one-line clarifying question instead.
+  2. Call transfer_to_deep_analysis_agent to hand over the task.
 
 
 TASK_PROMPT CONSTRUCTION RULES (CRITICAL — PREVENTS SHALLOW RESULTS):
@@ -8864,9 +9452,14 @@ signals that STRONGLY favor background execution:
 - Statistical modeling or simulation
 For these requests, recommend background as the DEFAULT option.
 Present two A2UI suggestion chips: "Run in Background" (recommended)
-and "Run Inline".
+and "Run Inline". Each chip's sendText action MUST carry the FULL verbatim
+analysis request in its context "text" value (prefixed with "Run Inline: "
+or "Run in Background: "), NOT a bare label — so the intent survives session
+healing and concurrent-request recovery.
 - If background: register the task directly with register_background_task
-- If inline: transfer to deep_analysis_agent as normal
+- If inline: restate the verbatim analysis intent in one short sentence, then
+  transfer to deep_analysis_agent. If the intent is missing/ambiguous, ask a
+  one-line clarifying question — never pick an unrelated pending task.
 
 EXCLUSION (CRITICAL — PREVENTS DUPLICATE TASKS):
 If you have ALREADY called register_background_task for the current
@@ -9062,8 +9655,10 @@ WRONG: beginRendering object without tags (missing tags and brackets = SYSTEM CR
     generate_content_config=_validated_generate_config,
     sub_agents=[deep_analysis_agent],
     before_agent_callback=_inject_completed_tasks,
+    before_model_callback=_strip_part_metadata,
     after_model_callback=[inject_image_callback, a2ui_metadata_callback, _enforce_task_result_text],
-    after_tool_callback=_log_bq_activity,
+    before_tool_callback=_dedup_workspace_writes,
+    after_tool_callback=[_record_workspace_write, _log_bq_activity],
 )
 
 # --- Background execution agent (Pro) ---
@@ -9268,8 +9863,10 @@ You MUST NEVER claim to have performed an action that you do not have a tool for
     tools=_bg_tools,
     code_executor=_code_executor,
     generate_content_config=_validated_generate_config,
+    before_model_callback=_strip_part_metadata,
     after_model_callback=[_enforce_task_result_text],
-    after_tool_callback=_log_bq_activity,
+    before_tool_callback=_dedup_workspace_writes,
+    after_tool_callback=[_record_workspace_write, _log_bq_activity],
 )
 
 app = App(
@@ -9604,7 +10201,10 @@ def convert_a2a_request_to_adk_run_args(
                 for part in request.message.parts
             ],
         ),
-        'run_config': RunConfig(max_llm_calls=25),
+        # Raised from 25 -> 150: complex multi-step reports (deep_analysis transfer
+        # via "Run Inline") routinely need >25 model+tool calls. The 800s watchdog
+        # and LlmCallsLimit auto-continue wrapper in fast_api_app.py bound runtime.
+        'run_config': RunConfig(max_llm_calls=150),
     }
 __PART_CONVERTERS_EOF__
 
@@ -9634,6 +10234,8 @@ import os
 import logging
 import asyncio
 import ast as _ast
+import re
+import contextvars
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -10124,16 +10726,88 @@ def _is_suggestions_part(part) -> bool:
                 if isinstance(_item, dict):
                     for _k in ('beginRendering', 'surfaceUpdate', 'deleteSurface'):
                         if _k in _item and isinstance(_item[_k], dict):
-                            if _item[_k].get('surfaceId') == 'suggestions':
+                            # Matches both the bare 'suggestions' id and the
+                            # per-turn scoped 'suggestions-<task_id>' (see
+                            # _scope_suggestions_surface).
+                            if (_item[_k].get('surfaceId') or '').startswith('suggestions'):
                                 return True
     except Exception:
         pass
     return False
 
 
+def _iter_surface_updates(parts):
+    # Yields every surfaceUpdate dict found in a list of a2a Parts.
+    for _p in parts:
+        try:
+            _root = getattr(_p, 'root', None)
+            if not (_root and isinstance(_root, a2a_types.DataPart)):
+                continue
+            _data = _root.data
+            _items = _data if isinstance(_data, list) else [_data]
+            for _item in _items:
+                if isinstance(_item, dict) and isinstance(_item.get('surfaceUpdate'), dict):
+                    yield _item['surfaceUpdate']
+        except Exception:
+            continue
+
+
+def _surface_update_has_button(_su) -> bool:
+    for _c in (_su.get('components') or []):
+        if isinstance(_c, dict) and isinstance(_c.get('component'), dict) and 'Button' in _c['component']:
+            return True
+    return False
+
+
+def _has_populated_suggestions(parts) -> bool:
+    # True iff some part carries a surfaceUpdate on a 'suggestions*' surface
+    # that actually contains at least one Button (a begin-only suggestions
+    # surface, or an update with no Buttons, renders as nothing in GE).
+    for _su in _iter_surface_updates(parts):
+        if (_su.get('surfaceId') or '').startswith('suggestions') and _surface_update_has_button(_su):
+            return True
+    return False
+
+
+def _has_interactive_card(parts) -> bool:
+    # True iff some NON-suggestions surface contains Button components.
+    # Mirrors the prompt's A2UI CARD INTERACTION EXCEPTION: when a card carries
+    # its own control buttons, suggestion chips are intentionally absent and
+    # must NOT be re-prompted for.
+    for _su in _iter_surface_updates(parts):
+        if not (_su.get('surfaceId') or '').startswith('suggestions') and _surface_update_has_button(_su):
+            return True
+    return False
+
+
+# --- Per-turn scoping for the always-on 'suggestions' surface ---
+# GE/A2UI treats a surfaceId as a conversation-level singleton anchored to the
+# message where it was FIRST rendered. The suggestion chip bar reuses a constant
+# surfaceId ('suggestions') on every turn, so a later turn's chips would patch
+# that singleton in place and render under the PREVIOUS turn's response (and the
+# current turn would show none). Rewriting the surfaceId to a per-turn unique id
+# forces GE to create a fresh surface anchored to the CURRENT message each turn.
+# Scoped here (the single choke point for all A2UI parts) so the model contract
+# stays 'suggestions' and no prompt change is needed.
+# NOTE: ONLY 'suggestions' is scoped. 'confirmation-surface' and 'welcome-card'
+# must keep stable ids: confirmation is intentionally carried across turns and
+# torn down via deleteSurface; welcome-card only renders on the first turn.
+_current_suggestions_suffix = contextvars.ContextVar('suggestions_suffix', default=None)
+
+def _scope_suggestions_surface(msg):
+    _suffix = _current_suggestions_suffix.get()
+    if not _suffix or not isinstance(msg, dict):
+        return msg
+    for _k in ('beginRendering', 'surfaceUpdate', 'dataModelUpdate', 'deleteSurface'):
+        _v = msg.get(_k)
+        if isinstance(_v, dict) and _v.get('surfaceId') == 'suggestions':
+            _v['surfaceId'] = 'suggestions-' + _suffix
+    return msg
+
 def create_a2ui_part(msg):
     _healed = _heal_buttons_in_a2ui(msg)
     _rewritten = _rewrite_suggestions_a2ui(_healed)
+    _rewritten = _scope_suggestions_surface(_rewritten)
     try:
         return _original_create_a2ui_part(_rewritten, version='0.8')
     except TypeError:
@@ -10232,7 +10906,7 @@ def _truncate_response_deep(_obj, _max_chars):
         return [_truncate_response_deep(item, _max_chars) for item in _obj]
     return _obj
 
-def _heal_session_events(session):
+def _heal_session_events(session, force_aggressive=False):
     if not session or not hasattr(session, 'events') or not session.events:
         return
     
@@ -10272,13 +10946,55 @@ def _heal_session_events(session):
         )
 
     # =========================================================================
-    # Token reduction — applied ONLY when root_agent uses a lightweight model
-    # (flash-lite). Heavier models (3.5-flash, pro) retain full context.
+    # Token reduction (v10.62) — keeps the input context under the 1M-token
+    # model window. Triggered when ANY of:
+    #   - force_aggressive=True (emergency, after a token-overflow ClientError)
+    #   - the root model is a lightweight model (flash-lite) — always compact
+    #   - the measured context size exceeds the char budget. Heavier models
+    #     (3.5-flash / pro) keep FULL context UNTIL near the limit, so normal
+    #     large reports are never trimmed — only runaway contexts are.
+    # Char-based by design: generated-image bytes are NOT stored in history
+    # (generate_image stashes them in session.state), so the real bloat is
+    # text — SQL result sets, MCP payloads, multi-turn accumulation.
     # =========================================================================
     _root_model = os.environ.get("AGENT_MODEL_LITE", "gemini-3.5-flash").lower()
-    if "lite" in _root_model:
-        _MAX_TOOL_CHARS = 2000
-        _MAX_EVENTS = 40
+    _is_lite = "lite" in _root_model
+
+    def _event_char_size(_ev):
+        _content = getattr(_ev, 'content', None)
+        if not _content or not getattr(_content, 'parts', None):
+            return 0
+        _sz = 0
+        for _part in _content.parts:
+            _t = getattr(_part, 'text', None)
+            if isinstance(_t, str):
+                _sz += len(_t)
+            _fr = getattr(_part, 'function_response', None)
+            if _fr and hasattr(_fr, 'response'):
+                try:
+                    _sz += len(str(_fr.response))
+                except Exception:
+                    pass
+        return _sz
+    _ctx_chars = sum(_event_char_size(_ev) for _ev in healed_events)
+
+    # ~1M-token window. JA can be ~1 char/token, so trigger well below 1M chars
+    # while staying clear of typical English reports (~4 chars/token). X-C's
+    # error-driven salvage is the hard backstop if anything slips past this.
+    _CHAR_BUDGET = 1800000
+    if force_aggressive or _is_lite or _ctx_chars > _CHAR_BUDGET:
+        if force_aggressive:
+            _MAX_TOOL_CHARS = 1500
+            _MAX_EVENTS = 30
+            _mode = "aggressive"
+        elif _is_lite:
+            _MAX_TOOL_CHARS = 2000
+            _MAX_EVENTS = 40
+            _mode = "lite"
+        else:
+            _MAX_TOOL_CHARS = 8000
+            _MAX_EVENTS = 60
+            _mode = "budget"
         _truncated_parts = 0
 
         # 1. Truncate large content in event parts
@@ -10307,16 +11023,148 @@ def _heal_session_events(session):
 
         if _truncated_parts > 0 or _pre_cap > _MAX_EVENTS:
             logger.log_text(
-                f"[HEALER] Token reduction (lite): truncated={_truncated_parts} parts, "
-                f"events {_pre_cap}->{len(healed_events)} (max={_MAX_EVENTS})"
+                "[HEALER] Token reduction (" + _mode + "): ctx_chars=" + str(_ctx_chars)
+                + " truncated=" + str(_truncated_parts) + " parts, events "
+                + str(_pre_cap) + "->" + str(len(healed_events)) + " (max=" + str(_MAX_EVENTS) + ")"
             )
 
     session.events = healed_events
 
 
+# =============================================================================
+# Y2 (v10.63): Per-session in-flight serialization.
+# Concurrent ADK runs on the SAME InMemorySession corrupt each other: a new
+# request calls _heal_session_events (mutating session.events) WHILE a slow
+# in-flight invocation (e.g. a ~60s inline deep_analysis) is mid-iteration,
+# which silently kills the in-flight run so it never completes. We serialize
+# invocations per session_id with an asyncio.Lock so a later request WAITS for
+# the in-flight one to finish (and runs on the healed session) instead of
+# racing it. Single event loop -> the dict access needs no extra locking.
+# Demo services run minScale=1 / concurrency>1, so same-session requests land
+# on the same instance, making an in-process lock sufficient.
+# =============================================================================
+_session_locks = {}
+def _get_session_lock(_sid):
+    import asyncio as _sl_asyncio
+    _lk = _session_locks.get(_sid)
+    if _lk is None:
+        _lk = _sl_asyncio.Lock()
+        _session_locks[_sid] = _lk
+    return _lk
+
+
+# =============================================================================
+# G1 (v10.65): Replay cache for duplicate action presses.
+# A single A2UI press is delivered as 3-5 identical invocations (multi-fire /
+# stream retries). The winner caches its final deliverable here keyed by the
+# idempotency key; duplicates re-emit the SAME parts so whichever stream GE
+# displays shows the real result instead of an empty "completed" turn. Same
+# event loop -> no extra locking; bounded to the most-recent entries.
+# =============================================================================
+_idem_results = {}
+def _store_idem_result(_key, _parts):
+    if not _key or not _parts:
+        return
+    _idem_results[_key] = _parts
+    if len(_idem_results) > 300:
+        for _old in list(_idem_results.keys())[:len(_idem_results) - 300]:
+            _idem_results.pop(_old, None)
+
+
+def _rescope_replay_parts(_parts, _suffix):
+    """Deep-copy replayed parts and re-anchor their A2UI surfaces to THIS task.
+
+    GE anchors a surfaceId to the message where it FIRST rendered
+    (conversation-level singleton). Replaying a cached artifact verbatim on a
+    different task therefore re-renders NOTHING for its card surfaces: the
+    beginRendering/surfaceUpdate just patch the ORIGINAL turn's card in place
+    and the replay turn shows text only (confirmed 2026-06-10: a duplicate
+    press turn displayed the prior turn's text while its 'flex-form' card
+    never appeared). Renaming every surfaceId with a per-replay suffix forces
+    GE to create fresh surfaces anchored to the replay turn, so the replayed
+    turn visually matches the winner turn. deleteSurface is left untouched:
+    it targets the ORIGINAL surface and renaming it would only turn a valid
+    teardown into a no-op. Suggestions surfaces are already per-turn scoped
+    ('suggestions-<task>'); the extra suffix keeps the 'suggestions' prefix
+    that downstream checks rely on.
+    """
+    _sfx = re.sub(r'[^A-Za-z0-9_-]', '', str(_suffix or ''))[:48]
+    if not _sfx or not _parts:
+        return _parts
+    def _rename(_obj):
+        if isinstance(_obj, dict):
+            for _k in ('beginRendering', 'surfaceUpdate', 'dataModelUpdate'):
+                _v = _obj.get(_k)
+                if isinstance(_v, dict) and _v.get('surfaceId'):
+                    _v['surfaceId'] = str(_v['surfaceId']) + '-r' + _sfx
+        elif isinstance(_obj, list):
+            for _it in _obj:
+                _rename(_it)
+    _out = []
+    for _p in _parts:
+        try:
+            _root = getattr(_p, 'root', None)
+            if isinstance(_root, a2a_types.DataPart) and getattr(_root, 'data', None) is not None:
+                _cp = _p.model_copy(deep=True)
+                _rename(_cp.root.data)
+                _out.append(_cp)
+            else:
+                _out.append(_p)
+        except Exception:
+            _out.append(_p)
+    return _out
+
+
+# =============================================================================
+# H1 (v10.66): Per-session last-deliverable cache for GE "Regenerate".
+# GE's "Regenerate response" re-sends the SAME request as a NEW invocation
+# (different idempotency key, so G1 replay does not catch it). The model, seeing
+# the answer already in history, returns an empty/short response — which the
+# terminal else-branch used to emit as a content-replacing final, BLANKING the
+# delivered report. We cache the last real deliverable per session keyed by a
+# stable message signature; when a turn yields NO new deliverable AND its
+# signature matches the cached one (i.e. a re-send/regenerate of the same
+# request), we replay the cached parts instead of blanking the turn.
+# =============================================================================
+_session_last_artifact = {}
+def _store_session_artifact(_sid, _sig, _parts):
+    if not _sid or not _parts:
+        return
+    _session_last_artifact[_sid] = (_sig, _parts)
+    if len(_session_last_artifact) > 300:
+        for _old in list(_session_last_artifact.keys())[:len(_session_last_artifact) - 300]:
+            _session_last_artifact.pop(_old, None)
+
+def _msg_signature(_run_args):
+    # Stable across a GE regenerate (which keeps the same chip/text but may change
+    # the userAction timestamp): key on sourceComponentId + context text, or the
+    # typed text. Deliberately ignores surfaceId (carries a per-turn UUID suffix).
+    try:
+        import json as _sj
+        _typed = ''
+        for _p in (getattr(_run_args.get('new_message'), 'parts', None) or []):
+            _t = getattr(_p, 'text', None)
+            if not _t:
+                continue
+            if 'userAction' in _t:
+                try:
+                    _ua = _sj.loads(_t).get('userAction', {}) or {}
+                    _ctx = _ua.get('context', {}) or {}
+                    return 'ua|' + str(_ua.get('sourceComponentId', '')) + '|' + str(_ctx.get('text', ''))
+                except Exception:
+                    pass
+            else:
+                _typed = _t
+        return 'txt|' + _typed
+    except Exception:
+        return ''
+
+
 class AdkAgentToA2AExecutor(A2aAgentExecutor):
     # Note: Concurrent request dedup is handled at the Firestore level
-    # in register_background_task (duplicate task_name check).
+    # in register_background_task (duplicate task_name check) and per-press
+    # via the Y1 idempotency guard. Overlapping (non-identical) invocations on
+    # one session are serialized by the Y2 per-session lock (see _get_session_lock).
     # The previous _active_contexts guard was removed because context_id
     # is shared across all interactions in a conversation, causing
     # legitimate subsequent requests to be blocked.
@@ -10335,10 +11183,145 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
     ) -> None:
         runner = await self._resolve_runner()
 
+        # Scope the always-on 'suggestions' surface to THIS turn so its chips
+        # render under the current message instead of leaking onto the previous
+        # turn's response. context.task_id is unique per A2A task (= per turn);
+        # consumed by _scope_suggestions_surface() via create_a2ui_part().
+        try:
+            _turn_suffix = re.sub(r'[^A-Za-z0-9_-]', '', str(context.task_id or ''))[:64] or uuid.uuid4().hex
+            _current_suggestions_suffix.set(_turn_suffix)
+        except Exception:
+            pass
+
         run_args = part_converters.convert_a2a_request_to_adk_run_args(context)
 
         session_id = run_args['session_id']
         user_id = run_args['user_id']
+
+        # =============================================================================
+        # Y1/G1 (v10.65): Duplicate chip/button-press handling with REPLAY.
+        # A single A2UI press arrives as 3-5 identical sendText invocations
+        # (multi-fire / GE stream retries) on the same session, all carrying the
+        # SAME userAction.timestamp. We serialize on the per-session lock (Y2),
+        # then INSIDE the lock claim that timestamp once in Firestore: the first
+        # holder is the winner (runs normally and caches its deliverable); later
+        # holders are duplicates that REPLAY the winner's cached artifact on their
+        # own task, so whichever stream GE shows displays the real result instead
+        # of an empty "completed" turn. Serializing the claim inside the lock
+        # guarantees the winner runs before any duplicate reads the cache.
+        # Typed messages (no userAction timestamp) are never deduped.
+        # =============================================================================
+        _idem_key_raw = None
+        _idem_src = ''
+        try:
+            import json as _idem_json
+            _ua_ts = None
+            _ua_surface = ''
+            _ua_source = ''
+            for _p in (getattr(run_args.get('new_message'), 'parts', None) or []):
+                _pt = getattr(_p, 'text', None)
+                if not (_pt and 'userAction' in _pt):
+                    continue
+                try:
+                    _ua_obj = _idem_json.loads(_pt).get('userAction', {}) or {}
+                except Exception:
+                    _ua_obj = {}
+                _ua_ts = _ua_obj.get('timestamp')
+                _ua_surface = str(_ua_obj.get('surfaceId', ''))
+                _ua_source = str(_ua_obj.get('sourceComponentId', ''))
+                if _ua_ts:
+                    break
+            if _ua_ts:
+                import hashlib as _idem_hl
+                _idem_key_raw = _idem_hl.sha1(
+                    (session_id + '|' + _ua_surface + '|' + _ua_source + '|' + str(_ua_ts)).encode('utf-8')
+                ).hexdigest()
+                _idem_src = _ua_source
+        except Exception as _idem_err:
+            logger.log_text("[idempotency] key parse skipped (non-fatal): " + str(_idem_err)[:160])
+
+        # Serialize on the session lock (fail OPEN on timeout), then claim/replay/run.
+        import asyncio as _y2_asyncio
+        _sess_lock = _get_session_lock(session_id)
+        _y2_held = False
+        try:
+            await _y2_asyncio.wait_for(_sess_lock.acquire(), timeout=850)
+            _y2_held = True
+        except Exception as _y2_err:
+            logger.log_text("[session_lock] acquire skipped (non-fatal): " + str(_y2_err)[:120])
+        try:
+            _winner_key = None
+            if _idem_key_raw:
+                try:
+                    import builtins as _idem_bi
+                    from google.api_core import exceptions as _idem_exc
+                    _idem_fs = getattr(_idem_bi, '_firestore_client', None)
+                    _idem_demo = os.environ.get("DEMO_ID", "")
+                    if _idem_fs and _idem_demo:
+                        _idem_ref = _idem_fs.collection(_idem_demo + "_action_idempotency").document(_idem_key_raw)
+                        _is_dup = False
+                        try:
+                            _idem_ref.create({
+                                'claimed_at': datetime.now(timezone.utc).isoformat(),
+                                'session_id': session_id,
+                                'source_component_id': _idem_src,
+                            })
+                        except _idem_exc.AlreadyExists:
+                            _is_dup = True
+                        if _is_dup:
+                            # Winner has already finished (we hold the lock after it);
+                            # replay its cached deliverable on THIS duplicate task.
+                            # Re-scope surfaceIds so the replayed cards actually
+                            # render on this turn (v10.72, see _rescope_replay_parts).
+                            _rp_parts = _rescope_replay_parts(
+                                _idem_results.get(_idem_key_raw), context.task_id)
+                            logger.log_text(
+                                "[idempotency] duplicate press -> replay src=" + _idem_src
+                                + " key=" + _idem_key_raw[:12] + " parts=" + str(len(_rp_parts) if _rp_parts else 0)
+                            )
+                            if _rp_parts:
+                                await event_queue.enqueue_event(
+                                    TaskArtifactUpdateEvent(
+                                        task_id=context.task_id,
+                                        last_chunk=True,
+                                        context_id=context.context_id,
+                                        artifact=Artifact(artifact_id=str(uuid.uuid4()), parts=_rp_parts),
+                                    )
+                                )
+                            await event_queue.enqueue_event(
+                                TaskStatusUpdateEvent(
+                                    task_id=context.task_id,
+                                    context_id=context.context_id,
+                                    status=TaskStatus(
+                                        state=TaskState.completed,
+                                        timestamp=datetime.now(timezone.utc).isoformat(),
+                                    ),
+                                    final=True,
+                                )
+                            )
+                            return
+                        else:
+                            _winner_key = _idem_key_raw
+                except Exception as _claim_err:
+                    logger.log_text("[idempotency] claim skipped (non-fatal): " + str(_claim_err)[:160])
+            await self._process_request_body(context, event_queue, runner, run_args, session_id, user_id, idem_key=_winner_key)
+        finally:
+            if _y2_held:
+                try:
+                    _sess_lock.release()
+                except Exception:
+                    pass
+
+    async def _process_request_body(
+        self,
+        context: RequestContext,
+        event_queue: EventQueue,
+        runner,
+        run_args,
+        session_id,
+        user_id,
+        idem_key=None,
+    ) -> None:
         session = await runner.session_service.get_session(
             app_name=runner.app_name,
             user_id=user_id,
@@ -10433,6 +11416,20 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
         # =============================================================================
         artifact_text_parts = []
         artifact_media_parts = []
+        # Running capture of SHORT conversational text the model emitted this turn
+        # (incl. text later cleared by a trailing tool call). Used only by the
+        # UI-only render guard below to promote a real prior utterance into an
+        # otherwise text=0 artifact, which GE refuses to render. Never fabricated.
+        _all_model_texts = []
+        # True once the adk_request_credential auth flow has produced its user
+        # message this turn. The auth texts are short (~74 chars) and final by
+        # design - the stub guard and chip re-prompt below must never touch them.
+        _auth_flow = False
+        # True once a deterministic configuration error (e.g. tool-schema
+        # rejection) has produced its final user message. Like _auth_flow, the
+        # stub guard / chip re-prompt must not fire extra LLM calls for it --
+        # those calls re-send the same broken tool declarations and fail too.
+        _fatal_config_error = False
 
 
         # =============================================================================
@@ -10459,14 +11456,128 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
         # =============================================================================
         # MALFORMED_FUNCTION_CALL Auto-Retry
         # The lite model sometimes fails to generate valid tool calls after errors.
-        # Instead of immediately showing an error to the user, retry once with
-        # a healed session. run_async can be safely re-invoked on the same session.
+        # Instead of immediately showing an error to the user, retry up to twice
+        # with a healed session (multimodal/image turns make MALFORMED more likely,
+        # so 1 retry was too thin). run_async can be safely re-invoked on the same
+        # session. Each retry is a FULL re-run, so the 800s watchdog bounds latency.
         # =============================================================================
-        _max_malformed_retries = 1
+        _max_malformed_retries = 3  # v10.61: was 2 — a touch more stochastic-retry headroom before salvage
         _malformed_retries = 0
         _malformed_should_retry = False
 
-        async for adk_event in runner.run_async(**run_args):
+        # =============================================================================
+        # LlmCallsLimit Auto-Continue (v10.57)
+        # Long, multi-step reports can exhaust RunConfig.max_llm_calls mid-invocation.
+        # ADK raises LlmCallsLimitExceededError from inside runner.run_async; if it
+        # escapes execute() the task fails with NO artifact (the report is lost),
+        # even though the session already holds every gathered tool result. Manually
+        # typing "continue" recovers it because a NEW invocation resets the call
+        # counter. This wrapper does the same automatically, IN THE SAME TURN: on a
+        # limit error it heals the session, resets the stream parser, and re-invokes
+        # run_async with a short continuation message, up to _MAX_AUTO_CONTINUES
+        # times. The 800s watchdog remains the overall wall-clock safety net.
+        # Caught by class name (not import) to stay robust across ADK versions.
+        # =============================================================================
+        _MAX_AUTO_CONTINUES = 4
+        # v10.61: English prompt with an explicit same-language clause so the recovered
+        # report follows the conversation's language instead of being forced to Japanese.
+        _CONTINUE_MESSAGE = (
+            "Using everything you have already gathered and analyzed, finish the "
+            "interrupted report to completion. Keep any additional tool calls to the "
+            "strict minimum. Write the report in the SAME language you have been using "
+            "with the user in this conversation; do not switch languages."
+        )
+
+        async def _run_with_auto_continue(initial_args=None):
+            nonlocal stream_parser
+            _auto_continues = 0
+            _cont_args = initial_args if initial_args is not None else run_args
+            while True:
+                try:
+                    async for _ac_event in runner.run_async(**_cont_args):
+                        yield _ac_event
+                    return  # run_async finished without hitting the call limit
+                except Exception as _ac_err:
+                    if type(_ac_err).__name__ != 'LlmCallsLimitExceededError':
+                        raise  # not our concern — let normal handling take over
+                    if _auto_continues >= _MAX_AUTO_CONTINUES or _timed_out:
+                        # Budget exhausted / timed out: stop gracefully so the
+                        # drain + artifact logic can emit whatever was accumulated
+                        # instead of failing the whole task.
+                        logger.log_text("LlmCallsLimitExceededError - auto-continue budget exhausted; emitting partial result")
+                        return
+                    _auto_continues += 1
+                    logger.log_text(
+                        "LlmCallsLimitExceededError - auto-continuing in-turn ("
+                        + str(_auto_continues) + "/" + str(_MAX_AUTO_CONTINUES) + ")"
+                    )
+                    # Re-fetch + heal the session so the next invocation resumes cleanly.
+                    _ac_session = await runner.session_service.get_session(
+                        app_name=runner.app_name,
+                        user_id=run_args['user_id'],
+                        session_id=run_args['session_id'],
+                    )
+                    if _ac_session is not None:
+                        _heal_session_events(_ac_session)
+                    # Fresh parser: the interrupted partial stream is discarded; the
+                    # final report is produced by the continuation invocation.
+                    stream_parser = A2uiStreamParser(catalog=a2ui_selected_catalog)
+                    # Keep the user informed (stays inside the Thinking accordion).
+                    _ac_msg = "⏳ This is taking a while. Consolidating the results so far and continuing to generate the report… (" + str(_auto_continues) + "/" + str(_MAX_AUTO_CONTINUES) + ")"
+                    _ac_evt = TaskStatusUpdateEvent(
+                        task_id=context.task_id,
+                        context_id=context.context_id,
+                        status=TaskStatus(
+                            state=TaskState.working,
+                            message=Message(
+                                message_id=str(uuid.uuid4()),
+                                role=Role.agent,
+                                parts=[a2a_types.Part(root=a2a_types.TextPart(text=_ac_msg))],
+                            ),
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                        ),
+                        final=False,
+                    )
+                    task_result_aggregator.process_event(_ac_evt)
+                    await event_queue.enqueue_event(_ac_evt)
+                    # Re-invoke with a short continuation prompt (fresh call budget).
+                    _cont_args = dict(run_args)
+                    _cont_args['new_message'] = genai_types.Content(
+                        role='user',
+                        parts=[genai_types.Part(text=_CONTINUE_MESSAGE)],
+                    )
+                    continue
+
+        # =============================================================================
+        # MALFORMED retry re-entry (v10.58)
+        # Wraps _run_with_auto_continue so a MALFORMED_FUNCTION_CALL retry feeds its
+        # events back through the SAME main-loop body (with A2uiStreamParser + all
+        # SAFETY NETs) instead of a separate simplified pass that dumped raw text
+        # (and any A2UI JSON) straight into the artifact. The body sets
+        # _malformed_should_retry + continue; we end the current run here, heal the
+        # session, reset the parser, and start a fresh run on the same iteration.
+        # =============================================================================
+        async def _all_events():
+            nonlocal stream_parser, _malformed_should_retry
+            while True:
+                async for _ev in _run_with_auto_continue():
+                    yield _ev
+                    if _malformed_should_retry:
+                        break  # stop consuming the current (failed) run
+                if _malformed_should_retry:
+                    _malformed_should_retry = False
+                    _rs = await runner.session_service.get_session(
+                        app_name=runner.app_name,
+                        user_id=run_args['user_id'],
+                        session_id=run_args['session_id'],
+                    )
+                    if _rs is not None:
+                        _heal_session_events(_rs)
+                    stream_parser = A2uiStreamParser(catalog=a2ui_selected_catalog)
+                    continue  # re-run on the healed session
+                return
+
+        async for adk_event in _all_events():
           if _timed_out:
               logger.log_text("⏱️ Agent processing timed out after 800s — sending graceful error to user.")
               timeout_part = a2a_types.Part(root=a2a_types.TextPart(
@@ -10500,64 +11611,81 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
 
           if hasattr(adk_event, 'error_code') and adk_event.error_code:
               _err_code_str = str(adk_event.error_code)
+              # --- Deterministic tool-schema rejection: fail fast (v10.71) ---
+              # Vertex rejects the request when a tool declaration cannot be
+              # compiled server-side ("Limits exceeded while trying to flatten
+              # schema" - e.g. a recursive custom-MCP schema that reached the
+              # API raw). EVERY retry and EVERY synth-salvage pass re-sends
+              # the same tool declarations, so no amount of retrying can
+              # succeed. Surface an explicit, actionable error immediately
+              # instead of burning the salvage loop (confirmed 2026-06-10:
+              # 4 identical ~4-min retry cycles ended in a GE ServerError).
+              # Checked BEFORE the ClientError/X-C branch because the
+              # tools.py fast-fail patch demotes this 500 to a ClientError.
+              # NOTE: ADK 2.x error events carry only the exception CLASS
+              # name in error_code (e.g. "ServerError"); the detail lives in
+              # error_message - so match against both.
+              _err_full_str = _err_code_str + " " + str(getattr(adk_event, 'error_message', '') or '')
+              if ('flatten schema' in _err_full_str
+                      or 'Schema is too complex' in _err_full_str):
+                  logger.log_text("[schema_error] deterministic tool-schema rejection - failing fast: " + _err_full_str[:200])
+                  _schema_err_part = a2a_types.Part(root=a2a_types.TextPart(
+                      text="⚠️ The model rejected this agent's tool definitions (a tool schema is too complex - typically a deeply recursive custom MCP tool schema). Retrying cannot fix this. Please redeploy the agent with ADK_DISABLE_JSON_SCHEMA_FOR_FUNC_DECL=1, or remove/simplify the offending MCP tool."
+                  ))
+                  artifact_text_parts.clear()
+                  artifact_text_parts.append(_schema_err_part)
+                  _fatal_config_error = True
+                  break
               # --- MALFORMED_FUNCTION_CALL recovery ---
               # The model sometimes generates invalid tool calls (bad schema,
               # mixed text + function_call). Instead of failing hard, provide
               # a user-friendly retry message so the conversation can continue.
               if 'MALFORMED_FUNCTION_CALL' in _err_code_str:
-                  # --- Auto-retry: heal session and re-invoke run_async ---
+                  # --- Auto-retry: flag for re-run; _all_events() heals + restarts ---
+                  # Session healing, parser reset, and the fresh run are handled by
+                  # the _all_events() wrapper so the retry's events flow back through
+                  # THIS same body (A2uiStreamParser + all SAFETY NETs). Doing a raw
+                  # break into a separate simplified loop previously dumped the
+                  # post-retry report (incl. A2UI JSON) as raw text.
                   if _malformed_retries < _max_malformed_retries:
                       _malformed_retries += 1
                       logger.log_text("MALFORMED_FUNCTION_CALL detected - auto-retrying (" + str(_malformed_retries) + "/" + str(_max_malformed_retries) + ")")
-                      # Re-fetch session and heal to remove the failed event
-                      session = await runner.session_service.get_session(
-                          app_name=runner.app_name, user_id=run_args['user_id'], session_id=run_args['session_id']
-                      )
-                      _heal_session_events(session)
-                      # Reset stream parser for clean retry
-                      stream_parser = A2uiStreamParser(catalog=a2ui_selected_catalog)
                       _malformed_should_retry = True
-                      break  # Break inner async for loop to retry run_async
+                      continue  # _all_events() heals the session and re-runs
 
-                  # --- Max retries exhausted: show recovery message ---
-                  logger.log_text("MALFORMED_FUNCTION_CALL detected - retries exhausted - event: " + str(adk_event) + " - vars: " + str(getattr(adk_event, '__dict__', 'N/A')) + " - providing retry guidance to user.")
-                  _recovery_text = "I encountered a temporary processing error. Let me try a different approach - please repeat your request or click a suggestion below."
-                  _recovery_part = a2a_types.Part(root=a2a_types.TextPart(text=_recovery_text))
+                  # --- Max retries exhausted: route to synthesis salvage (v10.61) ---
+                  # Do NOT surrender to the user yet. All gathered data is still in the
+                  # session; breaking here with artifact_text_parts left EMPTY lets the
+                  # tool-forbidden synthesis-recovery loop below run. Because that pass
+                  # forbids tool calls it cannot MALFORMED on a tool call, so it salvages
+                  # the report in the same turn the vast majority of the time. The B-1
+                  # guaranteed fallback (further below) remains the true last resort, so
+                  # the user is no longer forced to click "Try Again" repeatedly.
+                  logger.log_text("MALFORMED_FUNCTION_CALL detected - retries exhausted - routing to tool-forbidden synthesis salvage")
+                  break
+              # --- X-C (v10.62): input-token overflow / client-error salvage ---
+              # A 1M-token context overflow surfaces as a ClientError /
+              # INVALID_ARGUMENT ("exceeds the maximum number of tokens"). Do NOT
+              # show a bare "Error: ClientError"; aggressively compact the session
+              # and fall through to the tool-forbidden synthesis salvage so the
+              # user still gets a report (or the B-1 fallback). The synth loop
+              # re-heals with the budget compactor, so the retry payload fits.
+              if ('exceeds the maximum number of tokens' in _err_code_str
+                      or 'INVALID_ARGUMENT' in _err_code_str
+                      or 'ClientError' in _err_code_str):
+                  logger.log_text("[token_overflow] main run client error - emergency compaction + synthesis salvage: " + _err_code_str[:160])
+                  try:
+                      _oc_sess = await runner.session_service.get_session(
+                          app_name=runner.app_name,
+                          user_id=run_args['user_id'],
+                          session_id=run_args['session_id'],
+                      )
+                      if _oc_sess is not None:
+                          _heal_session_events(_oc_sess, force_aggressive=True)
+                  except Exception as _oc_err:
+                      logger.log_text("[token_overflow] emergency compaction failed (non-fatal): " + str(_oc_err)[:160])
                   artifact_text_parts.clear()
-                  artifact_text_parts.append(_recovery_part)
-
-                  # Programmatically inject fallback suggestion chips so the user can actually "click a suggestion below" to recover!
-                  _fallback_suggestions = [
-                      { 'beginRendering': { 'surfaceId': 'suggestions', 'root': 'root' } },
-                      { 'surfaceUpdate': { 'surfaceId': 'suggestions', 'components': [
-                          { 'id': 'root', 'component': { 'Row': { 'children': { 'explicitList': ['fb_chip1', 'fb_chip2'] }, 'distribution': 'spaceEvenly', 'alignment': 'center' } } },
-                          { 'id': 'fb_chip1', 'component': { 'Button': { 'child': 'fb_chip1Lbl', 'action': { 'name': 'sendText', 'context': [{ 'key': 'text', 'value': { 'literalString': 'Please try the last analysis step again' } }] } } } },
-                          { 'id': 'fb_chip1Lbl', 'component': { 'Text': { 'text': { 'literalString': '🔄 Try Again' }, 'usageHint': 'body' } } },
-                          { 'id': 'fb_chip2', 'component': { 'Button': { 'child': 'fb_chip2Lbl', 'action': { 'name': 'sendText', 'context': [{ 'key': 'text', 'value': { 'literalString': 'Hello' } }] } } } },
-                          { 'id': 'fb_chip2Lbl', 'component': { 'Text': { 'text': { 'literalString': '🏠 Restart' }, 'usageHint': 'body' } } }
-                      ] } }
-                  ]
-                  for _item in _fallback_suggestions:
-                      fb_ui_part = create_a2ui_part(_item)
-                      artifact_media_parts.append(fb_ui_part)
-                  # Emit as working status so the user sees it immediately
-                  _recovery_evt = TaskStatusUpdateEvent(
-                      task_id=context.task_id,
-                      context_id=context.context_id,
-                      status=TaskStatus(
-                          state=TaskState.working,
-                          message=Message(
-                              message_id=str(uuid.uuid4()),
-                              role=Role.agent,
-                              parts=[_recovery_part],
-                          ),
-                          timestamp=datetime.now(timezone.utc).isoformat(),
-                      ),
-                      final=False,
-                  )
-                  task_result_aggregator.process_event(_recovery_evt)
-                  await event_queue.enqueue_event(_recovery_evt)
-                  continue
+                  break
               a2a_event = TaskStatusUpdateEvent(
                       task_id=context.task_id,
                       context_id=context.context_id,
@@ -10732,6 +11860,9 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                               text_part = a2a_types.Part(root=a2a_types.TextPart(text=rp.text))
                               synthetic_parts.append(text_part)
                               artifact_text_parts.append(text_part)  # ★ Cleared on next function_call
+                              # Keep a copy for the UI-only render guard (short texts only).
+                              if _trimmed and len(_trimmed) <= 2000:
+                                  _all_model_texts.append(_trimmed)
                           if rp.a2ui_json:
                               a2ui_messages = rp.a2ui_json if isinstance(rp.a2ui_json, list) else [rp.a2ui_json]
                               a2ui_messages = _heal_a2ui_message_list(a2ui_messages)
@@ -11043,6 +12174,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                                       auth_part = a2a_types.Part(root=a2a_types.TextPart(text=auth_text))
                                       artifact_text_parts.clear()
                                       artifact_text_parts.append(auth_part)
+                                      _auth_flow = True
                                       # Send as final response (don't clear)
                                       a2a_event = TaskStatusUpdateEvent(
                                               task_id=context.task_id,
@@ -11063,6 +12195,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                                       auth_part = a2a_types.Part(root=a2a_types.TextPart(text=auth_text))
                                       artifact_text_parts.clear()
                                       artifact_text_parts.append(auth_part)
+                                      _auth_flow = True
                                       a2a_event = TaskStatusUpdateEvent(
                                               task_id=context.task_id,
                                               context_id=context.context_id,
@@ -11089,8 +12222,30 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                               # EXCEPTION 2: register_background_task - the LLM
                               # often emits the full user confirmation alongside the
                               # function_call. Clearing traps it in thinking.
+                              # EXCEPTION 3: generate_image - the model is instructed
+                              # to emit the full analysis text in the SAME response as
+                              # the generate_image call (TURN SPLITTING rule). Clearing
+                              # here silently discards that report, leaving only the
+                              # auto-attached image (the "image-only response" bug).
+                              # GENERAL RULE: if ADK flagged this model response as the
+                              # genuine user-facing response (custom_metadata
+                              # "a2a:response", set by inject_image_callback /
+                              # a2ui_metadata_callback), its text is deliverable, not
+                              # progress — preserve it regardless of which tool was
+                              # called. This generalizes the fix beyond images.
                               _is_transfer = part.function_call.name.startswith('transfer_to_') or part.function_call.name == 'transfer_to_agent'
-                              _preserve = _is_transfer or part.function_call.name == 'register_background_task'
+                              _event_is_response = False
+                              try:
+                                  _cm = getattr(adk_event, 'custom_metadata', None)
+                                  if isinstance(_cm, dict) and _cm.get('a2a:response'):
+                                      _event_is_response = True
+                              except Exception:
+                                  _event_is_response = False
+                              _preserve = (
+                                  _is_transfer
+                                  or part.function_call.name in ('register_background_task', 'generate_image')
+                                  or _event_is_response
+                              )
                               if not _preserve:
                                   artifact_text_parts.clear()
                           elif part.function_response:
@@ -11114,6 +12269,26 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                                   )
                                   task_result_aggregator.process_event(_fr_text_evt)
                                   await event_queue.enqueue_event(_fr_text_evt)
+                                  # D-1: heartbeat to fill the silent gap during the
+                                  # (non-streamed) model generation that follows the
+                                  # last tool. For intermediate tools it is harmlessly
+                                  # superseded by the next tool's status.
+                                  _hb_evt = TaskStatusUpdateEvent(
+                                      task_id=context.task_id,
+                                      context_id=context.context_id,
+                                      status=TaskStatus(
+                                          state=TaskState.working,
+                                          message=Message(
+                                              message_id=str(uuid.uuid4()),
+                                              role=Role.agent,
+                                              parts=[a2a_types.Part(root=a2a_types.TextPart(text="📝 Synthesizing the results into the report…"))],
+                                          ),
+                                          timestamp=datetime.now(timezone.utc).isoformat(),
+                                      ),
+                                      final=False,
+                                  )
+                                  task_result_aggregator.process_event(_hb_evt)
+                                  await event_queue.enqueue_event(_hb_evt)
                           elif part.executable_code:
                               # --- Code execution: show the code being executed ---
                               _exec_code = getattr(part.executable_code, 'code', '') or ''
@@ -11179,47 +12354,10 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                               task_result_aggregator.process_event(a2a_event)
                               await event_queue.enqueue_event(a2a_event)
 
-        # --- MALFORMED_FUNCTION_CALL Auto-Retry ---
-        # If a retry was triggered, run a second event loop pass with healed session.
-        if _malformed_should_retry:
-            logger.log_text("MALFORMED_FUNCTION_CALL - restarting run_async after session healing")
-            _malformed_should_retry = False
-            async for adk_event in runner.run_async(**run_args):
-              if _timed_out:
-                  break
-              if hasattr(adk_event, 'error_code') and adk_event.error_code:
-                  _err2 = str(adk_event.error_code)
-                  if 'MALFORMED_FUNCTION_CALL' in _err2:
-                      # Second MALFORMED — exhausted retries, show recovery message
-                      logger.log_text("MALFORMED_FUNCTION_CALL - retry also failed, showing recovery message")
-                      _recovery_text = "I encountered a temporary processing error. Let me try a different approach - please repeat your request or click a suggestion below."
-                      _recovery_part = a2a_types.Part(root=a2a_types.TextPart(text=_recovery_text))
-                      artifact_text_parts.clear()
-                      artifact_text_parts.append(_recovery_part)
-                      _fallback_suggestions = [
-                          { 'beginRendering': { 'surfaceId': 'suggestions', 'root': 'root' } },
-                          { 'surfaceUpdate': { 'surfaceId': 'suggestions', 'components': [
-                              { 'id': 'root', 'component': { 'Row': { 'children': { 'explicitList': ['fb_chip1', 'fb_chip2'] }, 'distribution': 'spaceEvenly', 'alignment': 'center' } } },
-                              { 'id': 'fb_chip1', 'component': { 'Button': { 'child': 'fb_chip1Lbl', 'action': { 'name': 'sendText', 'context': [{ 'key': 'text', 'value': { 'literalString': 'Please try the last analysis step again' } }] } } } },
-                              { 'id': 'fb_chip1Lbl', 'component': { 'Text': { 'text': { 'literalString': '🔄 Try Again' }, 'usageHint': 'body' } } },
-                              { 'id': 'fb_chip2', 'component': { 'Button': { 'child': 'fb_chip2Lbl', 'action': { 'name': 'sendText', 'context': [{ 'key': 'text', 'value': { 'literalString': 'Hello' } }] } } } },
-                              { 'id': 'fb_chip2Lbl', 'component': { 'Text': { 'text': { 'literalString': '🏠 Restart' }, 'usageHint': 'body' } } }
-                          ] } }
-                      ]
-                      for _item in _fallback_suggestions:
-                          fb_ui_part = create_a2ui_part(_item)
-                          artifact_media_parts.append(fb_ui_part)
-                      continue
-              # Process normal events in retry loop (text, function_call, etc.)
-              content = getattr(adk_event, 'content', None)
-              if content and hasattr(content, 'parts'):
-                  for part in content.parts:
-                      if hasattr(part, 'text') and part.text:
-                          _final_response = getattr(adk_event, 'is_final_response', lambda: False)
-                          if callable(_final_response) and _final_response():
-                              artifact_text_parts.append(a2a_types.Part(root=a2a_types.TextPart(text=part.text)))
-                      if hasattr(part, 'function_call') and part.function_call:
-                          artifact_text_parts.clear()
+        # MALFORMED_FUNCTION_CALL retries are handled in-loop by _all_events()
+        # above: the body flags _malformed_should_retry + continue, and the wrapper
+        # heals the session and re-runs through this same body. No separate retry
+        # pass is needed (it previously bypassed the A2UI parser/safety nets).
 
         # Cancel the timeout watchdog now that the event loop has finished
         _watchdog_task.cancel()
@@ -11302,10 +12440,393 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
         logger.log_text(f"[final_artifact] text={len(artifact_text_parts)} normal_media={len(_normal_media)} suggestion_media={len(_suggestion_media)} total={len(artifact_parts)}")
         logger.log_text(f"[final_artifact_parts] {_part_labels}")
 
+        # =============================================================================
+        # Stub guard (v10.70): the model can stall with a degenerate-but-VALID
+        # final output - confirmed in logs (Input 175k -> Output 6 tokens, a bare
+        # progress line, zero function_calls in the invocation). No error code
+        # fires, so no existing salvage triggers, and the stub becomes the whole
+        # deliverable (rendered outside thinking; the turn just stops). Detect by
+        # deliverable SHAPE - a stub of text with no card/image and no chips -
+        # and route through the synthesis recovery below with a neutral
+        # completion prompt. Clarifying questions (ending in a question mark)
+        # are preserved verbatim; auth and timeout turns are exempt.
+        # =============================================================================
+        _stub_guard_fired = False
+        if (not _normal_media) and (not _suggestion_media) and (not _timed_out) and (not _auth_flow) and (not _fatal_config_error):
+            _stub_len = 0
+            _stub_tail = ''
+            for _sg_p in artifact_text_parts:
+                _sg_t = (getattr(getattr(_sg_p, 'root', None), 'text', '') or '').strip()
+                if _sg_t:
+                    _stub_len += len(_sg_t)
+                    _stub_tail = _sg_t[-1]
+            if 0 < _stub_len <= 120 and _stub_tail not in ('?', chr(0xFF1F)):
+                _stub_guard_fired = True
+                logger.log_text("[stub_guard] " + str(_stub_len) + "-char stub deliverable, no card/chips - completion re-prompt")
+                artifact_text_parts.clear()
+                artifact_parts = []
+
+        # =============================================================================
+        # B-2 (v10.59): Synthesis retry when the turn produced NO deliverable.
+        # The final report generation can return empty (Content:None) on a bloated
+        # context; enforce_result then injects a raw tool dict that leak_failsafe
+        # blocks -> total=0 -> the UI hangs on "thinking". Instead of giving up, we
+        # re-run the agent with a synthesis-only prompt (no tools), up to N times.
+        # _heal_session_events compresses the bloated context (existing mechanism),
+        # raising success odds while keeping the model's prior conclusions. This
+        # fires ONLY on the empty path; normal successful turns are untouched.
+        # =============================================================================
+        def _extract_report_parts(_text):
+            # Convert a report-shaped text chunk into (text_parts, media_parts),
+            # reusing the A2UI stream parser + the untagged/tagged safety nets.
+            _tp, _mp = [], []
+            _found = False
+            _sp = A2uiStreamParser(catalog=a2ui_selected_catalog)
+            try:
+                _chunk = _sanitize_a2ui_text_icons(_text) if '<a2ui-json>' in _text else _text
+                _rps = _sp.process_chunk(_chunk)
+            except Exception:
+                _rps = []
+            for _rp in _rps:
+                if _rp.text and _rp.text.strip():
+                    _stripped = _rp.text.strip()
+                    # Block raw Python dict/list repr leaks (same guard as main loop).
+                    if not ((_stripped.startswith('{') or _stripped.startswith('[')) and ("'content':" in _stripped or "'parts':" in _stripped)):
+                        _tp.append(a2a_types.Part(root=a2a_types.TextPart(text=_rp.text)))
+                if _rp.a2ui_json:
+                    _msgs = _rp.a2ui_json if isinstance(_rp.a2ui_json, list) else [_rp.a2ui_json]
+                    for _m in _heal_a2ui_message_list(_msgs):
+                        _mp.append(create_a2ui_part(_m))
+                        _found = True
+            # Untagged A2UI safety net (model omitted <a2ui-json> tags).
+            if not _found and '<a2ui-json>' not in _text and any(_k in _text for _k in ('"beginRendering"', '"surfaceUpdate"', '"deleteSurface"')):
+                _pos = 0
+                while _pos < len(_text):
+                    _sb = _text.find('{', _pos)
+                    _sk = _text.find('[', _pos)
+                    if _sb == -1 and _sk == -1:
+                        break
+                    _start = _sb if _sk == -1 else (_sk if _sb == -1 else min(_sb, _sk))
+                    _oc = _text[_start]
+                    _cc = '}' if _oc == '{' else ']'
+                    _end = _find_balanced_block(_text, _start, _oc, _cc)
+                    if _end == -1:
+                        _pos = _start + 1
+                        continue
+                    _obj = _parse_loose_json(_text[_start:_end])
+                    _ok = False
+                    if isinstance(_obj, list):
+                        _ok = any(isinstance(_i, dict) and (any(_kk in _i for _kk in ("beginRendering", "surfaceUpdate", "deleteSurface")) or ("id" in _i and "component" in _i)) for _i in _obj)
+                    elif isinstance(_obj, dict):
+                        _ok = any(_kk in _obj for _kk in ("beginRendering", "surfaceUpdate", "deleteSurface")) or ("id" in _obj and "component" in _obj)
+                    if _ok:
+                        _items = _obj if isinstance(_obj, list) else [_obj]
+                        for _it in _heal_a2ui_message_list(_items):
+                            if isinstance(_it, dict):
+                                _mp.append(create_a2ui_part(_it))
+                        _pos = _end
+                    else:
+                        _pos = _start + 1
+            return _tp, _mp
+
+        # v10.61: English prompts + same-language clause (see _CONTINUE_MESSAGE).
+        _SYNTH_FULL_MSG = (
+            "Using ONLY the results you have already gathered (do NOT make any more "
+            "tool calls), produce the final analysis report now, in full. Include the "
+            "analytical body text, an A2UI card wrapped in <a2ui-json> tags, and "
+            "suggestion chips at the end. Write everything in the SAME language you "
+            "have been using with the user in this conversation; do not switch languages."
+        )
+        _SYNTH_TEXT_MSG = (
+            "Using ONLY the results you have already gathered (do NOT make any more "
+            "tool calls, and do NOT use A2UI or JSON), produce the final analysis report "
+            "now as complete Markdown plain text. Include the key findings, the numbers, "
+            "and at least three recommendations. Write everything in the SAME language "
+            "you have been using with the user in this conversation; do not switch languages."
+        )
+        # v10.70: neutral completion prompt for the stub guard. Deliberately does
+        # NOT force a report shape - a greeting/confirmation stub should be
+        # re-completed as a greeting/confirmation, not inflated into a report.
+        _STUB_COMPLETE_MSG = (
+            "Your previous reply was an unfinished status line, not a complete "
+            "answer. Complete your final response to the user now, using ONLY the "
+            "results you have already gathered (do NOT make any more tool calls). "
+            "Provide the full answer the user asked for, with A2UI cards where "
+            "appropriate and suggestion chips at the end. Write everything in the "
+            "SAME language you have been using with the user in this conversation; "
+            "do not switch languages."
+        )
+        # v10.70: chip-only re-prompt for the missing-chips recovery below.
+        _SYNTH_CHIPS_MSG = (
+            "Your previous response was delivered to the user, but its suggestion "
+            "chips were missing. Output ONLY the suggestion chip bar now: a single "
+            "<a2ui-json> block using surfaceId 'suggestions', containing BOTH the "
+            "beginRendering message AND the surfaceUpdate message with a Row of 3-4 "
+            "Buttons whose sendText actions reflect natural next actions in this "
+            "conversation. Do NOT repeat the report, do NOT output any other text, "
+            "cards, or tool calls. Write the button labels in the SAME language you "
+            "have been using with the user."
+        )
+        _MAX_SYNTH_RETRIES = 3
+        _synth_try = 0
+        while (not artifact_text_parts) and (not _normal_media) and (not _timed_out) and _synth_try < _MAX_SYNTH_RETRIES:
+            _synth_try += 1
+            logger.log_text("[synth_retry] empty deliverable - synthesis retry " + str(_synth_try) + "/" + str(_MAX_SYNTH_RETRIES))
+            _hb_msg = "📝 Synthesizing the analysis results into the report… (" + str(_synth_try) + "/" + str(_MAX_SYNTH_RETRIES) + ")"
+            _hb_evt = TaskStatusUpdateEvent(
+                task_id=context.task_id,
+                context_id=context.context_id,
+                status=TaskStatus(
+                    state=TaskState.working,
+                    message=Message(message_id=str(uuid.uuid4()), role=Role.agent, parts=[a2a_types.Part(root=a2a_types.TextPart(text=_hb_msg))]),
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                ),
+                final=False,
+            )
+            task_result_aggregator.process_event(_hb_evt)
+            await event_queue.enqueue_event(_hb_evt)
+            # Heal + compress the bloated context (existing mechanism); reset parser.
+            _sr_session = await runner.session_service.get_session(
+                app_name=runner.app_name, user_id=run_args['user_id'], session_id=run_args['session_id']
+            )
+            if _sr_session is not None:
+                _heal_session_events(_sr_session)
+            stream_parser = A2uiStreamParser(catalog=a2ui_selected_catalog)
+            artifact_text_parts.clear()
+            artifact_media_parts.clear()
+            if _stub_guard_fired and _synth_try == 1:
+                _synth_msg = _STUB_COMPLETE_MSG
+            else:
+                _synth_msg = _SYNTH_TEXT_MSG if _synth_try >= _MAX_SYNTH_RETRIES else _SYNTH_FULL_MSG
+            _synth_args = dict(run_args)
+            _synth_args['new_message'] = genai_types.Content(role='user', parts=[genai_types.Part(text=_synth_msg)])
+            try:
+                async for _sr_event in _run_with_auto_continue(initial_args=_synth_args):
+                    if _timed_out:
+                        break
+                    _sr_content = getattr(_sr_event, 'content', None)
+                    if not (_sr_content and hasattr(_sr_content, 'parts')):
+                        continue
+                    for _sr_part in _sr_content.parts:
+                        if getattr(_sr_part, 'text', None):
+                            _t_parts, _m_parts = _extract_report_parts(_sr_part.text)
+                            artifact_text_parts.extend(_t_parts)
+                            artifact_media_parts.extend(_m_parts)
+            except Exception as _sr_err:
+                logger.log_text("[synth_retry] error during synthesis run: " + str(_sr_err))
+            # Drain any buffered A2UI left in the synthesis parser.
+            try:
+                _sr_rem = getattr(stream_parser, '_buffer', '')
+                if _sr_rem:
+                    if getattr(stream_parser, '_found_delimiter', False):
+                        _drain = stream_parser.process_chunk('</a2ui-json>')
+                    else:
+                        _drain = [ResponsePart(text=_sr_rem)]
+                        stream_parser._buffer = ''
+                    for _dp in _drain:
+                        if _dp.text and _dp.text.strip():
+                            artifact_text_parts.append(a2a_types.Part(root=a2a_types.TextPart(text=_dp.text)))
+                        if _dp.a2ui_json:
+                            _dm = _dp.a2ui_json if isinstance(_dp.a2ui_json, list) else [_dp.a2ui_json]
+                            for _dmi in _heal_a2ui_message_list(_dm):
+                                artifact_media_parts.append(create_a2ui_part(_dmi))
+            except Exception:
+                pass
+            # Recompute media split + artifact_parts after the synthesis pass.
+            _normal_media = []
+            _suggestion_media = []
+            for _mp2 in artifact_media_parts:
+                if _is_suggestions_part(_mp2):
+                    _suggestion_media.append(_mp2)
+                else:
+                    _normal_media.append(_mp2)
+            artifact_parts = artifact_text_parts + _normal_media + _suggestion_media
+            if artifact_parts:
+                logger.log_text("[synth_retry] recovered deliverable on retry " + str(_synth_try) + " (text=" + str(len(artifact_text_parts)) + ", media=" + str(len(artifact_media_parts)) + ")")
+                break
+
+        # =============================================================================
+        # B-1 (v10.59): Guaranteed fallback. If synthesis retries still produced no
+        # deliverable, never end silently -- emit an explicit message + retry chips
+        # so the UI shows a real response instead of hanging on "thinking".
+        # =============================================================================
+        if not artifact_parts:
+            logger.log_text("[synth_retry] all retries exhausted - emitting explicit fallback message")
+            _b1_text = "⚠️ The report could not be generated. The analysis scope may be too large. Please narrow the target period, entities, or metrics and try again."
+            _b1_c1_text = "Narrow the analysis to a single entity"
+            _b1_c1_label = "🎯 Narrow scope"
+            _b1_c2_text = "Generate the report again"
+            _b1_c2_label = "🔄 Retry"
+            _b1_part = a2a_types.Part(root=a2a_types.TextPart(text=_b1_text))
+            artifact_text_parts.clear()
+            artifact_text_parts.append(_b1_part)
+            _b1_suggestions = [
+                { 'beginRendering': { 'surfaceId': 'suggestions', 'root': 'root' } },
+                { 'surfaceUpdate': { 'surfaceId': 'suggestions', 'components': [
+                    { 'id': 'root', 'component': { 'Row': { 'children': { 'explicitList': ['b1_chip1', 'b1_chip2'] }, 'distribution': 'spaceEvenly', 'alignment': 'center' } } },
+                    { 'id': 'b1_chip1', 'component': { 'Button': { 'child': 'b1_chip1Lbl', 'action': { 'name': 'sendText', 'context': [{ 'key': 'text', 'value': { 'literalString': _b1_c1_text } }] } } } },
+                    { 'id': 'b1_chip1Lbl', 'component': { 'Text': { 'text': { 'literalString': _b1_c1_label }, 'usageHint': 'body' } } },
+                    { 'id': 'b1_chip2', 'component': { 'Button': { 'child': 'b1_chip2Lbl', 'action': { 'name': 'sendText', 'context': [{ 'key': 'text', 'value': { 'literalString': _b1_c2_text } }] } } } },
+                    { 'id': 'b1_chip2Lbl', 'component': { 'Text': { 'text': { 'literalString': _b1_c2_label }, 'usageHint': 'body' } } }
+                ] } }
+            ]
+            artifact_media_parts = []
+            for _b1_item in _b1_suggestions:
+                artifact_media_parts.append(create_a2ui_part(_b1_item))
+            _normal_media = []
+            _suggestion_media = []
+            for _mp3 in artifact_media_parts:
+                if _is_suggestions_part(_mp3):
+                    _suggestion_media.append(_mp3)
+                else:
+                    _normal_media.append(_mp3)
+            artifact_parts = artifact_text_parts + _normal_media + _suggestion_media
+            # Stream the fallback message + chips as a WORKING event so GE renders the
+            # suggestions surface from the live stream (chips only in the final artifact
+            # may not render). Mirrors the prior MALFORMED-recovery streaming pattern.
+            try:
+                _b1_evt = TaskStatusUpdateEvent(
+                    task_id=context.task_id,
+                    context_id=context.context_id,
+                    status=TaskStatus(
+                        state=TaskState.working,
+                        message=Message(
+                            message_id=str(uuid.uuid4()),
+                            role=Role.agent,
+                            parts=[_b1_part] + _suggestion_media,
+                        ),
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                    ),
+                    final=False,
+                )
+                task_result_aggregator.process_event(_b1_evt)
+                await event_queue.enqueue_event(_b1_evt)
+            except Exception as _b1_err:
+                logger.log_text("[synth_retry] B-1 streaming failed: " + str(_b1_err))
+            logger.log_text(f"[final_artifact_after_recovery] text={len(artifact_text_parts)} normal_media={len(_normal_media)} suggestion_media={len(_suggestion_media)} total={len(artifact_parts)}")
+
+        # =============================================================================
+        # UI-only render guard (v10.68): GE does NOT render a final artifact that has
+        # UI/media parts but ZERO text parts (confirmed in logs: a welcome-card-only
+        # turn with text=0 showed a blank turn). The greeting prompt now asks the model
+        # to lead with a one-line plain-text greeting, but the lite model may ignore it.
+        # As a backstop, if the turn ends UI-only, promote the most recent SHORT
+        # conversational text the model emitted this turn (often cleared earlier by a
+        # trailing tool call) into the artifact so the turn renders. We NEVER fabricate
+        # text (no hardcoded natural language); if nothing reusable was captured we log
+        # and leave the turn as-is.
+        # =============================================================================
+        if (not artifact_text_parts) and (_normal_media or _suggestion_media):
+            _promoted = None
+            for _cand in reversed(_all_model_texts):
+                _c = (_cand or '').strip()
+                if _c:
+                    _promoted = _c
+                    break
+            if _promoted:
+                artifact_text_parts.append(a2a_types.Part(root=a2a_types.TextPart(text=_promoted)))
+                artifact_parts = artifact_text_parts + _normal_media + _suggestion_media
+                logger.log_text("[ui_only_guard] promoted prior model text to prevent blank UI-only render (len=" + str(len(_promoted)) + ")")
+            else:
+                logger.log_text("[ui_only_guard] UI-only artifact (text=0) and no reusable model text captured - turn may render blank")
+
+        # =============================================================================
+        # Chip recovery (v10.70): intermittently the model omits the Next Actions
+        # chips - either a begin-only 'suggestions' surface with no surfaceUpdate
+        # (renders as nothing), or no suggestions block at all (confirmed in logs:
+        # a long text-only answer with suggestion_media=0 under degraded context).
+        # (a) Drop orphan begin-only suggestion surfaces. (b) If the turn has a
+        # substantive deliverable but no populated chips, run ONE chip-only
+        # re-prompt and keep ONLY the suggestion parts it returns. Skipped when a
+        # card carries its own control buttons (the prompt's A2UI CARD INTERACTION
+        # EXCEPTION makes chips intentionally absent there), on auth/timeout
+        # turns, and when B-1 already attached its retry chips. Runs BEFORE the
+        # G1 idempotency cache and the H1 session artifact store so replays and
+        # GE "Regenerate" serve the chip-complete version.
+        # =============================================================================
+        _chips_ok = _has_populated_suggestions(_suggestion_media)
+        if (not _chips_ok) and _suggestion_media:
+            _orphan_count = len(_suggestion_media)
+            _suggestion_media = []
+            artifact_media_parts = [p for p in artifact_media_parts if not _is_suggestions_part(p)]
+            artifact_parts = artifact_text_parts + _normal_media + _suggestion_media
+            logger.log_text("[chip_reprompt] dropped " + str(_orphan_count) + " orphan suggestion part(s) (no populated surfaceUpdate)")
+        if ((not _chips_ok) and (not _timed_out) and (not _auth_flow)
+                and (not _fatal_config_error)
+                and (not _has_interactive_card(_normal_media))):
+            _cr_text_len = sum(
+                len((getattr(getattr(p, 'root', None), 'text', '') or '').strip())
+                for p in artifact_text_parts
+            )
+            if _normal_media or _cr_text_len > 120:
+                logger.log_text("[chip_reprompt] substantive deliverable without chips - one chip-only re-prompt")
+                _cr_args = dict(run_args)
+                _cr_args['new_message'] = genai_types.Content(role='user', parts=[genai_types.Part(text=_SYNTH_CHIPS_MSG)])
+                _cr_media = []
+                try:
+                    async for _cr_event in _run_with_auto_continue(initial_args=_cr_args):
+                        if _timed_out:
+                            break
+                        _cr_content = getattr(_cr_event, 'content', None)
+                        if not (_cr_content and hasattr(_cr_content, 'parts')):
+                            continue
+                        for _cr_part in _cr_content.parts:
+                            if getattr(_cr_part, 'text', None):
+                                _cr_tp, _cr_mp = _extract_report_parts(_cr_part.text)
+                                _cr_media.extend(_cr_mp)
+                except Exception as _cr_err:
+                    logger.log_text("[chip_reprompt] error during chip re-prompt: " + str(_cr_err))
+                # Keep ONLY suggestion parts - any re-emitted text or cards are
+                # discarded so the re-prompt can never duplicate the deliverable.
+                _recovered_chips = [p for p in _cr_media if _is_suggestions_part(p)]
+                if _has_populated_suggestions(_recovered_chips):
+                    # Stream the chips as a WORKING event so GE renders the
+                    # suggestions surface from the live stream (chips only in the
+                    # final artifact may not render). Mirrors the B-1 pattern.
+                    try:
+                        _cr_evt = TaskStatusUpdateEvent(
+                            task_id=context.task_id,
+                            context_id=context.context_id,
+                            status=TaskStatus(
+                                state=TaskState.working,
+                                message=Message(
+                                    message_id=str(uuid.uuid4()),
+                                    role=Role.agent,
+                                    parts=_recovered_chips,
+                                ),
+                                timestamp=datetime.now(timezone.utc).isoformat(),
+                            ),
+                            final=False,
+                        )
+                        task_result_aggregator.process_event(_cr_evt)
+                        await event_queue.enqueue_event(_cr_evt)
+                    except Exception as _cr_stream_err:
+                        logger.log_text("[chip_reprompt] streaming recovered chips failed: " + str(_cr_stream_err))
+                    artifact_media_parts.extend(_recovered_chips)
+                    _suggestion_media = list(_recovered_chips)
+                    artifact_parts = artifact_text_parts + _normal_media + _suggestion_media
+                    logger.log_text("[chip_reprompt] recovered " + str(len(_recovered_chips)) + " suggestion part(s)")
+                else:
+                    logger.log_text("[chip_reprompt] re-prompt yielded no usable chips - leaving turn as-is")
+
+        # G1 (v10.65): cache this winner's final deliverable so duplicate presses
+        # of the SAME action can replay it instead of rendering an empty turn.
+        if idem_key:
+            _replay_parts = artifact_parts or (
+                task_result_aggregator.task_status_message.parts
+                if (task_result_aggregator.task_status_message is not None
+                    and task_result_aggregator.task_status_message.parts) else None)
+            _store_idem_result(idem_key, _replay_parts)
+
+        # H1 (v10.66): signature of THIS turn's request, used to detect a
+        # regenerate/re-send of the same request that produced the last report.
+        _cur_sig = _msg_signature(run_args)
+
         if (
             task_result_aggregator.task_state == TaskState.working
             and artifact_parts
         ):
+          _store_session_artifact(session_id, _cur_sig, artifact_parts)
           await event_queue.enqueue_event(
               TaskArtifactUpdateEvent(
                   task_id=context.task_id,
@@ -11334,6 +12855,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
             and task_result_aggregator.task_status_message.parts
         ):
           # Fallback: use last message if no artifact parts accumulated
+          _store_session_artifact(session_id, _cur_sig, task_result_aggregator.task_status_message.parts)
           await event_queue.enqueue_event(
               TaskArtifactUpdateEvent(
                   task_id=context.task_id,
@@ -11357,18 +12879,52 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
               )
           )
         else:
-          await event_queue.enqueue_event(
-              TaskStatusUpdateEvent(
-                  task_id=context.task_id,
-                  status=TaskStatus(
-                      state=task_result_aggregator.task_state,
-                      timestamp=datetime.now(timezone.utc).isoformat(),
-                      message=task_result_aggregator.task_status_message,
-                  ),
-                  context_id=context.context_id,
-                  final=True,
+          # H1: the model produced NO new deliverable this turn. If this is a
+          # re-send/regenerate of the same request that produced the last report
+          # (matching signature), replay that report so GE's "Regenerate" does not
+          # blank the turn. Otherwise emit a clean terminal status (never a
+          # non-completed state with final=True, which GE treats as incomplete).
+          _last = _session_last_artifact.get(session_id)
+          if (_last and _last[0] == _cur_sig and _cur_sig
+                  and task_result_aggregator.task_state != TaskState.failed):
+              logger.log_text("[empty_turn] no new deliverable - replaying last session report (" + str(len(_last[1])) + " parts)")
+              await event_queue.enqueue_event(
+                  TaskArtifactUpdateEvent(
+                      task_id=context.task_id,
+                      last_chunk=True,
+                      context_id=context.context_id,
+                      # Re-scope surfaceIds so replayed cards render on the
+                      # regenerated turn (v10.72, see _rescope_replay_parts).
+                      artifact=Artifact(artifact_id=str(uuid.uuid4()), parts=_rescope_replay_parts(_last[1], context.task_id)),
+                  )
               )
-          )
+              await event_queue.enqueue_event(
+                  TaskStatusUpdateEvent(
+                      task_id=context.task_id,
+                      status=TaskStatus(
+                          state=TaskState.completed,
+                          timestamp=datetime.now(timezone.utc).isoformat(),
+                      ),
+                      context_id=context.context_id,
+                      final=True,
+                  )
+              )
+          else:
+              _final_state = task_result_aggregator.task_state
+              if _final_state == TaskState.working:
+                  _final_state = TaskState.completed
+              await event_queue.enqueue_event(
+                  TaskStatusUpdateEvent(
+                      task_id=context.task_id,
+                      status=TaskStatus(
+                          state=_final_state,
+                          timestamp=datetime.now(timezone.utc).isoformat(),
+                          message=task_result_aggregator.task_status_message,
+                      ),
+                      context_id=context.context_id,
+                      final=True,
+                  )
+              )
 
 request_handler = DefaultRequestHandler(
     agent_executor=AdkAgentToA2AExecutor(runner=runner, use_legacy=True), task_store=InMemoryTaskStore()
@@ -11692,48 +13248,168 @@ async def execute_task(request: Request):
                 _full_prompt = _task_prompt
 
                 _results = []
+                _all_text = []
                 _tool_calls = []
                 _event_count = 0
                 _cancel_check_counter = 0
-                async for event in _runner.run_async(
-                    user_id=_user_id,
-                    session_id=_session_id,
-                    new_message=_genai_types.Content(
-                        role="user",
-                        parts=[_genai_types.Part(text=_full_prompt)],
-                    ),
-                ):
-                    _event_count += 1
+                _bg_malformed_retries = 0
 
-                    # Track tool calls for diagnostics
-                    if event.content and event.content.parts:
-                        for _ep in event.content.parts:
-                            if hasattr(_ep, 'function_call') and _ep.function_call:
-                                _fc_name = _ep.function_call.name if _ep.function_call.name else "unknown"
-                                _tool_calls.append(_fc_name)
-                                _wlogger.warning("execute_task: TOOL_CALL task=%s tool=%s", _task_id, _fc_name)
-                            if hasattr(_ep, 'function_response') and _ep.function_response:
-                                _fr_name = _ep.function_response.name if _ep.function_response.name else "unknown"
-                                _wlogger.warning("execute_task: TOOL_RESULT task=%s tool=%s", _task_id, _fr_name)
+                # =====================================================================
+                # Background resilience — parity with the foreground handler.
+                # The worker previously ran run_async raw: a MALFORMED_FUNCTION_CALL or
+                # LlmCallsLimit at the synthesis step ended the run with no final text,
+                # so result_summary was stored as "No output" even after all data was
+                # gathered. This mirrors the proven foreground logic (v10.55-v10.59):
+                #   - LlmCallsLimit auto-continue (re-invoke with a continuation message)
+                #   - MALFORMED retry + session heal (re-run the whole invocation)
+                #   - robust text capture (retain any text part as a fallback)
+                #   - synthesis recovery (re-prompt for a text-only report if empty)
+                # The happy path (final response has text) is unchanged — every new
+                # branch fires ONLY on the error/empty paths.
+                # =====================================================================
+                _BG_MAX_AUTO_CONTINUES = 4
+                _BG_MAX_MALFORMED_RETRIES = 3  # v10.61: was 2 — parity with foreground
+                _BG_MAX_SYNTH_RETRIES = 3
+                # v10.61: English prompts + same-language clause so the stored report
+                # follows the conversation's language instead of being forced to Japanese.
+                _BG_CONTINUE_MESSAGE = (
+                    "Using everything you have already gathered and analyzed, finish the "
+                    "interrupted report to completion. Keep any additional tool calls to the "
+                    "strict minimum. Write the report in the SAME language you have been using "
+                    "with the user in this conversation; do not switch languages."
+                )
+                _BG_SYNTH_MESSAGE = (
+                    "Using ONLY the results you have already gathered (do NOT make any more "
+                    "tool calls, and do NOT use A2UI or JSON), produce the final analysis report "
+                    "now as complete Markdown plain text. Include the key findings, the numbers, "
+                    "and at least three recommendations. Write everything in the SAME language "
+                    "you have been using with the user in this conversation; do not switch languages."
+                )
 
-                    # Cooperative cancellation check (every 10 events to reduce Firestore reads)
-                    _cancel_check_counter += 1
-                    if _cancel_check_counter % 10 == 0:
+                async def _bg_heal_session():
+                    try:
+                        _hs = await _runner.session_service.get_session(
+                            app_name=_runner.app_name, user_id=_user_id, session_id=_session_id,
+                        )
+                        if _hs is not None:
+                            _heal_session_events(_hs)
+                    except Exception as _he:
+                        _wlogger.warning("execute_task: session heal failed task=%s err=%s", _task_id, str(_he)[:200])
+
+                async def _bg_run_with_auto_continue(_msg_text):
+                    # Re-invoke run_async on LlmCallsLimitExceededError with a healed
+                    # session + continuation message, up to _BG_MAX_AUTO_CONTINUES.
+                    # Caught by class name (not import) to stay robust across ADK versions.
+                    _auto = 0
+                    _cur_text = _msg_text
+                    while True:
                         try:
-                            _check_snap = _exec_ref.get()
-                            _check = _check_snap.to_dict() if _check_snap.exists else {}
-                            if _check.get("status") == "cancelled":
-                                _wlogger.warning("execute_task: CANCELLED task=%s after %d events", _task_id, _event_count)
-                                return {"status": "cancelled", "task_id": _task_id}
-                        except Exception:
-                            pass  # Check failure should not stop task execution
+                            async for _ev in _runner.run_async(
+                                user_id=_user_id,
+                                session_id=_session_id,
+                                new_message=_genai_types.Content(role="user", parts=[_genai_types.Part(text=_cur_text)]),
+                            ):
+                                yield _ev
+                            return
+                        except Exception as _ace:
+                            if type(_ace).__name__ != 'LlmCallsLimitExceededError':
+                                raise
+                            if _auto >= _BG_MAX_AUTO_CONTINUES:
+                                _wlogger.warning("execute_task: LlmCallsLimit budget exhausted task=%s — emitting partial", _task_id)
+                                return
+                            _auto += 1
+                            _wlogger.warning("execute_task: LlmCallsLimit auto-continue task=%s (%d/%d)", _task_id, _auto, _BG_MAX_AUTO_CONTINUES)
+                            await _bg_heal_session()
+                            _cur_text = _BG_CONTINUE_MESSAGE
 
-                    if event.is_final_response() and event.content and event.content.parts:
-                        for _p in event.content.parts:
-                            if hasattr(_p, 'text') and _p.text:
-                                _results.append(_p.text)
+                async def _bg_events(_msg_text):
+                    # Wrap the auto-continue generator with MALFORMED retry: on a
+                    # MALFORMED_FUNCTION_CALL event, heal the session and re-run the
+                    # whole invocation on the same session (mirrors foreground _all_events).
+                    nonlocal _bg_malformed_retries
+                    _retry_text = _msg_text
+                    while True:
+                        _should_retry = False
+                        async for _ev in _bg_run_with_auto_continue(_retry_text):
+                            _ec = getattr(_ev, 'error_code', None)
+                            if _ec and 'MALFORMED_FUNCTION_CALL' in str(_ec) and _bg_malformed_retries < _BG_MAX_MALFORMED_RETRIES:
+                                _bg_malformed_retries += 1
+                                _wlogger.warning("execute_task: MALFORMED auto-retry task=%s (%d/%d)", _task_id, _bg_malformed_retries, _BG_MAX_MALFORMED_RETRIES)
+                                _should_retry = True
+                                break
+                            yield _ev
+                        if _should_retry:
+                            await _bg_heal_session()
+                            _retry_text = _BG_CONTINUE_MESSAGE
+                            continue
+                        return
 
-                _result_text = chr(10).join(_results) if _results else "No output"
+                async def _bg_consume(_gen):
+                    # Shared consumption: tool tracking, cancellation, text capture.
+                    # Returns True if the task was cancelled mid-run.
+                    nonlocal _event_count, _cancel_check_counter
+                    async for event in _gen:
+                        _event_count += 1
+
+                        # Track tool calls for diagnostics + robust text capture
+                        if event.content and event.content.parts:
+                            for _ep in event.content.parts:
+                                if hasattr(_ep, 'function_call') and _ep.function_call:
+                                    _fc_name = _ep.function_call.name if _ep.function_call.name else "unknown"
+                                    _tool_calls.append(_fc_name)
+                                    _wlogger.warning("execute_task: TOOL_CALL task=%s tool=%s", _task_id, _fc_name)
+                                if hasattr(_ep, 'function_response') and _ep.function_response:
+                                    _fr_name = _ep.function_response.name if _ep.function_response.name else "unknown"
+                                    _wlogger.warning("execute_task: TOOL_RESULT task=%s tool=%s", _task_id, _fr_name)
+                                # Robust capture: retain ANY text part as a fallback so a
+                                # missing final-response text never silently loses content.
+                                if hasattr(_ep, 'text') and _ep.text:
+                                    _all_text.append(_ep.text)
+
+                        # Cooperative cancellation check (every 10 events to reduce Firestore reads)
+                        _cancel_check_counter += 1
+                        if _cancel_check_counter % 10 == 0:
+                            try:
+                                _check_snap = _exec_ref.get()
+                                _check = _check_snap.to_dict() if _check_snap.exists else {}
+                                if _check.get("status") == "cancelled":
+                                    _wlogger.warning("execute_task: CANCELLED task=%s after %d events", _task_id, _event_count)
+                                    return True
+                            except Exception:
+                                pass  # Check failure should not stop task execution
+
+                        if event.is_final_response() and event.content and event.content.parts:
+                            for _p in event.content.parts:
+                                if hasattr(_p, 'text') and _p.text:
+                                    _results.append(_p.text)
+                    return False
+
+                # --- Main run (auto-continue + MALFORMED retry) ---
+                if await _bg_consume(_bg_events(_full_prompt)):
+                    return {"status": "cancelled", "task_id": _task_id}
+
+                # --- Synthesis recovery: no final-response text was produced (e.g. the
+                # synthesis turn hit MALFORMED/limit). The data is already gathered, so
+                # re-prompt for a text-only report, healing the bloated context first. ---
+                _synth_try = 0
+                while (not _results) and _synth_try < _BG_MAX_SYNTH_RETRIES:
+                    _synth_try += 1
+                    _wlogger.warning("execute_task: synthesis recovery task=%s (%d/%d) — empty final text, re-synthesizing", _task_id, _synth_try, _BG_MAX_SYNTH_RETRIES)
+                    await _bg_heal_session()
+                    try:
+                        if await _bg_consume(_bg_run_with_auto_continue(_BG_SYNTH_MESSAGE)):
+                            return {"status": "cancelled", "task_id": _task_id}
+                    except Exception as _se:
+                        _wlogger.warning("execute_task: synthesis recovery error task=%s err=%s", _task_id, str(_se)[:200])
+
+                # Prefer final-response text; fall back to any captured text; else empty.
+                if _results:
+                    _result_text = chr(10).join(_results)
+                elif _all_text:
+                    _wlogger.warning("execute_task: using fallback text capture task=%s (no final-response text)", _task_id)
+                    _result_text = chr(10).join(_all_text)
+                else:
+                    _result_text = "No output"
                 # Strip A2UI blocks from result — they are session-specific UI artifacts
                 # that become meaningless when stored and replayed later.
                 import re as _re_strip
@@ -11745,10 +13421,24 @@ async def execute_task(request: Request):
                     _wlogger.warning("execute_task: NO_TOOL_CALLS task=%s events=%d — agent may not have executed operations", _task_id, _event_count)
 
                 _final_status = "completed"
+                # Persist the FULL report (was [:2000], which truncated the deliverable
+                # so "View Full Report"/continue could never recover the rest). Cap by
+                # BYTES, not chars: JA is ~3 bytes/char in UTF-8, and the whole doc
+                # (this field + tool_calls + log_tail) must stay under Firestore's 1 MiB
+                # document limit, so leave generous headroom.
+                _RESULT_CAP_BYTES = 700000
+                _result_bytes = _result_text.encode("utf-8")
+                if len(_result_bytes) > _RESULT_CAP_BYTES:
+                    _result_summary_store = (
+                        _result_bytes[:_RESULT_CAP_BYTES].decode("utf-8", "ignore")
+                        + chr(10) + "...[truncated: report exceeded storage limit]"
+                    )
+                else:
+                    _result_summary_store = _result_text
                 _fs_update_with_retry(_exec_ref, {
                     "status": _final_status,
                     "progress_pct": 100,
-                    "result_summary": _result_text[:2000],
+                    "result_summary": _result_summary_store,
                     "completed_at": _completed_at,
                     "reported_to_user": False,
                     "tool_calls": _tool_calls[:50],
@@ -11951,6 +13641,7 @@ gcloud services enable secretmanager.googleapis.com
       "MAPS_API_KEY=\$API_KEY",
       "GEMINI_AUTHORIZATION_ID=\$AUTH_ID",
       "ADK_ENABLE_MCP_GRACEFUL_ERROR_HANDLING=1",
+      "ADK_DISABLE_JSON_SCHEMA_FOR_FUNC_DECL=1",
       `DEMO_ID=${dirName}`
     ];
     let secrets = [];
@@ -12027,7 +13718,7 @@ gcloud services enable secretmanager.googleapis.com
       deployCmd += `\nCR_ENV_VARS="${envVars.join(",")}"\nif [ "\$VIEWER_DEPLOYED" = "true" ]; then\n  CR_ENV_VARS="\$CR_ENV_VARS,DATA_VIEWER_URL=\$VIEWER_URL"\nfi\nCR_ENV_VARS="\$CR_ENV_VARS,SANDBOX_RESOURCE_NAME=\$SANDBOX_RESOURCE_NAME"\n`;
       deployCmd += `\ngcloud run deploy "\$SERVICE_NAME" \
     --source .. \
-    --memory "4Gi" \
+    --memory "8Gi" \
     --cpu 2 \
     --no-cpu-throttling \
     --cpu-boost \
@@ -12043,7 +13734,7 @@ gcloud services enable secretmanager.googleapis.com
     } else {
       deployCmd = `CR_ENV_VARS="${envVars.join(",")}"\nif [ "\$VIEWER_DEPLOYED" = "true" ]; then\n  CR_ENV_VARS="\$CR_ENV_VARS,DATA_VIEWER_URL=\$VIEWER_URL"\nfi\nCR_ENV_VARS="\$CR_ENV_VARS,SANDBOX_RESOURCE_NAME=\$SANDBOX_RESOURCE_NAME"\ngcloud run deploy "\$SERVICE_NAME" \
     --source .. \
-    --memory "4Gi" \
+    --memory "8Gi" \
     --cpu 2 \
     --no-cpu-throttling \
     --cpu-boost \
