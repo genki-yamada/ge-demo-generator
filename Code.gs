@@ -69,7 +69,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v10.72-public',
+  APP_VERSION: 'v10.73-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -858,7 +858,11 @@ function getTechnicalInstruction_() {
     
     "**ANALYTICAL RESULT CARD TEMPLATE (MANDATORY)**:\n" +
     "When presenting query results, KPIs, or entity summaries, wrap them in an A2UI Card. " +
-    "Use surfaceId matching the analysis type (e.g. 'fleet-audit', 'cost-analysis', 'entity-profile'). " +
+    "Use surfaceId matching the analysis type (e.g. 'fleet-audit', 'cost-analysis', 'entity-profile'), and make it UNIQUE per card: " +
+    "when rendering ANOTHER card of a type already shown earlier in the conversation, append a short distinguishing suffix " +
+    "(entity or sequence, e.g. 'batch-editor-sakura', 'cost-analysis-2'). NEVER reuse a surfaceId from a previous turn unless you are " +
+    "intentionally updating or deleting that exact card: the client anchors a surfaceId to the message where it FIRST rendered, so a " +
+    "reused id silently overwrites the OLD card and renders NOTHING in the current turn. " +
     "Minimal structure:\n" +
     "[\n" +
     "  { \"id\": \"card_root\", \"component\": { \"Card\": { \"children\": { \"explicitList\": [\"card_title\", \"card_divider\", \"card_body\"] } } } },\n" +
@@ -10789,9 +10793,11 @@ def _has_interactive_card(parts) -> bool:
 # forces GE to create a fresh surface anchored to the CURRENT message each turn.
 # Scoped here (the single choke point for all A2UI parts) so the model contract
 # stays 'suggestions' and no prompt change is needed.
-# NOTE: ONLY 'suggestions' is scoped. 'confirmation-surface' and 'welcome-card'
-# must keep stable ids: confirmation is intentionally carried across turns and
-# torn down via deleteSurface; welcome-card only renders on the first turn.
+# NOTE: ONLY 'suggestions' is unconditionally scoped here. Other surfaces keep
+# their FIRST-render id stable (confirmation-surface is intentionally carried
+# across turns and torn down via deleteSurface; welcome-card only renders on
+# the first turn); cross-turn REUSE of those ids is handled separately by
+# _rescope_reused_surfaces() below (v10.73).
 _current_suggestions_suffix = contextvars.ContextVar('suggestions_suffix', default=None)
 
 def _scope_suggestions_surface(msg):
@@ -10804,10 +10810,84 @@ def _scope_suggestions_surface(msg):
             _v['surfaceId'] = 'suggestions-' + _suffix
     return msg
 
+
+# --- v10.73: cross-turn surfaceId reuse guard (non-suggestions surfaces) ---
+# GE anchors a surfaceId to the message where it FIRST rendered (conversation-
+# level singleton). The model is prompted to use type-based surfaceIds (e.g.
+# 'batch-editor'), so a SECOND card of the same type a few turns later re-emits
+# the SAME id: GE then patches the OLD turn's card in place (its content
+# visibly changes) and the new turn shows text only (confirmed 2026-06-11,
+# demo-hr-outsourcing: a second Batch Editor overwrote the card rendered a few
+# turns earlier and its own turn rendered no card). _rescope_replay_parts only
+# covers REPLAYED cached parts (G1/H1); this guard covers FRESH model output.
+# Rules (deliberately narrow to avoid regressions):
+#   - Only a beginRendering that reuses an id first rendered by a PRIOR
+#     invocation is renamed (re-anchored to THIS turn). First renders and
+#     same-invocation re-begins keep their id; streaming updates within a
+#     turn are untouched.
+#   - surfaceUpdate / dataModelUpdate / deleteSurface are rewritten to the
+#     LATEST incarnation of their surface (identity rewrite when never
+#     renamed), so the prompt's confirmation-surface lifecycle (render turn
+#     N, deleteSurface turn N+1) keeps working even after a rename, and a
+#     patch-only turn that intentionally updates an old card still can.
+#   - 'suggestions*' ids are skipped (already per-turn scoped above).
+# State is in-memory per session (same minScale=1 scope as the Y1/G1/H1
+# caches); the rename is idempotent because already-renamed ids are first
+# normalized back to their logical id.
+_current_surface_guard = contextvars.ContextVar('surface_guard', default=None)
+_session_surface_registry = {}
+
+def _get_surface_registry(_sid):
+    _reg = _session_surface_registry.get(_sid)
+    if _reg is None:
+        _reg = {}
+        _session_surface_registry[_sid] = _reg
+        if len(_session_surface_registry) > 300:
+            for _old in list(_session_surface_registry.keys())[:len(_session_surface_registry) - 300]:
+                _session_surface_registry.pop(_old, None)
+    return _reg
+
+def _rescope_reused_surfaces(msg):
+    _guard = _current_surface_guard.get()
+    if not _guard or not isinstance(msg, dict):
+        return msg
+    try:
+        _reg = _guard['registry']
+        _task = _guard['task']
+        for _k in ('beginRendering', 'surfaceUpdate', 'dataModelUpdate', 'deleteSurface'):
+            _v = msg.get(_k)
+            if not (isinstance(_v, dict) and _v.get('surfaceId')):
+                continue
+            _sid = str(_v['surfaceId'])
+            if _sid.startswith('suggestions'):
+                continue
+            # The model may echo an already-renamed id back from history;
+            # strip guard suffixes so it resolves to the same logical surface
+            # (also prevents '-u' suffix chaining across turns).
+            _logical = re.sub(r'(-u[0-9a-f]{4,32})+$', '', _sid) or _sid
+            _entry = _reg.get(_logical)
+            if _k == 'beginRendering':
+                if _entry is None:
+                    _reg[_logical] = {'current': _sid, 'owner': _task}
+                elif _entry.get('owner') == _task:
+                    _v['surfaceId'] = _entry['current']
+                else:
+                    _new = _logical + '-u' + _guard['suffix']
+                    _reg[_logical] = {'current': _new, 'owner': _task}
+                    _v['surfaceId'] = _new
+                    logger.log_text('[surface_rescope] cross-turn beginRendering reuse of ' + _logical + ' -> ' + _new)
+            elif _entry is not None:
+                _v['surfaceId'] = _entry['current']
+    except Exception:
+        pass
+    return msg
+
+
 def create_a2ui_part(msg):
     _healed = _heal_buttons_in_a2ui(msg)
     _rewritten = _rewrite_suggestions_a2ui(_healed)
     _rewritten = _scope_suggestions_surface(_rewritten)
+    _rewritten = _rescope_reused_surfaces(_rewritten)
     try:
         return _original_create_a2ui_part(_rewritten, version='0.8')
     except TypeError:
@@ -11197,6 +11277,21 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
 
         session_id = run_args['session_id']
         user_id = run_args['user_id']
+
+        # v10.73: arm the cross-turn surfaceId reuse guard for THIS invocation
+        # (consumed by _rescope_reused_surfaces() via create_a2ui_part()). The
+        # suffix is strictly [0-9a-f] so renamed ids stay normalizable.
+        try:
+            _sg_suffix = re.sub(r'[^a-f0-9]', '', str(context.task_id or '').lower())[:12]
+            if len(_sg_suffix) < 4:
+                _sg_suffix = uuid.uuid4().hex[:12]
+            _current_surface_guard.set({
+                'registry': _get_surface_registry(session_id),
+                'task': str(context.task_id or '') or _sg_suffix,
+                'suffix': _sg_suffix,
+            })
+        except Exception:
+            pass
 
         # =============================================================================
         # Y1/G1 (v10.65): Duplicate chip/button-press handling with REPLAY.
