@@ -69,7 +69,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v10.73-public',
+  APP_VERSION: 'v10.74-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -5957,6 +5957,78 @@ def delete_scheduled_task(
     }
 
 
+def run_scheduled_task_now(
+    task_id: str,
+    tool_context: ToolContext,
+) -> dict:
+    """Triggers ONE immediate background execution of a registered scheduled task.
+
+    Use this for manual test runs ("run it now") of a scheduled task. The task's
+    stored task_prompt is executed by the background worker exactly like a
+    Cloud Scheduler fire. Returns immediately with a ticket; the result arrives
+    via the background-task notification flow (or get_task_result).
+
+    Args:
+        task_id: The task_id of the registered scheduled task to execute now.
+
+    Returns:
+        dict with trigger status and ticket id.
+    """
+    import builtins
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
+    if not _fs or not _demo_id:
+        return {"error": "Firestore not available (client=" + str(bool(_fs)) + ", demo_id=" + repr(_demo_id) + ")"}
+
+    _def_doc = _fs.collection(_demo_id + "_task_definitions").document(task_id).get()
+    if not _def_doc.exists:
+        return {"error": "Scheduled task not found: " + task_id}
+
+    _exec_snap = _fs.collection(_demo_id + "_task_executions").document(task_id).get()
+    if _exec_snap.exists and (_exec_snap.to_dict() or {}).get("status") == "working":
+        return {
+            "status": "already_running",
+            "ticket-id": task_id,
+            "message": "This task is already executing. Use get_task_result to check progress.",
+        }
+
+    # Fire-and-forget: trigger the /execute_task worker via localhost (same
+    # pattern as register_background_task; see the comment there for why the
+    # public SELF_URL must NOT be used for self-calls). force_run lets the
+    # worker re-run a task whose single per-definition execution doc still
+    # holds a terminal status from a previous run.
+    import threading as _threading
+    import requests as _requests
+    _port = os.environ.get("PORT", "8080")
+    _worker_url = "http://localhost:" + _port + "/execute_task"
+
+    def _fire_now():
+        import logging as _log
+        _logger = _log.getLogger("sched_test_run")
+        try:
+            _resp = _requests.post(
+                _worker_url,
+                json={"task_id": task_id, "demo_id": _demo_id, "force_run": True},
+                headers={"Content-Type": "application/json"},
+                timeout=(5, 0.5),
+            )
+            _logger.warning("run_now fire: status=%s task_id=%s", _resp.status_code, task_id)
+        except _requests.exceptions.ReadTimeout:
+            # Expected: the worker processes asynchronously.
+            _logger.warning("run_now fire: accepted (ReadTimeout expected), task_id=%s", task_id)
+        except Exception as _e:
+            _logger.error("run_now fire FAILED: %s: %s", type(_e).__name__, str(_e)[:500])
+    _threading.Thread(target=_fire_now, daemon=True).start()
+
+    return {
+        "status": "triggered",
+        "ticket-id": task_id,
+        "message": "Test execution started in the background. The result will be "
+                   "reported automatically when it completes; use get_task_result "
+                   "for progress checks.",
+    }
+
+
 def write_operational_alert(
     alert_title: str,
     alert_message: str,
@@ -8622,6 +8694,7 @@ _all_tools.append(tools.update_task_progress)
 _all_tools.append(tools.register_scheduled_task)
 _all_tools.append(tools.update_scheduled_task)
 _all_tools.append(tools.delete_scheduled_task)
+_all_tools.append(tools.run_scheduled_task_now)
 
 # --- Agent Sandbox Code Executor (always enabled) ---
 _code_executor = AgentEngineSandboxCodeExecutor(
@@ -8748,6 +8821,7 @@ def _log_bq_activity(tool, args, tool_context, tool_response):
         'register_scheduled_task',
         'update_scheduled_task',
         'delete_scheduled_task',
+        'run_scheduled_task_now',
         'cancel_background_task',
         'update_task_progress',
         'write_operational_alert',
@@ -9170,6 +9244,21 @@ SCHEDULED TASKS:
 - register_scheduled_task: Register a recurring task with cron schedule.
 - update_scheduled_task: Change the cron schedule of an existing task.
 - delete_scheduled_task: Remove a scheduled task and its Cloud Scheduler job.
+- run_scheduled_task_now: Trigger ONE immediate background execution of an
+  already-registered scheduled task (manual test run). Returns a ticket
+  instantly; the result is reported automatically when done (or via
+  get_task_result).
+
+MANUAL TEST RUN OF A SCHEDULED TASK (CRITICAL):
+When the user asks to test-run or immediately execute an already-registered
+scheduled task, you MUST call run_scheduled_task_now(task_id) and reply
+right away with a short acknowledgment plus suggestion chips (e.g. a
+progress-check chip using get_task_result). NEVER execute the task's
+workflow inline yourself: the client stops rendering a turn after about
+2 minutes, so a long inline run makes your answer invisible to the user
+even when it succeeds. Any test-run button you place on a scheduled-task
+confirmation card MUST route to run_scheduled_task_now, not to inline
+execution.
 
 WHEN TO USE:
 - User explicitly asks for "background", "schedule", "periodic", "monitor"
@@ -9437,6 +9526,21 @@ SCHEDULED TASKS:
   The task runs via Cloud Scheduler at the specified intervals.
 - update_scheduled_task: Change the cron schedule of an existing scheduled task.
 - delete_scheduled_task: Remove a scheduled task and its Cloud Scheduler job.
+- run_scheduled_task_now: Trigger ONE immediate background execution of an
+  already-registered scheduled task (manual test run). Returns a ticket
+  instantly; the result is reported automatically when done (or via
+  get_task_result).
+
+MANUAL TEST RUN OF A SCHEDULED TASK (CRITICAL):
+When the user asks to test-run or immediately execute an already-registered
+scheduled task, you MUST call run_scheduled_task_now(task_id) and reply
+right away with a short acknowledgment plus suggestion chips (e.g. a
+progress-check chip using get_task_result). NEVER execute the task's
+workflow inline yourself: the client stops rendering a turn after about
+2 minutes, so a long inline run makes your answer invisible to the user
+even when it succeeds. Any test-run button you place on a scheduled-task
+confirmation card MUST route to run_scheduled_task_now, not to inline
+execution.
 
 WHEN TO USE:
 - User explicitly asks for "background", "schedule", "periodic", "monitor"
@@ -9670,6 +9774,7 @@ WRONG: beginRendering object without tags (missing tags and brackets = SYSTEM CR
 # Standalone agent: no transfer logic, no A2UI formatting, no suggestion chips.
 _bg_tools = [t for t in _all_tools if t is not tools.background_task_tool]
 _bg_tools = [t for t in _bg_tools if t is not tools.register_scheduled_task]
+_bg_tools = [t for t in _bg_tools if t is not tools.run_scheduled_task_now]
 
 background_agent = LlmAgent(
     model=gemini_pro_model,
@@ -9682,8 +9787,9 @@ You are an AUTONOMOUS BACKGROUND WORKER. You execute tasks WITHOUT user interact
 
 EXECUTION RULES:
 1. EXECUTE all operations DIRECTLY using data tools. You ARE the final executor.
-2. NEVER call register_background_task or register_scheduled_task — you are the
-   background worker. Calling them creates infinite loops.
+2. NEVER call register_background_task, register_scheduled_task, or
+   run_scheduled_task_now — you are the background worker. Calling them
+   creates infinite loops.
 3. Do NOT produce A2UI JSON cards or suggestion chips — there is no UI client.
 4. Do NOT transfer to any other agent — you are standalone.
 5. Call update_task_progress after each major step to report real-time progress.
@@ -13240,14 +13346,19 @@ async def execute_task(request: Request):
     # --- Support both direct calls and Pub/Sub push messages ---
     # Direct call (from LRFT/localhost): {"task_id": "...", "demo_id": "..."}
     # Pub/Sub push (from Cloud Scheduler): {"message": {"data": "base64..."}}
+    _msg_id = ""
+    _force_run = False
     if "message" in _body and isinstance(_body.get("message"), dict):
+        # Each Cloud Scheduler fire publishes a NEW Pub/Sub message with a
+        # unique messageId; redeliveries of the SAME fire reuse the same id.
+        _msg_id = str(_body["message"].get("messageId", "") or "")
         _msg_data = _body["message"].get("data", "")
         if _msg_data:
             try:
                 _decoded = _bjson.loads(_b64.b64decode(_msg_data).decode("utf-8"))
                 _task_id = _decoded.get("task_id", "")
                 _demo_id = _decoded.get("demo_id", "")
-                _wlogger.warning("execute_task: Pub/Sub trigger task_id=%s demo_id=%s", _task_id, _demo_id)
+                _wlogger.warning("execute_task: Pub/Sub trigger task_id=%s demo_id=%s msg_id=%s", _task_id, _demo_id, _msg_id)
             except Exception as _parse_err:
                 _wlogger.error("execute_task: Failed to parse Pub/Sub data: %s", str(_parse_err))
                 _task_id = ""
@@ -13258,6 +13369,9 @@ async def execute_task(request: Request):
     else:
         _task_id = _body.get("task_id", "")
         _demo_id = _body.get("demo_id", "")
+        # Set by run_scheduled_task_now (manual test run): allow re-running a
+        # task whose execution doc already holds a terminal status.
+        _force_run = bool(_body.get("force_run"))
 
     _fs = getattr(builtins, '_firestore_client', None)
     if not _fs or not _task_id or not _demo_id:
@@ -13288,20 +13402,34 @@ async def execute_task(request: Request):
             _exec_snap = _exec_ref.get()
             _current = _exec_snap.to_dict() if _exec_snap.exists else None
 
+            # Same Pub/Sub message redelivered (ack lost, or the run exceeded
+            # the ack deadline): this exact fire already ran or is running.
+            if _current and _msg_id and _msg_id == _current.get("last_sched_msg_id", ""):
+                _wlogger.warning("execute_task: duplicate delivery of msg %s for task %s, skipping", _msg_id, _task_id)
+                return {"status": _current.get("status", "unknown"), "task_id": _task_id}
+
+            # A NEW Cloud Scheduler fire (fresh messageId) of a recurring task,
+            # or an explicit manual test run (force_run from
+            # run_scheduled_task_now), MUST re-run even though the single
+            # per-definition execution doc still holds the previous run's
+            # terminal status. Without this exception the 2nd+ fire of every
+            # recurring scheduled task is skipped forever.
+            _is_refire = bool(_msg_id and _def_data.get("task_type") == "scheduled") or _force_run
+
             # Check if cancelled before starting
-            if _current and _current.get("status") == "cancelled":
+            if _current and _current.get("status") == "cancelled" and not _is_refire:
                 return {"status": "cancelled", "task_id": _task_id}
 
             # Idempotency guard: skip if already completed or failed
-            # (prevents result-topic Pub/Sub re-triggers from overwriting status)
-            if _current and _current.get("status") in ("completed", "failed"):
+            # (prevents stray re-posts of the same execution from overwriting status)
+            if _current and _current.get("status") in ("completed", "failed") and not _is_refire:
                 _wlogger.warning("execute_task: task %s already %s, skipping re-execution", _task_id, _current.get("status"))
                 return {"status": _current.get("status"), "task_id": _task_id}
 
             # Update status to working — use set(merge=True) so it works for
             # both pre-existing docs (immediate tasks) and new docs (scheduled tasks)
             _now = _dt.datetime.now(_dt.timezone.utc).isoformat()
-            _exec_ref.set({
+            _working_doc = {
                 "task_id": _task_id,
                 "definition_id": _task_id,
                 "status": "working",
@@ -13311,7 +13439,12 @@ async def execute_task(request: Request):
                 "result_summary": "",
                 "completed_at": "",
                 "reported_to_user": False,
-            }, merge=True)
+            }
+            if _msg_id:
+                # Remember the processed fire so a redelivery of the SAME
+                # message is skipped while a fresh fire still re-runs.
+                _working_doc["last_sched_msg_id"] = _msg_id
+            _exec_ref.set(_working_doc, merge=True)
             _wlogger.warning("execute_task: STARTING task=%s name=%s prompt_len=%d prompt_head=%s", _task_id, _task_name, len(_task_prompt), repr(_task_prompt[:200]))
 
             try:
