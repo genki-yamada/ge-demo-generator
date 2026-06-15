@@ -69,7 +69,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v10.95-public',
+  APP_VERSION: 'v10.100-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -5725,7 +5725,7 @@ def submit_background_task_now(task_name: str, task_description: str, task_promp
             # Use short read timeout (0.5s): this is fire-and-forget.
             # The execute_task endpoint runs the agent asynchronously;
             # we only need to confirm the request was accepted, not wait for completion.
-            _resp = _requests.post(_worker_url, json={"task_id": _task_id, "demo_id": _demo_id}, headers=_headers, timeout=(5, 0.5))
+            _resp = _requests.post(_worker_url + "?task_id=" + _task_id + "&demo_id=" + _demo_id, json={"task_id": _task_id, "demo_id": _demo_id}, headers=_headers, timeout=(5, 0.5))
             _logger.warning("_fire: response status=%s body=%s", _resp.status_code, _resp.text[:300])
         except _requests.exceptions.ReadTimeout:
             # Expected: the worker is processing asynchronously.
@@ -6164,7 +6164,7 @@ def run_scheduled_task_now(
         _logger = _log.getLogger("sched_test_run")
         try:
             _resp = _requests.post(
-                _worker_url,
+                _worker_url + "?task_id=" + task_id + "&demo_id=" + _demo_id + "&force_run=1",
                 json={"task_id": task_id, "demo_id": _demo_id, "force_run": True},
                 headers={"Content-Type": "application/json"},
                 timeout=(5, 0.5),
@@ -11135,6 +11135,13 @@ _ICON_FALLBACK_MAP = {
     'question_answer': 'help',
 }
 
+import re as _a2ui_debris_re_mod
+# Stray A2UI tag debris emitted as TEXT (e.g. a leaked "a2ui-json>" fragment) when
+# the opening <a2ui-json> tag is split across stream chunks and the parser consumes
+# only the leading "<". The leading "<" and trailing ">" are both optional so a
+# fragment like "a2ui-json>" or "<a2ui-json" is still removed (v10.100).
+_A2UI_TAG_DEBRIS_RE = _a2ui_debris_re_mod.compile(r'<\s*/?\s*a2ui[-_]json\s*>?|a2ui[-_]json\s*>', _a2ui_debris_re_mod.IGNORECASE)
+
 def _sanitize_a2ui_text_icons(text):
     import re as _re
     import json as _json
@@ -11575,6 +11582,9 @@ PREFLIGHT_CLASSIFIER_PROMPT = (
     "title (short card title); intro (one sentence describing the planned analysis); "
     "data (one line: which data it will use); method (one line: the analytical method); "
     "output (one line: what the result will contain); estimate (rough time, e.g. '~1-3 min'); "
+    "steps (an ORDERED array of 3 to 5 objects, each {title: a short imperative step name, "
+    "detail: one short line describing what that step does - its data, method, and output}, "
+    "breaking the analysis into sequential stages the user can read top to bottom); "
     "label_title (a short card title); "
     "label_inline, label_background, label_adjust, label_field. "
     "These four are FIXED action labels - translate their MEANING into the user's "
@@ -11586,7 +11596,7 @@ PREFLIGHT_CLASSIFIER_PROMPT = (
     "Each label may start with a fitting emoji. "
     "Set category to 'ANALYSIS' ONLY for the heavy multi-step case; otherwise 'QUICK' or 'OTHER'. "
     "ABSOLUTE LANGUAGE RULE: EVERY human-readable string (title, intro, data, method, "
-    "output, estimate, and every label) MUST be written in EXACTLY the language from "
+    "output, estimate, every step title and detail, and every label) MUST be written in EXACTLY the language from "
     "STEP 1. If the user wrote in English, write every string in English; never answer "
     "an English message in French, German, or any other language. Do not translate the "
     "user's words into another language. "
@@ -11636,6 +11646,29 @@ def _is_preflight_passthrough(text):
     _l = (text or "").lstrip().lower()
     return _l.startswith("run inline:") or _l.startswith("run in background:")
 
+def _is_preflight_confirmed_press(run_args):
+    # True only when the press came from the Analysis Plan card's OWN inline
+    # button, which carries context {"pf": "1"}. Such a press is the user's
+    # explicit, already-confirmed inline choice, so the gate must let it run
+    # (re-carding it would loop). A plain "Run Inline:" drill-down chip has NO
+    # pf marker, so it is re-classified and may be carded if it is heavy (v10.96).
+    try:
+        _nm = run_args.get("new_message") if isinstance(run_args, dict) else None
+        if _nm is None:
+            return False
+        for _p in (getattr(_nm, "parts", None) or []):
+            _t = getattr(_p, "text", None)
+            if _t and "userAction" in _t:
+                try:
+                    _ua = json.loads(_t).get("userAction", {}) or {}
+                    if str((_ua.get("context", {}) or {}).get("pf", "")) == "1":
+                        return True
+                except Exception:
+                    pass
+    except Exception:
+        return False
+    return False
+
 async def _classify_for_preflight(text):
     try:
         from google.genai import client as _genai_client
@@ -11671,26 +11704,69 @@ def _build_preflight_card_parts(plan, scope_text):
             return _v if (isinstance(_v, str) and _v.strip()) else _d
         _title = _g("label_title", _g("title", "Analysis plan"))
         _intro = _g("intro", "I will run a multi-step analysis.")
-        _why_bits = [b for b in [_g("data", ""), _g("method", ""), _g("output", ""), _g("estimate", "")] if b]
-        _why = " | ".join(_why_bits) if _why_bits else _g("estimate", "This may take a few minutes.")
+        _estimate = _g("estimate", "")
+        # Render the plan as a vertical, NUMBERED step timeline (Deep-Research
+        # style) when the classifier returned a 'steps' array; otherwise fall
+        # back to the original single data | method | output line. Components are
+        # keyed by id, so build the column's child list dynamically (v10.96).
+        _raw_steps = plan.get("steps")
+        _steps = []
+        if isinstance(_raw_steps, list):
+            for _s in _raw_steps:
+                if isinstance(_s, dict):
+                    _stitle = _s.get("title")
+                    if isinstance(_stitle, str) and _stitle.strip():
+                        _sdetail = _s.get("detail")
+                        _sdetail = _sdetail.strip() if (isinstance(_sdetail, str) and _sdetail.strip()) else ""
+                        _steps.append((_stitle.strip(), _sdetail))
+        _steps = _steps[:6]
+        _clock = chr(0x1F552)
+        _children = ["title", "intro"]
+        _comps = [
+            {"id": "root", "component": {"Card": {"child": "col"}}},
+            {"id": "title", "component": {"Text": {"text": {"literalString": _title}, "usageHint": "h2"}}},
+            {"id": "intro", "component": {"Text": {"text": {"literalString": _intro}, "usageHint": "body"}}},
+        ]
+        if _steps:
+            for _i in range(len(_steps)):
+                _stitle, _sdetail = _steps[_i]
+                _rid = "step" + str(_i)
+                _mid = _rid + "_status"
+                _bid = _rid + "_body"
+                _tid = _rid + "_title"
+                _did = _rid + "_detail"
+                _keycap = (chr(0x31 + _i) + chr(0xFE0F) + chr(0x20E3)) if _i < 9 else (str(_i + 1) + ".")
+                _marker = _keycap + " " + _clock
+                _body_children = [_tid] + ([_did] if _sdetail else [])
+                _children.append(_rid)
+                _comps.append({"id": _rid, "component": {"Row": {"children": {"explicitList": [_mid, _bid]}, "distribution": "start", "alignment": "start"}}})
+                _comps.append({"id": _mid, "component": {"Text": {"text": {"literalString": _marker}, "usageHint": "body"}}})
+                _comps.append({"id": _bid, "component": {"Column": {"children": {"explicitList": _body_children}, "distribution": "start", "alignment": "stretch"}}})
+                _comps.append({"id": _tid, "component": {"Text": {"text": {"literalString": _stitle}, "usageHint": "body"}}})
+                if _sdetail:
+                    _comps.append({"id": _did, "component": {"Text": {"text": {"literalString": _sdetail}, "usageHint": "caption"}}})
+            if _estimate:
+                _children.append("eta")
+                _comps.append({"id": "eta", "component": {"Text": {"text": {"literalString": chr(0x23F1) + " " + _estimate}, "usageHint": "caption"}}})
+        else:
+            _why_bits = [b for b in [_g("data", ""), _g("method", ""), _g("output", ""), _estimate] if b]
+            _why = " | ".join(_why_bits) if _why_bits else "This may take a few minutes."
+            _children.append("why")
+            _comps.append({"id": "why", "component": {"Text": {"text": {"literalString": _why}, "usageHint": "caption"}}})
+        _children.extend(["scopeField", "actions"])
+        _comps.append({"id": "col", "component": {"Column": {"children": {"explicitList": _children}, "distribution": "start", "alignment": "stretch"}}})
+        _comps.append({"id": "scopeField", "component": {"TextField": {"label": {"literalString": _g("label_field", "Adjust scope")}, "text": {"path": "/form/scope"}, "textFieldType": "longText"}}})
+        _comps.append({"id": "actions", "component": {"Row": {"children": {"explicitList": ["bInline", "bBg", "bRefine"]}, "distribution": "spaceEvenly", "alignment": "center"}}})
+        _comps.append({"id": "bInline", "component": {"Button": {"child": "bInlineL", "primary": True, "action": {"name": "sendText", "context": [{"key": "text", "value": {"literalString": "Run Inline: " + scope_text}}, {"key": "pf", "value": {"literalString": "1"}}]}}}})
+        _comps.append({"id": "bInlineL", "component": {"Text": {"text": {"literalString": _g("label_inline", "Run inline now")}, "usageHint": "body"}}})
+        _comps.append({"id": "bBg", "component": {"Button": {"child": "bBgL", "action": {"name": "sendText", "context": [{"key": "text", "value": {"literalString": "Run in Background: " + scope_text}}]}}}})
+        _comps.append({"id": "bBgL", "component": {"Text": {"text": {"literalString": _g("label_background", "Run in background")}, "usageHint": "body"}}})
+        _comps.append({"id": "bRefine", "component": {"Button": {"child": "bRefineL", "action": {"name": "sendText", "context": [{"key": "text", "value": {"path": "/form/scope"}}]}}}})
+        _comps.append({"id": "bRefineL", "component": {"Text": {"text": {"literalString": _g("label_adjust", "Adjust & re-propose")}, "usageHint": "body"}}})
         _card = [
             {"beginRendering": {"surfaceId": "analysis-plan", "root": "root"}},
             {"dataModelUpdate": {"surfaceId": "analysis-plan", "path": "/form", "contents": [{"key": "scope", "valueString": scope_text}]}},
-            {"surfaceUpdate": {"surfaceId": "analysis-plan", "components": [
-                {"id": "root", "component": {"Card": {"child": "col"}}},
-                {"id": "col", "component": {"Column": {"children": {"explicitList": ["title", "intro", "why", "scopeField", "actions"]}, "distribution": "start", "alignment": "stretch"}}},
-                {"id": "title", "component": {"Text": {"text": {"literalString": _title}, "usageHint": "h2"}}},
-                {"id": "intro", "component": {"Text": {"text": {"literalString": _intro}, "usageHint": "body"}}},
-                {"id": "why", "component": {"Text": {"text": {"literalString": _why}, "usageHint": "caption"}}},
-                {"id": "scopeField", "component": {"TextField": {"label": {"literalString": _g("label_field", "Adjust scope")}, "text": {"path": "/form/scope"}, "textFieldType": "longText"}}},
-                {"id": "actions", "component": {"Row": {"children": {"explicitList": ["bInline", "bBg", "bRefine"]}, "distribution": "spaceEvenly", "alignment": "center"}}},
-                {"id": "bInline", "component": {"Button": {"child": "bInlineL", "primary": True, "action": {"name": "sendText", "context": [{"key": "text", "value": {"literalString": "Run Inline: " + scope_text}}]}}}},
-                {"id": "bInlineL", "component": {"Text": {"text": {"literalString": _g("label_inline", "Run inline now")}, "usageHint": "body"}}},
-                {"id": "bBg", "component": {"Button": {"child": "bBgL", "action": {"name": "sendText", "context": [{"key": "text", "value": {"literalString": "Run in Background: " + scope_text}}]}}}},
-                {"id": "bBgL", "component": {"Text": {"text": {"literalString": _g("label_background", "Run in background")}, "usageHint": "body"}}},
-                {"id": "bRefine", "component": {"Button": {"child": "bRefineL", "action": {"name": "sendText", "context": [{"key": "text", "value": {"path": "/form/scope"}}]}}}},
-                {"id": "bRefineL", "component": {"Text": {"text": {"literalString": _g("label_adjust", "Adjust & re-propose")}, "usageHint": "body"}}},
-            ]}},
+            {"surfaceUpdate": {"surfaceId": "analysis-plan", "components": _comps}},
         ]
         _parts = []
         for _m in _card:
@@ -12040,20 +12116,26 @@ def _msg_signature(_run_args):
 # replay the dead-end message), and incidental generate_image (a 30-40s sink
 # that caused most overruns) is blocked inline.
 # =============================================================================
-# v10.87: render-probe (silent up to 360s, heartbeat up to 240s) PROVED GE does
-# NOT cut off streamed turns near ~120s - the old premise was wrong. The
-# automatic inline-overrun -> background CONVERSION is therefore disabled by
-# default (set INLINE_OVERRUN_CONVERT=1 to re-enable): a heavy analysis now runs
-# to completion and renders INLINE instead of being moved to a background task
-# after a wasted wait. The soft tool budget is kept (generous) only to bound
-# runaway gathering and force an inline synthesis; the 800s graceful watchdog
-# remains the true-hang backstop. Background is now OPT-IN only (explicit chip /
-# scheduled task). All env-tunable.
+# v10.99 (operator preference): do NOT auto-convert an overrunning inline turn to
+# a background task. Instead cap inline gathering with a TIGHTER soft budget and,
+# once it is hit, force the model to SYNTHESIZE THE REPORT INLINE from the data
+# already gathered (partial but immediate) - the user always gets an inline answer.
+# Background stays OPT-IN only (the pre-flight card, an explicit chip, or a
+# scheduled task).
+# Context (still valid, from v10.98): the v10.87 "GE renders silently up to 360s"
+# premise was WRONG for real analyses - that probe streamed a constant heartbeat,
+# whereas a real heavy analysis has long SILENT gaps (big SQL, generate_image,
+# synthesis). Logs (demo-video-archiving, 2026-06-15) show GE re-issues the press
+# ~every 60s with no output and can error on very long turns. Capping gathering at
+# 180s (was 250s) bounds the turn; generate_image - the biggest single sink - is
+# reserved out earlier so the forced synthesis still fits. All env-tunable.
 _INLINE_OVERRUN_CONVERT = os.environ.get('INLINE_OVERRUN_CONVERT', '0') == '1'
-_INLINE_SOFT_TOOL_BUDGET_S = float(os.environ.get('INLINE_SOFT_TOOL_BUDGET_S', '250'))
+_INLINE_SOFT_TOOL_BUDGET_S = float(os.environ.get('INLINE_SOFT_TOOL_BUDGET_S', '180'))
 _INLINE_HARD_DEADLINE_S = float(os.environ.get('INLINE_HARD_DEADLINE_S', '600'))
-# Cutoff for generate_image (kept generous now that turns can run long).
-_INLINE_IMAGE_BUDGET_S = float(os.environ.get('INLINE_IMAGE_BUDGET_S', '200'))
+# Cutoff for generate_image: the single biggest inline time sink (~30-40s); block
+# it well before the soft cutoff so the forced inline synthesis still fits the
+# budget. Offer the summary image as a one-click drill-down chip instead.
+_INLINE_IMAGE_BUDGET_S = float(os.environ.get('INLINE_IMAGE_BUDGET_S', '150'))
 # Control-action context texts that must NEVER be converted into a background
 # task (they carry no analysis intent of their own).
 _INLINE_CONTROL_PREFIXES = ('continue', 'check progress', 'view full report', 'open operations')
@@ -12369,10 +12451,85 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
         # Fail-open: any miss/error falls through to the normal agent run.
         try:
             _gate_text = _extract_user_text(run_args)
-            if _gate_text and not _is_preflight_passthrough(_gate_text):
-                _plan = await _classify_for_preflight(_gate_text)
+            # v10.96: also gate button/chip-triggered runs. A plain "Run Inline:"
+            # drill-down chip used to bypass the card and run synchronously; now it
+            # is re-classified and, if it is a heavy multi-step analysis, the card
+            # is shown so the user can still choose background. Exceptions that must
+            # NOT be carded: a "Run in Background:" press (already the safe choice)
+            # and a confirmed inline press from the card's OWN button (pf=1), which
+            # would otherwise loop. The scope handed to the classifier/card strips
+            # the "Run Inline:" prefix so the card rebuilds clean action text.
+            _gate_l = (_gate_text or "").lstrip().lower()
+            _gate_is_inline = _gate_l.startswith("run inline:")
+            _gate_is_bg = _gate_l.startswith("run in background:")
+            _gate_skip = _gate_is_bg or _is_preflight_confirmed_press(run_args)
+            _gate_scope = _gate_text.split(":", 1)[1].strip() if _gate_is_inline else _gate_text
+
+            # v10.97: deterministic short-circuit for an explicit "Run in
+            # Background:" press. Register the task HERE (bypassing the agent and
+            # the F1 guard via submit_background_task_now) so a STICKY
+            # deep_analysis_agent can never receive it, call register_background_task,
+            # get F1-blocked by the "complete inline in THIS turn" message, and
+            # dead-end into a MALFORMED storm / "Something went wrong". Dup-safe
+            # (submit_background_task_now returns already_active); on any failure we
+            # emit a retry chip instead of falling through to that dead-end path.
+            if _gate_is_bg:
+                _bg_scope = _gate_text.split(":", 1)[1].strip() if (":" in _gate_text) else ""
+                if _bg_scope:
+                    async def _emit_bg_terminal(_t, _chip_specs):
+                        _parts = [a2a_types.Part(root=a2a_types.TextPart(text=_t))]
+                        _comps = [{'id': 'root', 'component': {'Row': {'children': {'explicitList': ['bg_chip' + str(_i) for _i in range(len(_chip_specs))]}, 'distribution': 'spaceEvenly', 'alignment': 'center'}}}]
+                        for _i in range(len(_chip_specs)):
+                            _ct, _cl = _chip_specs[_i]
+                            _comps.append({'id': 'bg_chip' + str(_i), 'component': {'Button': {'child': 'bg_chip' + str(_i) + 'Lbl', 'action': {'name': 'sendText', 'context': [{'key': 'text', 'value': {'literalString': _ct}}]}}}})
+                            _comps.append({'id': 'bg_chip' + str(_i) + 'Lbl', 'component': {'Text': {'text': {'literalString': _cl}, 'usageHint': 'body'}}})
+                        for _m in ({'beginRendering': {'surfaceId': 'suggestions', 'root': 'root'}}, {'surfaceUpdate': {'surfaceId': 'suggestions', 'components': _comps}}):
+                            _parts.append(create_a2ui_part(_m))
+                        await event_queue.enqueue_event(TaskStatusUpdateEvent(task_id=context.task_id, context_id=context.context_id, status=TaskStatus(state=TaskState.working, message=Message(message_id=str(uuid.uuid4()), role=Role.agent, parts=_parts), timestamp=datetime.now(timezone.utc).isoformat()), final=False))
+                        await event_queue.enqueue_event(TaskArtifactUpdateEvent(task_id=context.task_id, last_chunk=True, context_id=context.context_id, artifact=Artifact(artifact_id=str(uuid.uuid4()), parts=_parts)))
+                        await event_queue.enqueue_event(TaskStatusUpdateEvent(task_id=context.task_id, status=TaskStatus(state=TaskState.completed, timestamp=datetime.now(timezone.utc).isoformat()), context_id=context.context_id, final=True))
+                        if idem_key:
+                            _store_idem_result(idem_key, _parts)
+                    _bg_name = 'bg_press_' + ''.join(_c for _c in _bg_scope.lower() if _c.isalnum())[:24]
+                    _bg_prompt = (
+                        "Run the FULL-DEPTH version of the user's request below and deliver a "
+                        "complete report. This is a background run with no chat time limit, so do "
+                        "the thorough analysis (statistics, charts, recommendations). Ignore any "
+                        "inline/quick-pass constraints mentioned in the request." + chr(10) + chr(10)
+                        + "REQUEST:" + chr(10) + _bg_scope
+                    )
+                    try:
+                        _bg_reg = await asyncio.to_thread(
+                            _agent_tools.submit_background_task_now,
+                            _bg_name,
+                            'Background task requested by the user via a Run in Background press.',
+                            _bg_prompt,
+                        )
+                    except Exception as _bg_reg_err:
+                        _bg_reg = {'status': 'error', 'message': str(_bg_reg_err)[:200]}
+                    if _bg_reg.get('status') in ('submitted', 'already_active'):
+                        _bg_ticket = str(_bg_reg.get('ticket-id', ''))
+                        await _emit_bg_terminal(
+                            chr(0x1F680) + " Got it - this analysis is now running as a background task (ticket: "
+                            + _bg_ticket + "). It keeps running to completion; press the button below to "
+                            "check progress and retrieve the full report.",
+                            [("Check progress of task " + _bg_ticket, chr(0x1F4CA) + " Check Task Status")],
+                        )
+                        logger.log_text("[preflight_gate] Run in Background press -> direct registration (ticket " + _bg_ticket + "), bypassed agent")
+                        return
+                    await _emit_bg_terminal(
+                        chr(0x26A0) + chr(0xFE0F) + " I could not start the background task ("
+                        + str(_bg_reg.get('message', 'unknown error'))[:160]
+                        + "). Please press the button to try again.",
+                        [("Run in Background: " + _bg_scope, chr(0x1F501) + " Try again")],
+                    )
+                    logger.log_text("[preflight_gate] bg direct-registration failed, emitted retry: " + str(_bg_reg.get('message', ''))[:160])
+                    return
+
+            if _gate_scope and not _gate_skip:
+                _plan = await _classify_for_preflight(_gate_scope)
                 if isinstance(_plan, dict) and _plan.get("category") == "ANALYSIS":
-                    _pf_parts = _build_preflight_card_parts(_plan, _gate_text)
+                    _pf_parts = _build_preflight_card_parts(_plan, _gate_scope)
                     if _pf_parts:
                         await event_queue.enqueue_event(
                             TaskStatusUpdateEvent(
@@ -13045,18 +13202,27 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                       for rp in response_parts:
                           synthetic_parts = []
                           if rp.text:
-                              # Robust Failsafe: Block raw Python dict/list repr leaks from reaching the chat
-                              _trimmed = rp.text.strip()
-                              _is_repr = _trimmed.startswith('{') or _trimmed.startswith('[')
-                              if _is_repr and ("'content':" in _trimmed or "'parts':" in _trimmed):
-                                  logger.log_text(f"[leak_failsafe] 🛡️ Blocked raw Python response dict leak: {_trimmed[:100]}...")
-                                  continue
-                              text_part = a2a_types.Part(root=a2a_types.TextPart(text=rp.text))
-                              synthetic_parts.append(text_part)
-                              artifact_text_parts.append(text_part)  # ★ Cleared on next function_call
-                              # Keep a copy for the UI-only render guard (short texts only).
-                              if _trimmed and len(_trimmed) <= 2000:
-                                  _all_model_texts.append(_trimmed)
+                              # Strip stray A2UI tag debris (e.g. a leaked "a2ui-json>"
+                              # fragment the stream parser emits as text when the opening
+                              # tag splits across chunks) before it reaches the chat (v10.100).
+                              _clean_text = _A2UI_TAG_DEBRIS_RE.sub('', rp.text)
+                              _trimmed = _clean_text.strip()
+                              # Drop a text part that was ONLY tag debris / whitespace so it
+                              # does not render as an empty bubble above the card.
+                              if not _trimmed:
+                                  pass
+                              else:
+                                  # Robust Failsafe: Block raw Python dict/list repr leaks from reaching the chat
+                                  _is_repr = _trimmed.startswith('{') or _trimmed.startswith('[')
+                                  if _is_repr and ("'content':" in _trimmed or "'parts':" in _trimmed):
+                                      logger.log_text(f"[leak_failsafe] 🛡️ Blocked raw Python response dict leak: {_trimmed[:100]}...")
+                                      continue
+                                  text_part = a2a_types.Part(root=a2a_types.TextPart(text=_clean_text))
+                                  synthetic_parts.append(text_part)
+                                  artifact_text_parts.append(text_part)  # ★ Cleared on next function_call
+                                  # Keep a copy for the UI-only render guard (short texts only).
+                                  if len(_trimmed) <= 2000:
+                                      _all_model_texts.append(_trimmed)
                           if rp.a2ui_json:
                               a2ui_messages = rp.a2ui_json if isinstance(rp.a2ui_json, list) else [rp.a2ui_json]
                               a2ui_messages = _heal_a2ui_message_list(a2ui_messages)
@@ -14368,7 +14534,27 @@ async def execute_task(request: Request):
     import datetime as _dt
     import base64 as _b64, json as _bjson, logging as _wlog
     _wlogger = _wlog.getLogger("bg_worker")
-    _body = await request.json()
+
+    # Read ids from the QUERY STRING first. The localhost fire-and-forget caller
+    # (_fire in submit_background_task_now / run_scheduled_task_now) uses a 0.5s
+    # read timeout and disconnects immediately; awaiting request.json() then races
+    # into ClientDisconnect and kills the worker before it starts, leaving the task
+    # stuck at 'submitted' (v10.98). Query params live on the request line and are
+    # always available regardless of when this coroutine is scheduled. The body is
+    # only needed for Pub/Sub push (Cloud Scheduler), which carries no query params.
+    _qp = request.query_params
+    _qp_task = (_qp.get("task_id") or "") if _qp else ""
+    _qp_demo = (_qp.get("demo_id") or "") if _qp else ""
+    if _qp_task and _qp_demo:
+        _body = {"task_id": _qp_task, "demo_id": _qp_demo}
+        if str(_qp.get("force_run", "")).lower() in ("1", "true"):
+            _body["force_run"] = True
+    else:
+        try:
+            _body = await request.json()
+        except Exception as _bjerr:
+            _wlogger.error("execute_task: no query ids and body read failed (%s)", type(_bjerr).__name__)
+            return {"status": "error", "message": "Missing task id (no query params, body unreadable)"}
 
     # --- Support both direct calls and Pub/Sub push messages ---
     # Direct call (from LRFT/localhost): {"task_id": "...", "demo_id": "..."}
