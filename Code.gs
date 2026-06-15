@@ -69,7 +69,7 @@ const CONFIG = {
   GITHUB_TOKEN: SCRIPT_PROPS.getProperty('GITHUB_TOKEN'),
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
-  APP_VERSION: 'v10.74-public',
+  APP_VERSION: 'v10.95-public',
   LOG_SHEET_URL: SCRIPT_PROPS.getProperty('LOG_SHEET_URL')
 };
 
@@ -713,6 +713,24 @@ function verifyAndResolveTable(candidateId) {
   return null;
 }
 
+/**
+ * Resolves the final publicDatasetId from the planner output.
+ * - Toggle OFF: always null (ignore any LLM-hallucinated ID).
+ * - Planner echoed the provided ID (normal case): use it as-is (already verified/user-specified).
+ * - Planner returned a DIFFERENT ID: trust it only after BigQuery API verification;
+ *   otherwise fall back to the verified options ID.
+ */
+function resolvePlannedPublicDatasetId_(parsedId, options) {
+  if (!options.usePublicDataset) return null;
+  const plannedId = (typeof parsedId === 'string') ? parsedId.trim() : '';
+  if (plannedId && plannedId !== options.publicDatasetId) {
+    const verified = verifyAndResolveTable(plannedId);
+    if (verified) return verified;
+    console.warn('[PublicDataset] Planner returned unverifiable ID "' + plannedId + '". Falling back to "' + options.publicDatasetId + '"');
+  }
+  return options.publicDatasetId || null;
+}
+
 
 function planAndGenerateData(userGoal, options) {
   // Step 0: If using public dataset and no ID specified, discover one using search grounding
@@ -805,8 +823,8 @@ function planAndGenerateData(userGoal, options) {
     businessInstruction: parsed.businessInstruction || parsed.systemInstruction || '',
     technicalInstruction: getTechnicalInstruction_(),
     systemInstruction: `${parsed.businessInstruction || parsed.systemInstruction || ''}\n\n${getTechnicalInstruction_()}`,
-    referenceDate: parsed.referenceDate || '2023-11-01',
-    publicDatasetId: parsed.publicDatasetId || options.publicDatasetId,
+    referenceDate: parsed.referenceDate || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd'),
+    publicDatasetId: resolvePlannedPublicDatasetId_(parsed.publicDatasetId, options),
     agentShortName: parsed.agentShortName || null,
     oneSentenceSummary: parsed.oneSentenceSummary || null,
     demoGuide: parsed.demoGuide,
@@ -848,7 +866,9 @@ function getTechnicalInstruction_() {
     "and that it should proactively write updates back to resolve issues.\n" +
     "8. **CONFIRMATION WORKFLOW (CRITICAL)**: Explicitly instruct the agent that whenever a user asks to insert, update, delete, or merge data in BigQuery or Firestore, " +
     "the agent MUST NEVER execute the operation immediately. Instead, the agent MUST ALWAYS present a clear summary of the proposed database action " +
-    "and ask the human user for explicit confirmation using <a2ui-json> tags.\n" +
+    "and ask the human user for explicit confirmation using <a2ui-json> tags. " +
+    "When the confirmation covers MULTIPLE independently-actionable items (e.g. a batch of draft orders), the card MUST let the user select WHICH items to approve " +
+    "(MultipleChoice variant 'checkbox' or per-row CheckBox bound to /form paths, with the confirm Button carrying the selections) — all-or-nothing batch confirmations are forbidden.\n" +
     "9. **OUTPUT PLACEMENT (HIGHEST PRIORITY — RULE #0)**: When you call a tool, any text you include in the SAME response as the tool call will be hidden from the user. " +
     "All analytical dashboards, insights, and A2UI suggestion chips MUST appear in your FINAL response that contains NO tool calls.\n\n" +
     
@@ -874,7 +894,14 @@ function getTechnicalInstruction_() {
     "  { \"id\": \"kpi_1_val\", \"component\": { \"Text\": { \"text\": { \"literalString\": \"[Value]\" }, \"usageHint\": \"title\" } } },\n" +
     "  { \"id\": \"kpi_1_lbl\", \"component\": { \"Text\": { \"text\": { \"literalString\": \"[Label]\" }, \"usageHint\": \"caption\" } } }\n" +
     "]\n" +
-    "Add more KPIs, Lists, and detail Rows as needed. Use Tabs for multi-section results.\n\n" +
+    "Add more KPIs, Lists, and detail Rows as needed.\n" +
+    "**TABS & MODAL THRESHOLDS (MANDATORY)**: A card with 3+ logical sections OR 8+ detail rows MUST use Tabs instead of one long scroll. " +
+    "When showing Top-N of a larger result set, never cram the remainder into a footnote Text — put the full list in a Modal opened by a 'view all' button.\n" +
+    "**NO PSEUDO-TABLES (CRITICAL)**: Never pack multiple metrics into ONE Text component using '|' or '/' separators. " +
+    "One entity per Row, one metric per Column/Text, so values align visually.\n" +
+    "**WHAT-IF SIMULATION CARD (WOW MOMENT)**: When an analysis result depends on a tunable parameter (threshold, budget, quantity), follow the result card with a what-if card: " +
+    "a Slider (label, minValue/maxValue, value bound to a /form path) plus a primary Button whose action context carries the /form value to request recalculation. " +
+    "Strongly recommended for critical-threshold findings (safety stock, alert thresholds).\n\n" +
     
     "**WHEN TO USE A2UI CARDS vs TEXT**:\n" +
     "- ALWAYS A2UI Card: Query results, KPI dashboards, entity profiles, data comparisons, workflow plans with action buttons, confirmation dialogs\n" +
@@ -982,7 +1009,7 @@ function getTechnicalInstruction_() {
     "11. **SUGGESTION CHIPS (CRITICAL)**: At the END of EVERY response, you MUST append a lightweight A2UI suggestion chip bar using surfaceId 'suggestions' and root='root' containing a Row of 3-4 Buttons with sendText actions. The chip block MUST be COMPLETE: a single <a2ui-json> block containing BOTH the beginRendering message AND the surfaceUpdate message with all Button components — never emit beginRendering alone. NEVER write any plain text or markdown headers (like \"Next Actions\", \"💡 Next Actions\", or other localized header equivalent) before the suggestions block; the system will automatically render the appropriate header. " +
     "**BUTTON SCHEMA CONFORMANCE (CRITICAL)**: NEVER nest components inside a Button's 'child' property. 'child' MUST always be a flat string pointing to the ID of a separately defined Text component.\n" +
     "**A2UI CARD INTERACTION EXCEPTION (STRICT RULE)**: When your response already contains a major interactive A2UI card featuring its own control buttons " +
-    "(such as the Welcome Card onboarding buttons, or the Workflow Execution Plan mode selection buttons like Immediate/Background/Scheduled), " +
+    "(such as the Welcome Card onboarding buttons, the Analysis Plan pre-flight card buttons like Run inline / Run in background / Adjust, or the Workflow Execution Plan mode selection buttons like Immediate/Background/Scheduled), " +
     "you **MUST NOT** output any suggestion chip bar at the bottom of your response. The card's own control buttons are sufficient. " +
     "If you output suggestion chips in these turns, they will duplicate the card buttons and fail to render the '💡 Next Actions' title. " +
     "Suggestion chips MUST only appear in normal conversational or analytical turns where no other interactive button-heavy cards are present.\n" +
@@ -1039,12 +1066,15 @@ function getTechnicalInstruction_() {
 function buildPlanningPrompt(userGoal, options) {
   const profile = getDataProfile_(options.dataProfile || 'standard');
   const maxRows = Math.min(options.rowCount || profile.defaultRowCount, 150);
+  const todayStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
   const publicDatasetInfo = options.usePublicDataset && options.publicDatasetId 
     ? `- RELATED PUBLIC DATASET (ENRICHMENT ONLY): ${options.publicDatasetId}
        * ROLE: This dataset serves as EXTERNAL CONTEXT (e.g., weather, statistics) to enrich the core business data.
        * CONSTRAINT: DO NOT use this dataset as a replacement for core business operations (e.g., do not use public orders/customers if you are generating a retail demo).
-       * JOIN STRATEGY: Link via common attributes like 'zip_code', 'category', 'region', or 'date' rather than internal system IDs.`
-    : `- IMPORTANT: NO public dataset should be used for this demo. Focus ONLY on synthetic tables below. Do NOT attempt to JOIN with external public-data.`;
+       * JOIN STRATEGY: Link via common attributes like 'zip_code', 'category', 'region', or 'date' rather than internal system IDs.
+       * OUTPUT FIELD (MANDATORY): In your JSON response, set "publicDatasetId" to EXACTLY this ID. Do NOT invent or substitute a different dataset.
+       * DEMO GUIDE REQUIREMENT (MANDATORY): At least ONE prompt in 'demoGuide' MUST explicitly ask the agent to enrich the analysis by combining the synthetic tables with this external public dataset (e.g., correlate internal metrics with the external context it provides). Design the JOIN keys in the synthetic tables so this prompt produces meaningful results.`
+    : `- IMPORTANT: NO public dataset should be used for this demo. Focus ONLY on synthetic tables below. Do NOT attempt to JOIN with external public-data. In your JSON response, set "publicDatasetId" to null.`;
   
   return `You are a versatile data analyst and BigQuery expert capable of generating realistic datasets for ANY industry or business function.
 Design and generate a demo dataset based on the following business problem.
@@ -1130,6 +1160,12 @@ ${userGoal}
     - **TOKEN BUDGET STRATEGY**: ${profile.strategy}
 ${publicDatasetInfo}
 
+## TEMPORAL ANCHOR (CRITICAL — TODAY'S DATE)
+Today's actual date is **${todayStr}**.
+- The "referenceDate" field in your JSON output MUST be exactly ${todayStr}. NEVER use a date from your training data as "now" — demos run TODAY, and stale data anchors (e.g., a year-old "current inventory") immediately break the demo's credibility when a user asks about "the current situation".
+- All "current state" snapshot records (e.g., latest inventory levels, current statuses, open tasks, active alerts) MUST be dated at or within a few days BEFORE ${todayStr}, so first-touch questions like "what is the current status?" hit fresh, recent data.
+- Historical transaction/fact records span backwards from ${todayStr} (see TEMPORAL COVERAGE below). Future dates are allowed ONLY for genuinely forward-looking records (planned work, scheduled deliveries, forecasts) and should fall within ~2 months after ${todayStr}.
+
 ## REALISTIC DATA SYNTHESIS (CRITICAL)
 Generate data that reflects real-world business complexity. Apply the following domain-agnostic principles, **adapting them to the specific industry/function identified above**:
 
@@ -1168,7 +1204,7 @@ Use **actual real-world data** wherever possible to maximize authenticity:
 - **Geographic Locations**: Use real city names, regions, and countries. Match locations to the business context (e.g., major retail markets, manufacturing hubs)
 - **Person Names**: Use culturally appropriate, realistic names for the stated region/language (e.g., Japanese names for Japan-based scenarios)
 - **Numerical Values**: Use realistic price points, quantities, and metrics based on real-world benchmarks (e.g., actual market prices, typical order volumes)
-- **Dates**: Use recent, realistic dates anchored to the referenceDate. Ensure that for TIMESTAMP columns, hours are in the range 00-23, minutes 00-59, and seconds 00-59. Never generate invalid hours like 24 or 25. For \`DATE\` columns, use \`YYYY-MM-DD\`. For \`TIMESTAMP\` columns, use \`YYYY-MM-DD HH:MM:SS\` format. Do not use plain dates in timestamp columns.
+- **Dates**: Use recent, realistic dates anchored to the referenceDate (= today, ${todayStr}; see TEMPORAL ANCHOR above). Ensure that for TIMESTAMP columns, hours are in the range 00-23, minutes 00-59, and seconds 00-59. Never generate invalid hours like 24 or 25. For \`DATE\` columns, use \`YYYY-MM-DD\`. For \`TIMESTAMP\` columns, use \`YYYY-MM-DD HH:MM:SS\` format. Do not use plain dates in timestamp columns.
 
 **DO NOT invent fictional brands, fake product names, or placeholder values like "Product A" or "Company XYZ".**
 
@@ -1220,6 +1256,8 @@ If the Business Problem naturally involves processing non-structured inputs like
 
 ### 6. Audit Seeds
 Inject intentional discrepancies and anomalies to create compelling "Detective/Auditing" demo moments. The agent's value is demonstrated when it **discovers** these issues. Apply ALL of the following patterns, adapting to the specific business domain:
+
+**FIRST-QUERY DISCOVERABILITY (MANDATORY)**: At least one audit seed MUST be discoverable by the most natural "current status" aggregate query a business user would ask first (e.g., comparing each entity's LATEST snapshot record against a threshold defined in a master table). Verify the anomaly survives a per-entity latest-record aggregation (latest record per entity, then compare) — NOT only a single-row lookup. If snapshot dates differ across entities, the anomaly must still surface when taking each entity's own latest record.
 
 #### 6a. Cross-Silo Discrepancies & Ambiguities (External File/Image vs BigQuery Master)
 - **FOR DOCUMENT SCAN SCENARIOS (e.g., Handwritten orders)**: 
@@ -1333,8 +1371,8 @@ Output in the following JSON format. Output **pure JSON only without code blocks
     - If Type A (Operational): Define persona/expertise. Instruct the agent to perform a conceptual workflow pipeline: (a) Scan & Analyze pending items, (b) Classify & Prioritize by applying business rules, (c) Plan & Coordinate by presenting the plan and allowing execution mode selection, (d) Process & Escalate, (e) Notify & Report. Include the FULL workflow definition from Section 8 here.
     - If Type B (Analytical/Strategic): Define the agent as an expert consultant. Instruct it to perform deep multi-hop SQL analysis, cross-source reasoning (correlating BQ with external files), and proactive strategic recommendation. Instruct it to write back strategic alerts, proposed budget modifications, or creative ideas to Firestore. Instruct it to use A2UI Dashboard Cards, Ranking Matrix, and Tabbed Comparisons to present insights, and use image generation for executive summaries.
     - **NO TECHNICAL SPECS (MANDATORY)**: Do NOT include any technical implementation details, specific tool names (e.g., 'generate_image', 'execute_sql'), UI framework terms (e.g., 'A2UI JSON', 'cards', 'chips', 'deleteSurface'), or system-level mechanisms. Focus purely on the business domain, data relationships, and operational rules. The technical/system behavior is managed by the platform's base instructions.",
-  "referenceDate": "YYYY-MM-DD",
-  "publicDatasetId": "bigquery-public-data.dataset.table",
+  "referenceDate": "MUST be exactly today's date, ${todayStr} (see TEMPORAL ANCHOR).",
+  "publicDatasetId": "Echo the RELATED PUBLIC DATASET id exactly as provided above, or null if no public dataset was provided.",
   "agentShortName": "A concise 2-3 word role-based name for the agent (e.g., 'Supply Chain Analyst', 'Fraud Investigator').",
   "oneSentenceSummary": "A concise, professional one-sentence summary of the business challenge and the generated solution.",
   "appliedFactors": {
@@ -2144,6 +2182,19 @@ HTML_TEMPLATE = """
         .detail-field:last-child { border-bottom: none; }
         .detail-field-k { font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.3px; min-width: 100px; flex-shrink: 0; padding-top: 2px; }
         .detail-field-v { font-size: 13px; color: var(--text-1); line-height: 1.6; word-break: break-word; white-space: pre-wrap; flex: 1; }
+        .detail-field-v.detail-field-rich { white-space: normal; min-width: 0; }
+        .detail-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+        .detail-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        .detail-table th { background: var(--bg-2); color: var(--text-3); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; text-align: left; padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid var(--border); }
+        .detail-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); color: var(--text-1); vertical-align: top; white-space: nowrap; }
+        .detail-table tbody tr:last-child td { border-bottom: none; }
+        .detail-table tbody tr:hover { background: var(--bg-2); }
+        .detail-chip { display: inline-block; background: var(--bg-2); border: 1px solid var(--border); border-radius: 14px; padding: 3px 10px; font-size: 12px; color: var(--text-2); }
+        .detail-kv { display: flex; flex-direction: column; gap: 2px; background: var(--bg-2); border-radius: var(--radius-sm); padding: 8px 12px; }
+        .detail-kv-row { display: flex; gap: 10px; padding: 3px 0; }
+        .detail-kv-k { font-size: 11px; font-weight: 600; color: var(--text-3); min-width: 120px; flex-shrink: 0; padding-top: 1px; }
+        .detail-kv-v { font-size: 12.5px; color: var(--text-1); word-break: break-word; min-width: 0; }
+        .detail-json { font-family: monospace; font-size: 11.5px; color: var(--text-2); word-break: break-all; }
 
         .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); width: 100%; }
         .card-actions select { 
@@ -2330,7 +2381,7 @@ HTML_TEMPLATE = """
     </div>
 
     <div class="modal-overlay" id="record-modal" onclick="if(event.target===this)closeModal()">
-        <div class="modal" style="position:relative;">
+        <div class="modal" style="position:relative;max-width:860px;">
             <button class="modal-close" onclick="closeModal()"><i data-lucide="x" style="width:20px;height:20px;"></i></button>
             <h3 id="rec-modal-title"><i data-lucide="database"></i> Record Detail</h3>
             <div id="rec-modal-meta" class="tcard-meta" style="margin-bottom:16px;"></div>
@@ -2440,16 +2491,29 @@ HTML_TEMPLATE = """
                 let currentIds = new Set();
                 let counts = { flagged: 0, resolved: 0, pending: 0 };
                 let statusCounts = {};
+                let statusDisplay = {};
                 let priorityCounts = { High: 0, Medium: 0, Low: 0 };
 
                 data.forEach(doc => {
                     currentIds.add(doc.id);
                     let statusStr = String(doc.data.status || doc.data.Status || 'Pending');
+                    // Statuses are grouped case-insensitively: agents write e.g. RESOLVED
+                    // while the dropdown writes Resolved - they are the SAME status.
+                    let statusKey = statusStr.toUpperCase();
                     let bClass = getStatusClass(statusStr);
                     counts[bClass]++;
-                    statusCounts[statusStr] = (statusCounts[statusStr] || 0) + 1;
-                    let priority = doc.data.priority || doc.data.Priority || 'Medium';
+                    if (!statusDisplay[statusKey]) statusDisplay[statusKey] = statusStr;
+                    statusCounts[statusKey] = (statusCounts[statusKey] || 0) + 1;
+                    let priority = String(doc.data.priority || doc.data.Priority || 'Medium');
+                    priority = priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase();
                     if (priorityCounts.hasOwnProperty(priority)) priorityCounts[priority]++;
+                    // Domain-specific statuses (e.g. ESCALATED) are not one of the three
+                    // standard options - surface them as a selected option instead of
+                    // silently falling back to "Pending".
+                    let customStatusOpt = '';
+                    if (statusKey !== 'PENDING' && statusKey !== 'RESOLVED' && statusKey !== 'FLAGGED') {
+                        customStatusOpt = '<option value="' + escDetailText(statusStr) + '" selected>' + escDetailText(statusStr) + '</option>';
+                    }
 
                     let docFingerprint = JSON.stringify(doc.data);
                     let isNew = !docStates[doc.id];
@@ -2480,9 +2544,21 @@ HTML_TEMPLATE = """
                             if (latest && latest.action) displayVal += ' • ' + latest.action;
                         } else if (val && typeof val === 'object') {
                             if (Array.isArray(val)) {
-                                displayVal = val.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join(', ');
+                                let hasObjects = val.some(v => v && typeof v === 'object');
+                                if (hasObjects) {
+                                    displayVal = val.length + (val.length === 1 ? ' item' : ' items');
+                                    let first = val.find(v => v && typeof v === 'object' && !Array.isArray(v));
+                                    let label = '';
+                                    if (first) {
+                                        let nameKey = Object.keys(first).find(k => k.toLowerCase().indexOf('name') !== -1 || k.toLowerCase().indexOf('title') !== -1);
+                                        if (nameKey && typeof first[nameKey] === 'string') label = first[nameKey];
+                                    }
+                                    if (label) displayVal += ': ' + label + (val.length > 1 ? ', ...' : '');
+                                } else {
+                                    displayVal = val.join(', ');
+                                }
                             } else {
-                                displayVal = Object.entries(val).map(([k,v]) => k + ': ' + v).join(', ');
+                                displayVal = Object.entries(val).map(([k,v]) => k + ': ' + (v && typeof v === 'object' ? (Array.isArray(v) ? v.length + ' items' : '...') : v)).join(', ');
                             }
                         }
                         displayVal = String(displayVal);
@@ -2510,9 +2586,10 @@ HTML_TEMPLATE = """
                         <div class="card-expand" onclick="openRecordDetail('\${doc.id}')"><i data-lucide="chevrons-up-down"></i> View all \${fieldCount} fields</div>
                         <div class="card-actions">
                             <select aria-label="Change status for \${doc.id}" onchange="event.stopPropagation(); updateStatus('\${doc.id}', this.value)">
-                                <option value="Pending" \${statusStr==='Pending'?'selected':''}>Pending</option>
-                                <option value="Resolved" \${statusStr==='Resolved'?'selected':''}>Resolved</option>
-                                <option value="Flagged" \${statusStr==='Flagged'?'selected':''}>Flagged</option>
+                                <option value="Pending" \${statusKey==='PENDING'?'selected':''}>Pending</option>
+                                <option value="Resolved" \${statusKey==='RESOLVED'?'selected':''}>Resolved</option>
+                                <option value="Flagged" \${statusKey==='FLAGGED'?'selected':''}>Flagged</option>
+                                \${customStatusOpt}
                             </select>
                             <button class="btn-del" onclick="event.stopPropagation(); deleteRecord('\${doc.id}')" aria-label="Delete record \${doc.id}"><i data-lucide="trash-2"></i></button>
                         </div>
@@ -2561,7 +2638,21 @@ HTML_TEMPLATE = """
                     if (notes) {
                         colMain += '  <div style="font-size:12.5px;color:var(--text-2);line-height:1.5;background:var(--bg-2);padding:10px 14px;border-radius:8px;border-left:4px solid var(--primary-light);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;" title="' + notes.replace(/"/g, '&quot;') + '">📝 ' + notes + '</div>';
                     } else {
-                        colMain += '  <div style="font-size:11px;color:var(--text-4);font-style:italic;">No additional notes recorded.</div>';
+                        var previewSkip = { status: 1, assigned_to: 1, assignedto: 1, customer_name: 1, customername: 1, product_name: 1, productname: 1, requested_qty: 1, requestedqty: 1, qty: 1, quantity: 1, notes: 1, message: 1, workflow_state: 1, updated_at: 1 };
+                        var previewParts = [];
+                        Object.keys(fields).forEach(function(fk) {
+                            if (previewParts.length >= 3 || previewSkip[fk.toLowerCase()]) return;
+                            var fval = String(fields[fk] || '').trim();
+                            if (!fval) return;
+                            if (fval.length > 70) fval = fval.slice(0, 67) + '...';
+                            var flabel = prettyFieldKey(fk);
+                            previewParts.push('<span style="display:inline-flex;align-items:baseline;gap:5px;background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:4px 9px;max-width:100%;"><span style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-4);white-space:nowrap;">' + escDetailText(flabel) + '</span><span style="font-size:11.5px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escDetailText(fval) + '</span></span>');
+                        });
+                        if (previewParts.length) {
+                            colMain += '  <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">' + previewParts.join('') + '</div>';
+                        } else {
+                            colMain += '  <div style="font-size:11px;color:var(--text-4);font-style:italic;">No additional notes recorded.</div>';
+                        }
                     }
                     colMain += '</div>';
 
@@ -2605,7 +2696,7 @@ HTML_TEMPLATE = """
                 if (chart1) {
                     let statusLabels = Object.keys(statusCounts).sort(function(a, b) { return statusCounts[b] - statusCounts[a]; });
                     let palette = ['#4F46E5', '#7C3AED', '#2563EB', '#0891B2', '#059669', '#D97706', '#EA580C', '#DC2626', '#DB2777', '#64748B'];
-                    chart1.data.labels = statusLabels;
+                    chart1.data.labels = statusLabels.map(function(l) { return statusDisplay[l] || l; });
                     chart1.data.datasets[0].data = statusLabels.map(function(l) { return statusCounts[l]; });
                     chart1.data.datasets[0].backgroundColor = statusLabels.map(function(l, i) { return palette[i % palette.length]; });
                     chart1.update();
@@ -2873,6 +2964,57 @@ HTML_TEMPLATE = """
             } catch (e) { document.getElementById('modal-body').textContent = 'Error: ' + e.message; }
         }
 
+        function escDetailText(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        function prettyFieldKey(k) {
+            return String(k).replace(/_/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(' ').map(function(w) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : w; }).join(' ');
+        }
+        function formatDetailScalar(v) {
+            if (v === null || v === undefined || v === '') return '<span style="color:var(--text-4)">-</span>';
+            if (typeof v === 'number' && isFinite(v)) return escDetailText(v.toLocaleString());
+            if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+            return escDetailText(String(v));
+        }
+        function renderDetailValue(val, depth) {
+            depth = depth || 0;
+            if (val === null || val === undefined || typeof val !== 'object') return formatDetailScalar(val);
+            if (depth >= 2) return '<span class="detail-json">' + escDetailText(JSON.stringify(val)) + '</span>';
+            if (Array.isArray(val)) {
+                if (!val.length) return '<span style="color:var(--text-4)">No entries</span>';
+                var allObjects = val.every(function(v) { return v && typeof v === 'object' && !Array.isArray(v); });
+                if (allObjects) {
+                    var cols = [];
+                    val.forEach(function(row) { Object.keys(row).forEach(function(k) { if (cols.indexOf(k) === -1) cols.push(k); }); });
+                    var t = '<div class="detail-table-wrap"><table class="detail-table"><thead><tr>';
+                    cols.forEach(function(c) { t += '<th>' + escDetailText(prettyFieldKey(c)) + '</th>'; });
+                    t += '</tr></thead><tbody>';
+                    val.forEach(function(row) {
+                        t += '<tr>';
+                        cols.forEach(function(c) {
+                            var isLong = typeof row[c] === 'string' && row[c].length > 60;
+                            t += (isLong ? '<td style="white-space:normal;min-width:240px;">' : '<td>') + renderDetailValue(row[c], depth + 1) + '</td>';
+                        });
+                        t += '</tr>';
+                    });
+                    t += '</tbody></table></div>';
+                    t += '<div style="font-size:11px;color:var(--text-3);margin-top:6px;">' + val.length + (val.length === 1 ? ' entry' : ' entries') + '</div>';
+                    return t;
+                }
+                var chips = val.map(function(v) {
+                    var inner = (v && typeof v === 'object') ? escDetailText(JSON.stringify(v)) : formatDetailScalar(v);
+                    return '<span class="detail-chip">' + inner + '</span>';
+                });
+                return '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + chips.join('') + '</div>';
+            }
+            var objKeys = Object.keys(val);
+            if (!objKeys.length) return '<span style="color:var(--text-4)">-</span>';
+            var rows = objKeys.map(function(k) {
+                return '<div class="detail-kv-row"><span class="detail-kv-k">' + escDetailText(prettyFieldKey(k)) + '</span><span class="detail-kv-v">' + renderDetailValue(val[k], depth + 1) + '</span></div>';
+            });
+            return '<div class="detail-kv">' + rows.join('') + '</div>';
+        }
+
         function openRecordDetail(docId) {
             const modal = document.getElementById('record-modal');
             modal.classList.add('open');
@@ -2889,45 +3031,46 @@ HTML_TEMPLATE = """
                 fetch('/api/data').then(r => r.json()).then(data => {
                     const doc = data.find(d => d.id === docId);
                     if (!doc) { document.getElementById('rec-modal-body').innerHTML = '<div style="color:var(--text-3)">Record not found.</div>'; return; }
-                    let html = '';
+                    let scalarHtml = '';
+                    let richHtml = '';
                     for (const [key, val] of Object.entries(doc.data)) {
                         if (key === 'workflow_state' && val && typeof val === 'object') {
                             let step = val.current_step || 0;
                             let total = val.total_steps || 1;
                             let pct = Math.round(step / total * 100);
                             let actions = (val.auto_actions_taken || []);
-                            html += '<div class="detail-field"><div class="detail-field-k">WORKFLOW</div>';
-                            html += '<div class="detail-field-v">';
-                            html += '<div class="wf-progress"><div class="wf-progress-bar" style="width:' + pct + '%"></div></div>';
-                            html += '<div style="margin-bottom:8px">Step ' + step + ' of ' + total + '</div>';
-                            if (val.pending_approval) html += '<span class="badge pending">Pending Approval</span>';
+                            richHtml += '<div class="detail-field"><div class="detail-field-k">WORKFLOW</div>';
+                            richHtml += '<div class="detail-field-v">';
+                            richHtml += '<div class="wf-progress"><div class="wf-progress-bar" style="width:' + pct + '%"></div></div>';
+                            richHtml += '<div style="margin-bottom:8px">Step ' + step + ' of ' + total + '</div>';
+                            if (val.pending_approval) richHtml += '<span class="badge pending">Pending Approval</span>';
                             if (actions.length) {
-                                html += '<div style="margin-top:8px; font-weight: 500;">Actions taken:</div>';
-                                html += '<ul style="margin: 4px 0; padding-left: 16px; font-size: 13px; color: var(--text-2);">' + actions.map(a => '<li>' + a + '</li>').join('') + '</ul>';
+                                richHtml += '<div style="margin-top:8px; font-weight: 500;">Actions taken:</div>';
+                                richHtml += '<ul style="margin: 4px 0; padding-left: 16px; font-size: 13px; color: var(--text-2);">' + actions.map(a => '<li>' + a + '</li>').join('') + '</ul>';
                             }
-                            html += '</div></div>';
+                            richHtml += '</div></div>';
                             continue;
                         } else if (key === 'activity_log' && Array.isArray(val)) {
-                            html += '<div class="detail-field"><div class="detail-field-k">ACTIVITY</div>';
-                            html += '<div class="detail-field-v">';
+                            richHtml += '<div class="detail-field"><div class="detail-field-k">ACTIVITY</div>';
+                            richHtml += '<div class="detail-field-v">';
                             val.forEach(entry => {
                                 let ts = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
-                                html += '<div class="timeline-entry">';
-                                html += '<span class="timeline-ts">' + ts + '</span>';
-                                html += '<span>' + (entry.action || '') + '</span>';
-                                if (entry.by) html += '<span class="timeline-by">' + entry.by + '</span>';
-                                html += '</div>';
+                                richHtml += '<div class="timeline-entry">';
+                                richHtml += '<span class="timeline-ts">' + ts + '</span>';
+                                richHtml += '<span>' + (entry.action || '') + '</span>';
+                                if (entry.by) richHtml += '<span class="timeline-by">' + entry.by + '</span>';
+                                richHtml += '</div>';
                             });
-                            html += '</div></div>';
+                            richHtml += '</div></div>';
                             continue;
                         }
-                        let displayVal = val;
                         if (val && typeof val === 'object') {
-                            displayVal = JSON.stringify(val, null, 2);
+                            richHtml += '<div class="detail-field"><div class="detail-field-k">' + escDetailText(prettyFieldKey(key)) + '</div><div class="detail-field-v detail-field-rich">' + renderDetailValue(val, 0) + '</div></div>';
+                            continue;
                         }
-                        displayVal = String(displayVal);
-                        html += '<div class="detail-field"><div class="detail-field-k">' + key + '</div><div class="detail-field-v">' + displayVal.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div></div>';
+                        scalarHtml += '<div class="detail-field"><div class="detail-field-k">' + escDetailText(prettyFieldKey(key)) + '</div><div class="detail-field-v">' + formatDetailScalar(val) + '</div></div>';
                     }
+                    let html = scalarHtml + richHtml;
                     document.getElementById('rec-modal-body').innerHTML = html || '<div style="color:var(--text-3)">No fields.</div>';
                     lucide.createIcons();
                 });
@@ -5427,10 +5570,6 @@ def register_background_task(
     Returns:
         dict with ticket-id and status.
     """
-    import builtins
-    _fs = getattr(builtins, '_firestore_client', None)
-    _demo_id = os.environ.get("DEMO_ID", "")
-
     # --- Structural guard: block recursive delegation ---
     # Background workers (user_id="background-worker") must execute tasks
     # directly using data tools, not re-register them as new background tasks.
@@ -5460,6 +5599,22 @@ def register_background_task(
                        "in THIS turn. Do not call register_background_task, get_task_result, or "
                        "list_background_tasks.",
         }
+
+    return submit_background_task_now(task_name, task_description, task_prompt)
+
+
+def submit_background_task_now(task_name: str, task_description: str, task_prompt: str) -> dict:
+    """Create and fire a background task WITHOUT the agent-level guards.
+
+    Shared core of register_background_task (the agent tool). Also called
+    directly (no ToolContext) by the inline-overrun conversion watchdog in
+    fast_api_app.py: when an inline turn exceeds the chat rendering deadline,
+    the executor moves the pressed "Run Inline:" intent here so the user
+    still receives the full report as a background task.
+    """
+    import builtins
+    _fs = getattr(builtins, '_firestore_client', None)
+    _demo_id = os.environ.get("DEMO_ID", "")
 
     _task_id = str(_task_uuid.uuid4())[:8]
     _now = _task_dt.datetime.now(_task_dt.timezone.utc)
@@ -5965,8 +6120,10 @@ def run_scheduled_task_now(
 
     Use this for manual test runs ("run it now") of a scheduled task. The task's
     stored task_prompt is executed by the background worker exactly like a
-    Cloud Scheduler fire. Returns immediately with a ticket; the result arrives
-    via the background-task notification flow (or get_task_result).
+    Cloud Scheduler fire. Returns immediately with a ticket. Results are written
+    to the operations console on completion; the chat summary is announced at the
+    start of the user's NEXT message turn (there is no push notification). Use
+    get_task_result for on-demand progress checks.
 
     Args:
         task_id: The task_id of the registered scheduled task to execute now.
@@ -6023,9 +6180,12 @@ def run_scheduled_task_now(
     return {
         "status": "triggered",
         "ticket-id": task_id,
-        "message": "Test execution started in the background. The result will be "
-                   "reported automatically when it completes; use get_task_result "
-                   "for progress checks.",
+        "message": "Test execution started in the background. Results are written "
+                   "to the operations console immediately upon completion, and a "
+                   "chat summary will be announced at the start of the user's next "
+                   "message turn (there is NO push notification — never promise "
+                   "one, and never promise a completion time). Use get_task_result "
+                   "for on-demand progress checks.",
     }
 
 
@@ -8360,6 +8520,7 @@ CRITICAL OPERATIONAL RULES:
 - A2UI_MANDATORY_OUTPUT (HIGHEST PRIORITY — NEVER SKIP):
     * EVERY response that contains an analysis result, data summary, ranking, comparison, entity profile, action plan, OR a confirmation request MUST use A2UI interactive cards wrapped in <a2ui-json> tags. Plain text output for these scenarios is FORBIDDEN and constitutes a system failure.
     * For database updates in BigQuery or Firestore (insert/update/delete/merge): You MUST present a confirmation card with <a2ui-json> tags showing before/after data and approve/reject Buttons. NEVER ask for confirmation in plain text.
+    * BATCH APPROVAL SELECTION (CRITICAL): When the confirmation covers MULTIPLE proposed items (e.g. a batch of draft orders), the card MUST let the user choose WHICH items to approve — use a MultipleChoice (variant: "checkbox", maxAllowedSelections = item count, selections bound to a /form path) or per-row CheckBox components, with the confirm Button's action context carrying the selected values. All-or-nothing batch confirmations are FORBIDDEN when the items are independently actionable.
     * At the END of EVERY response, you MUST append suggestion chips in a separate <a2ui-json> block with surfaceId "suggestions" containing 3-4 contextual follow-up Buttons. The chip block MUST be COMPLETE: include BOTH the beginRendering message AND the surfaceUpdate message with all Button components in the SAME block — never emit beginRendering alone. NEVER write any plain text or markdown headers (like "Next Actions", "💡 Next Actions", or other localized header equivalent) before the suggestions block; the system will automatically render the appropriate header. NEVER nest components inside a Button's 'child' property; 'child' MUST always be a flat string pointing to the ID of a separately defined Text component.
     * If you are unsure whether to use A2UI, USE IT. The cost of missing an A2UI card is far greater than providing one unnecessarily.
     * CONTEXT-AWARE ELEMENT SELECTION (CRITICAL): Choose the most appropriate A2UI element for each piece of content. Refer to the A2UI schema examples provided in your system prompt. General guidelines:
@@ -8371,11 +8532,26 @@ CRITICAL OPERATIONAL RULES:
       - Recommendations or action plans: Use numbered step cards or prioritized lists with visual hierarchy.
       - Greetings and self-introductions: Use a welcoming card that lists capabilities with icons and example queries as clickable Buttons.
       - Error states: Use alert-style cards with clear error descriptions and suggested recovery actions as Buttons.
+      - KPI tiles and status rows: Pair values with standard-catalog Icon components (e.g. check, warning, error, notifications, locationOn, shoppingCart, payment) instead of relying on emoji alone.
+      - Parameter-dependent analyses (thresholds, budgets, quantities): After the result card, you MAY present a what-if simulation card — a Slider (label, minValue/maxValue, value bound to a /form path) plus a primary Button whose action context carries the /form value to request recalculation. Strongly recommended for critical-threshold findings (e.g. safety-stock levels, alert thresholds) — letting the user drag a parameter and re-run the analysis is a flagship demo moment (see the interactive-form example).
+    * NO PSEUDO-TABLES (CRITICAL): NEVER pack multiple metrics into ONE Text component using "|" or "/" separators (e.g. "Qty: 1,096 t | Budget: 65M | Lead time: 2 days"). That is a pseudo-table and is FORBIDDEN inside cards. Use one entity per Row with one metric per Column/Text so values align visually (see the ranking-surface and comparison-matrix examples).
+    * TABS & MODAL THRESHOLDS (MANDATORY): A card with 3+ logical sections OR 8+ detail rows MUST use Tabs (see the tabbed-view example) instead of one long scroll. When showing Top-N of a larger result set, NEVER cram the remainder into a footnote Text — put the full list in a Modal opened by a "view all" button (see the modal-detail example).
+    * OPTION COMPLETENESS (CRITICAL): A selection card's options MUST include ALL entities from the query result — never arbitrarily truncate to the first few. When there are more than 5 options, set filterable: true on the MultipleChoice so the user can search.
+    * SURFACE LIFECYCLE AFTER ACTIONS (CRITICAL): When an action triggered from a form/confirmation/status card completes, do NOT leave the old card frozen in its pre-action state. Either send a surfaceUpdate to the SAME surfaceId transforming it into its completed state (e.g. a completed stamp, action buttons removed), or send deleteSurface followed by a fresh completion card (see the delete-surface example). This also applies to "Running..." status cards once the outcome is known in a later turn.
     * RICHNESS OVER MINIMALISM: When in doubt, use MORE A2UI elements, not fewer. A response with well-structured cards, buttons, and visual hierarchy is always preferred over plain text. Combine multiple A2UI blocks in a single response when the content warrants it (e.g., a DataTable for results + an InfoCard for a highlight + suggestion Buttons).
 - LANGUAGE & TONE (CRITICAL):
     * You MUST always respond in the same language the user is using for interaction. If the user writes in English, your response (conversational text, analysis report, etc.) MUST be strictly in English. If in Japanese, respond in Japanese.
     * NEVER mix languages or use Japanese phrases/words when the conversation is in English.
     * This language rule applies universally to ALL agents (coordinator and deep analysis specialist) at all times, without exception.
+- BUSINESS-FRIENDLY VOCABULARY (CRITICAL — your audience is a BUSINESS USER, not an engineer):
+    * NEVER expose infrastructure or implementation names in user-facing text or cards. Translate them into business terms (expressed in the user's language): BigQuery -> "the analytics database"; Firestore -> "the operations database"; Cloud Scheduler / cron -> "the recurring schedule"; Pub/Sub, task queue, async/asynchronous execution, scraping, Python, OCR engine -> describe only WHAT is achieved (e.g. "reads the document", "runs automatically in the background"), never the mechanism.
+    * NEVER show internal status enums (e.g. pending_approval, ALERT_ACTIVE) verbatim — express the state naturally in the user's language.
+    * INTERNAL IDS: at most ONE internal identifier per response, presented as a reference/ticket number when the user may need it later. All other entities MUST appear by their human-readable names (per the HUMAN-READABLE OUTPUT rule) — never raw codes like FAC-001 or MAT-007 in card text.
+    * EXCEPTION: if the user explicitly asks for technical/system details, you may name the underlying components.
+- FACTUAL REPORTING (NO EMBELLISHMENT — CRITICAL):
+    * Summaries, timelines, and activity reports MUST be built ONLY from events that actually happened in this session (or stored task/activity records). NEVER invent clock times, channels (e.g. calling an uploaded image a "fax"), counts, or steps that did not occur. If you do not know the exact time of an earlier action, omit the time rather than fabricating one.
+    * If the user's request conflicts with the actual data (e.g. the user says "all 32 factories" but the database contains 20), briefly state the discrepancy in one sentence, then proceed with the real data. Silently substituting different numbers erodes trust.
+    * NEVER promise completion times you do not control (e.g. "this will finish in a few seconds"). When describing asynchronous work, state the mechanism instead: results appear in the operations console as soon as processing completes, and you will summarize them in the next conversation turn.
 
 - VISUAL ASSETS & IMAGES:
     * Your output MUST NOT contain any inline images.
@@ -8387,6 +8563,8 @@ CRITICAL OPERATIONAL RULES:
         1. In the first turn, you MUST provide the full, comprehensive text analysis in your response *along with* the tool call to \\\`generate_image\\\`. Do NOT wait for the tool to complete to provide the main analysis text.
         2. After the tool returns success, let the system automatically attach the image. Your FINAL response for the turn MUST still contain the complete deliverable — the analysis report text and/or its A2UI cards, PLUS the suggestion chips — so the auto-attached image appears together with the report (a brief confirmation alone is only acceptable if the full analysis was already delivered in step 1). You MUST NEVER end the turn with only a progress/working note (e.g. "executing...", "analyzing...", or its localized equivalent); such filler is NOT a valid final response and causes the report to be dropped. If you have generated an image, you MUST go on to produce the full report, A2UI cards, and suggestion chips in the same turn — never stop immediately after the image.
     * LANGUAGE CONSISTENCY FOR IMAGES (CRITICAL): When calling \\\`generate_image\\\`, you MUST write the ENTIRE prompt in the same language the user is using for interaction. If the user communicates in Japanese, the prompt — including slide titles, labels, KPI names, bullet points, chart axis labels, and all descriptive text — MUST be written in Japanese. Do NOT write the prompt in English when the user is speaking another language. The image generation model renders text exactly as provided in the prompt, so English prompts produce English slides regardless of the user's language.
+    * PROACTIVE VISUALIZATION (WOW MOMENT — CRITICAL): The FIRST time in a session you complete a flagship analysis (a predictive, diagnostic, or audit finding that cross-references multiple data sources), you MUST call \\\`generate_image\\\` to produce an executive-summary slide of the findings WITHOUT waiting for the user to ask, following the TURN SPLITTING rule (full text analysis + cards are delivered alongside, so the user never waits on the image alone). Do this at most ONCE per session proactively; for subsequent major analyses, offer it via a suggestion chip instead.
+    * VISUALIZATION CHIP (MANDATORY): After every major analysis result card (when you did not just generate an image for it), the suggestion chips MUST include one chip offering to visualize THIS result as an executive summary slide, with the chip's sendText context carrying a specific request referencing the analysis just delivered.
     * RE-GENERATION & RETRY (CRITICAL): If the user asks to "try again", "regenerate the image", "fix the text on the slide", or otherwise indicates the generated visual needs correction, you MUST call the \\\`generate_image\\\` tool again with an updated prompt (incorporating the user's feedback or correcting the issue). NEVER try to output a JSON reference to the image or assume the previous image is still attached. You MUST trigger a new \\\`generate_image\\\` tool call.
     * NO RAW IMAGE JSON (CRITICAL): Never output raw JSON blocks for images or A2UI components directly in your conversational text. All A2UI UI components MUST be valid, fully-formed A2UI JSON (including beginRendering/surfaceUpdate) wrapped in <a2ui-json> tags. NEVER write partial or loose JSON objects like \\\`{"image": ...}\\\` or \\\`{"Image": ...}\\\` in your text response.
 
@@ -8414,6 +8592,8 @@ CRITICAL OPERATIONAL RULES:
     * DO NOT ASSUME column names (e.g., 'region', 'category', 'prefecture') exist without checking. Hallucinating columns causes fatal errors.
     * SQL ERROR RECOVERY: If a SQL query fails, output a status message, re-run \\\`get_table_info\\\` to verify schema, explore values with \\\`SELECT DISTINCT\\\`, and fix the query yourself. Be relentless in finding the correct data.
     * VALUE EXPLORATION: For unfamiliar columns, run \\\`SELECT DISTINCT column LIMIT 10\\\` to identify valid values.
+    * LATEST-SNAPSHOT AGGREGATION (CRITICAL): When aggregating a time-series STATE table (inventory levels, statuses, balances) across entities, you MUST take each entity's OWN latest record — e.g. \\\`QUALIFY ROW_NUMBER() OVER (PARTITION BY entity_id ORDER BY record_date DESC) = 1\\\` — and only then compare against thresholds. Filtering the whole table by a single global MAX(date) silently DROPS entities whose latest record has a different date, producing false "no issues found" answers.
+    * ZERO-RESULT SANITY CHECK (CRITICAL): If an anomaly/exception-detection query returns ZERO rows, do NOT immediately declare "no issues". First re-check your aggregation granularity ONCE (especially date filters — switch to the per-entity latest-record pattern above). Only after this verification may you report a confident zero. A premature "everything is fine" that is contradicted by a later drill-down destroys user trust.
     * HUMAN-READABLE OUTPUT (CRITICAL): Regardless of the underlying schema design (star, snowflake, normalized, or any other pattern), you MUST ensure every column in your final output is human-interpretable. Specifically:
       - Before writing any query, inspect the schema (via \\\`get_table_info\\\` or \\\`list_table_ids\\\`) to identify which columns are foreign keys, surrogate keys, or coded values that reference other tables.
       - JOIN with all relevant lookup/dimension/reference tables so that the output displays descriptive names, labels, or descriptions — never raw surrogate keys (e.g., numeric IDs), internal codes (e.g., "JP-13", "CAT_003"), or enum values when a human-readable equivalent exists in another table.
@@ -8436,7 +8616,7 @@ CRITICAL OPERATIONAL RULES:
 ---------------------------------------------------
 """
 
-public_info = "- Additional Dataset: Use [PUBLIC_DATASET_ID] for context." if "[PUBLIC_DATASET_ID]" else ""
+public_info = "- Additional Dataset: Use [PUBLIC_DATASET_ID] for context." if "${publicDatasetId || ''}" else ""
 
 # Embedding instruction directly (Reverted from separate file approach)
 gen_instruction = r"""
@@ -8752,6 +8932,74 @@ _WORKSPACE_WRITE_TOOLS = frozenset((
 ))
 _WS_WRITE_COOLDOWN_SEC = 120
 
+# =============================================================================
+# Inline wall-clock tool budget gate (v10.79; budgets relaxed v10.87)
+# NOTE (v10.87): render-probe testing proved GE renders streamed turns up to at
+# least 360s (silent) - the old "~120s render cutoff" premise below is WRONG.
+# This gate is now only a GENEROUS bound on runaway gathering (soft default
+# 250s); it forces an inline synthesis, it does NOT convert to background. Older
+# rationale retained for history:
+# The GE chat client was believed to stop rendering a streamed turn after ~2 min,
+# so an inline turn that keeps calling tools past that point delivers its
+# report to NOBODY (confirmed: a 339s "Run Inline" turn completed successfully
+# on the backend but rendered as a permanently blank "thinking" state).
+# fast_api_app.py arms INLINE_TOOL_DEADLINE (a time.monotonic() timestamp) at
+# the start of every A2A inline turn; once the deadline passes, this gate
+# blocks further tool calls so the model is forced to synthesize the report
+# from the data already in hand, leaving the executor enough time to stream
+# the deliverable before the client cutoff. Background /execute_task runs
+# never arm the contextvar (it stays None in their task context), so they
+# are unaffected. transfer_to_agent and register_background_task stay exempt:
+# both are instant and both lead to a fast, well-formed end of the turn.
+# =============================================================================
+import time as _itb_time
+import contextvars as _itb_contextvars
+INLINE_TOOL_DEADLINE = _itb_contextvars.ContextVar('inline_tool_deadline', default=None)
+# Separate, EARLIER deadline for generate_image (v10.85). generate_image adds
+# ~20-40s; if it starts late (but still before the soft tool deadline) it sinks
+# the synthesis window and the turn overruns the chat render cutoff with NO
+# inline result (confirmed: image at +74s -> overran 115s). Blocking it after
+# this earlier cutoff reserves time for the headline compute + report synthesis.
+INLINE_IMAGE_DEADLINE = _itb_contextvars.ContextVar('inline_image_deadline', default=None)
+_INLINE_GATE_EXEMPT_TOOLS = frozenset(('transfer_to_agent', 'register_background_task'))
+
+def _inline_tool_budget_gate(tool, args, tool_context):
+    """Skip the tool call once the inline wall-clock budget is exhausted."""
+    _deadline = INLINE_TOOL_DEADLINE.get()
+    if _deadline is None:
+        return None  # background /execute_task run - no inline time constraints
+    _name = getattr(tool, 'name', '') or ''
+    if _name in _INLINE_GATE_EXEMPT_TOOLS:
+        return None
+    _now = _itb_time.monotonic()
+    if _name == 'generate_image':
+        # Block generate_image once EITHER its earlier image deadline OR the soft
+        # tool deadline has passed - reserving the remaining budget for synthesis.
+        _img_deadline = INLINE_IMAGE_DEADLINE.get()
+        if (_img_deadline is None or _now < _img_deadline) and _now < _deadline:
+            return None
+        return {
+            "status": "blocked",
+            "message": (
+                "INLINE IMAGE BUDGET EXHAUSTED: do NOT generate an image now - it "
+                "is too slow and would leave no time to finish the report. Deliver "
+                "the final report immediately as text + tables + A2UI cards, and "
+                "offer a summary image as a one-click drill-down chip instead."
+            ),
+        }
+    if _now < _deadline:
+        return None
+    return {
+        "status": "blocked",
+        "message": (
+            "INLINE TIME BUDGET EXHAUSTED: do NOT call any more tools. "
+            "Immediately write the final report now using ONLY the data already "
+            "gathered in this conversation. If some requested items could not be "
+            "completed, state that briefly and offer to run the full-depth "
+            "analysis as a background task."
+        ),
+    }
+
 def _dedup_workspace_writes(tool, args, tool_context):
     """Block duplicate Workspace write calls within the cooldown window."""
     _name = getattr(tool, 'name', '')
@@ -8978,7 +9226,8 @@ Do NOT produce a shallow summary — the user explicitly requested deep analysis
 0. INTENT CONFIRMATION (MANDATORY FIRST CHECK — PREVENTS WRONG-ANALYSIS BUGS):
    Before doing ANY work, identify the SPECIFIC analysis the user actually
    requested from the recent conversation (e.g. the exact topic restated in the
-   delegating message, such as "equipment-failure trend analysis"). Anchor every
+   delegating message, such as a specific trend, comparison, or anomaly the user
+   named). Anchor every
    query and the final report to THAT intent.
    - If the delegated intent is clear, proceed and keep your work strictly on that
      topic.
@@ -8996,14 +9245,69 @@ Do NOT produce a shallow summary — the user explicitly requested deep analysis
      (get_task_result / list_background_tasks). You are the EXECUTOR, not a
      scheduler — escalating to a background task here makes the turn hang forever
      (the registration is structurally blocked anyway).
-   - HARD TOOL BUDGET: finish within about 12 tool calls. Prefer a few
-     pre-aggregated BigQuery queries (GROUP BY / window functions) over many raw
-     SELECTs. When you approach the budget, STOP gathering and synthesize the
-     report from what you already have rather than running more queries.
-   - SCHEMA FIRST (avoid retry storms): before writing SQL, confirm the exact
-     column names with get_table_info ONCE per table and reuse them. After an
-     "Unrecognized name" / "not found" error, do NOT keep guessing column names —
-     fix the query from the confirmed schema or proceed with available columns.
+   - HEADLINE FIRST, FEWEST QUERIES: compute the headline answer (the ranking /
+     totals / top offenders the user asked for) with ONE consolidated aggregate
+     query where possible (GROUP BY / SUM / window functions doing the work in
+     BigQuery). Do NOT burn the budget on exploratory probing - no "sample rows",
+     no "check the date range", no per-table reconnaissance beyond what you need.
+     Aim for well under 12 tool calls; the moment you have enough for the
+     headline, STOP gathering and write the report.
+   - SCHEMA FIRST (avoid retry storms): call get_table_info ONCE, and ONLY for
+     the tables you will actually query, then reuse the confirmed columns. After
+     an "Unrecognized name" / "not found" error, do NOT keep guessing column
+     names — fix the query from the confirmed schema or proceed with available
+     columns. Do not inspect tables you are not going to query.
+   - TEXT REPORT FIRST: produce the written report (numbers, findings, a short
+     recommendation) as your primary deliverable. Treat any image as optional
+     garnish that must not delay the text.
+   - CURRENCY IN RUNNING TEXT (avoid math-render glitches): in the markdown
+     report body, do NOT put a bare dollar sign in front of numbers. The chat
+     renderer treats a pair of dollar signs as LaTeX math, so an amount or a
+     revenue range gets mangled into garbled italic symbols. Write money with
+     the 3-letter currency code instead — e.g. "USD 577,844.94" or "12,345 JPY"
+     (use the business's currency). The currency SYMBOL is fine inside A2UI Text
+     components; this rule applies ONLY to streamed markdown / report text. Also
+     avoid wrapping numbers in asterisks adjacent to a dollar sign.
+   - WALL-CLOCK BUDGET: you have a few minutes for this inline turn - use them to
+     produce a thorough, high-quality FIRST-PASS (do NOT rush to a thin answer).
+     Still be efficient: gather only what the headline needs, then synthesize. If
+     a tool call is ever blocked with "INLINE TIME BUDGET EXHAUSTED", stop
+     gathering IMMEDIATELY and write the final report from the data you have.
+   - NO CODE-EXECUTION SIMULATION INLINE: never run code-execution heavy
+     computation (e.g. Monte Carlo simulation, iterative model fitting) in an
+     inline turn - it is slow and failure-prone here. Compute the statistics
+     directly in BigQuery SQL instead (STDDEV, CORR, APPROX_QUANTILES,
+     PERCENTILE_CONT, window functions). If a requested item truly requires
+     simulation, deliver an SQL-based approximation inline, label it as an
+     approximation, and offer the full simulation as a background task.
+   - ONE SUMMARY IMAGE (OPTIONAL): a first-pass MAY include ONE summary
+     chart/image to make it vivid (generate it once you have the headline
+     numbers). Deliver the TEXT report regardless - never let the image delay or
+     replace it. Generate AT MOST ONE image inline; put additional visuals in the
+     background escape-hatch. If generate_image is ever blocked with "INLINE
+     IMAGE BUDGET EXHAUSTED", skip it and deliver the text report immediately.
+   - INLINE FIRST-PASS, INTERACTIVE DRILL-DOWN: you are the INLINE executor.
+     Deliver a genuinely useful, well-structured analysis IN THIS TURN within
+     the time budget - concrete numbers, the key findings, and a short
+     recommendation, as much depth as fits (NOT a thin "headlines only" stub).
+     When the request has MULTIPLE analysis items, cover each at a solid
+     first-pass level rather than exhausting one. Then ALWAYS end with Next
+     Actions suggestion chips that propose the NEXT step the user is most likely
+     to want. The PREFERRED next step is an INLINE drill-down: 2-3 chips, each
+     targeting ONE NARROWER slice of what you just found (a specific top entity,
+     a single dimension/breakdown, one time window, or the root-cause of the
+     single biggest finding) so that pressing it runs as another quick
+     synchronous turn - NOT a background task. Write each drill-down chip's
+     sendText context as "Run Inline: <the narrower request>" (the "Run Inline:"
+     prefix makes it run synchronously and skip the pre-flight plan card). This
+     keeps the conversation an interactive loop: result -> drill-down -> result.
+     You MAY ALSO include AT MOST ONE optional escape-hatch chip for the full
+     exhaustive/comprehensive run as a background task, whose sendText context
+     is "Run in Background: <the full verbatim analysis request>" - offer it
+     only when a genuinely exhaustive batch (every row/entity) adds value beyond
+     the interactive drill-downs. Do NOT ask the user to choose
+     background-vs-inline BEFORE analyzing - just analyze, then offer the next
+     steps.
 
 1. ANALYSIS RIGOR (MANDATORY):
    a. EVIDENCE FIRST: Every claim or recommendation MUST be backed by
@@ -9254,47 +9558,50 @@ When the user asks to test-run or immediately execute an already-registered
 scheduled task, you MUST call run_scheduled_task_now(task_id) and reply
 right away with a short acknowledgment plus suggestion chips (e.g. a
 progress-check chip using get_task_result). NEVER execute the task's
-workflow inline yourself: the client stops rendering a turn after about
-2 minutes, so a long inline run makes your answer invisible to the user
-even when it succeeds. Any test-run button you place on a scheduled-task
+workflow inline yourself: a scheduled/recurring job belongs in the background
+worker (it must run idempotently on its own schedule), so route the manual
+test run to run_scheduled_task_now. Any test-run button you place on a scheduled-task
 confirmation card MUST route to run_scheduled_task_now, not to inline
 execution.
 
+HONEST ASYNC MESSAGING (CRITICAL): NEVER promise push notifications or
+completion within a specific time (e.g. "done in a few seconds") for ANY
+background or scheduled work. State the actual mechanism instead: results
+appear in the operations console as soon as processing completes, and you
+will summarize them at the start of the next conversation turn.
+
 WHEN TO USE:
 - User explicitly asks for "background", "schedule", "periodic", "monitor"
-- Analysis expected to take more than 2 minutes
 - User wants recurring reports or monitoring
+(Do NOT use background just because an analysis takes a few minutes - inline
+turns can run for minutes and render fine; answer those inline.)
 
-PROACTIVE SUGGESTION RULE (CRITICAL):
-Before starting any complex analysis, you MUST evaluate the expected
-workload. If ANY of the following complexity triggers are matched,
-PROACTIVELY suggest running it as a background task BEFORE executing:
+DELIVER INLINE FIRST, DRILL DOWN INTERACTIVELY (CRITICAL):
+You run INLINE and time-bounded. Do NOT ask the user to choose
+background-vs-inline before analyzing, and do NOT stop to propose a
+background task first. Instead:
+1. Run the analysis NOW and deliver a genuinely useful first-pass result
+   in THIS turn (concrete numbers, key findings, a short recommendation),
+   staying inside the inline time budget.
+2. Then ALWAYS present Next Actions A2UI suggestion chips. PREFER INLINE
+   drill-downs: 2-3 chips, each a NARROWER follow-up on what you just found
+   (a specific top entity, one breakdown dimension, a single time window, or
+   the root-cause of the biggest finding) so pressing it runs as another quick
+   synchronous turn. Write each drill-down chip's sendText context as
+   "Run Inline: <narrower request>" (the prefix runs it synchronously and skips
+   the pre-flight plan card) - this keeps an interactive loop: result ->
+   drill-down -> result. You MAY ALSO add AT MOST ONE optional background
+   escape-hatch chip for a genuinely exhaustive/comprehensive run, whose
+   sendText context is "Run in Background: <full verbatim analysis request>".
+   Write all chip LABELS in the SAME language the user is using.
+3. Do NOT call register_background_task yourself for the inline request - the
+   background run starts only if the user presses the escape-hatch chip.
 
-COMPLEXITY TRIGGERS:
-- JOINing 3+ tables or data sources
-- Combining BigQuery + Firestore + MCP data (cross-source analysis)
-- Statistical modeling, ML scoring, or simulation tasks
-- Generating comprehensive multi-section reports
-- User described the request as "detailed", "comprehensive", or "thorough"
-- Any task requiring 3+ sequential tool calls with intermediate processing
-
-SUGGESTION FLOW:
-1. Assess the request complexity against the triggers above
-2. If matched, respond with a brief explanation of the complexity
-   and present two choices via A2UI suggestion chips:
-   - "Run in Background" -> register_background_task with the full prompt
-   - "Run Now (may take a few minutes)" -> execute inline as normal
-3. If background chosen: register the task, confirm the ticket-id,
-   and tell the user they can monitor progress in the Data Viewer
-   Tasks tab or ask you for status anytime
-4. If inline chosen: proceed with normal analysis
-
-IMPORTANT: Be specific about WHY you suggest background execution
-(e.g., "This requires cross-referencing 4 tables with statistical
-analysis") so the user can make an informed decision.
-
-After registering a task, inform the user they can also monitor it
-in the Data Viewer Tasks tab if available.
+ONLY when the user has EXPLICITLY asked for background / scheduled /
+recurring / monitoring work (not merely a "detailed" or "comprehensive"
+analysis) should you register a background task up-front instead of
+answering inline. In that case confirm the ticket-id and tell the user
+they can monitor progress in the Data Viewer Tasks tab.
 --- END BACKGROUND TASK MANAGEMENT ---
 """,
     tools=_all_tools,
@@ -9302,7 +9609,7 @@ in the Data Viewer Tasks tab if available.
     generate_content_config=_validated_generate_config,
     before_model_callback=_strip_part_metadata,
     after_model_callback=[inject_image_callback, a2ui_metadata_callback, _enforce_task_result_text],
-    before_tool_callback=_dedup_workspace_writes,
+    before_tool_callback=[_inline_tool_budget_gate, _dedup_workspace_writes],
     after_tool_callback=[_record_workspace_write, _log_bq_activity],
     disallow_transfer_to_parent=False,
     disallow_transfer_to_peers=False,
@@ -9341,6 +9648,8 @@ rule for system stability.
 You are the primary coordinator. Handle most interactions yourself, including:
 - Greetings, follow-up questions, and general conversation
 - Single-step data lookups and retrieval (queries, reads, searches)
+- OVERVIEW / QUICK-LOOK requests — a concise snapshot answered with 1-2
+  bounded aggregate queries (see OVERVIEW / QUICK-LOOK below)
 - A2UI card generation for results
 - Simple create / update / delete operations
 - Presenting or reformatting existing data
@@ -9354,56 +9663,99 @@ Transfer to deep_analysis_agent when the request requires BOTH:
    identify patterns/trends, draw conclusions, or produce strategic recommendations
    (e.g. identifying discrepancies, mismatches, or reconciliation anomalies).
 
-CRITICAL — BACKGROUND-FIRST ROUTING (NEVER SKIP):
-When you determine a request qualifies for deep_analysis_agent transfer (complex analysis requiring 2+ tool calls and synthesis), you MUST propose background execution FIRST, BEFORE executing any analytical tools or transferring.
+OVERVIEW / QUICK-LOOK (ANSWER CONCISELY YOURSELF — DO NOT DELEGATE):
+A large share of requests ask for a high-level SNAPSHOT, not a deep analysis.
+These you handle YOURSELF and complete in seconds — never transfer them to
+deep_analysis_agent. Signals (in ANY language):
+- "overview", "summary", "snapshot", "dashboard", "at a glance", "how is/are
+  ... doing", "show me <X> performance / status / health / numbers", "current
+  <X> performance", "<X> overview"; AND
+- the welcome-card / suggestion-chip quick actions (e.g. a "Funnel Overview"
+  button that sends "Show me the current onboarding funnel performance").
+The defining trait: the user wants the HEADLINE numbers / current state, NOT a
+multi-step investigation, root-cause, forecast, or strategic recommendation.
 
-WARNING: You are STRICTLY FORBIDDEN from calling register_background_task or transferring to deep_analysis_agent in your very first response to a complex request without the user's explicit consent. You MUST ask the user first and let them choose.
+HOW TO ANSWER AN OVERVIEW (root, inline, fast):
+1. Run AT MOST 1-2 bounded aggregate queries (each a single GROUP BY / COUNT /
+   SUM / top-N over one table or a simple JOIN). Keep them cheap — this is the
+   ONE place you DO run a little SQL in root, because you COMPLETE the turn
+   yourself (no specialist to starve, no transfer). Do NOT chain 3+ queries,
+   do NOT inspect schema iteratively, do NOT call Code Execution.
+2. Present a CONCISE result card: the few headline metrics with one short line
+   of context each (what the number means / a notable point). No multi-section
+   report, no image.
+3. End with Next Actions suggestion chips, INCLUDING a deeper-dive chip whose
+   sendText is a plain analytical request (NO "Run Inline:" prefix), e.g.
+   "🔍 Deep-dive: analyze drivers of the onboarding funnel and recommend
+   improvements". Pressing it is a deep_analysis-class request, so it routes
+   through Step A below (the PRE-FLIGHT ANALYSIS PLAN CARD appears, inline is the
+   recommended default). Offer 2-3 such drill-down chips covering the obvious
+   next questions.
+
+WHEN AN "OVERVIEW" IS ACTUALLY A DEEP REQUEST: if the same message ALSO asks to
+analyze WHY / find drivers / compare-and-explain / forecast / recommend, it is
+NOT a quick-look — route it as a deep_analysis request (Step A: present the
+PRE-FLIGHT ANALYSIS PLAN CARD first). When unsure, give the concise overview
+FIRST and offer the deep-dive as a chip; a fast useful snapshot now beats a
+3-minute report the user did not ask for.
+
+=== ROUTING DECISION ORDER (evaluate IN THIS EXACT ORDER, top to bottom) ===
+For any request that is NOT an OVERVIEW / quick-look (handled above), you MUST
+walk these two steps IN ORDER. Do not jump to Step B before checking Step A.
+
+STEP A — PRE-FLIGHT ANALYSIS PLAN CARD (handled by the SYSTEM, not by you).
+When a FRESH user message is a heavy multi-step analysis, the SYSTEM renders an
+Analysis Plan card automatically BEFORE you run and waits for the user to choose
+inline / background / adjust. You therefore do NOT draw this card yourself; you
+normally receive such a request only as a user CHOICE:
+  - "Run Inline: <scope>"  -> Step B (transfer for an inline first-pass).
+  - "Run in Background: <scope>" -> register_background_task with that scope as a
+    COMPREHENSIVE task_prompt (TASK_PROMPT CONSTRUCTION RULES below) plus a
+    "📊 Check Task Status" chip.
+FALLBACK: if you ever receive a fresh heavy-analysis request directly (the system
+did not gate it), do NOT try to draw a plan card — just proceed per Step B
+(transfer inline). The card is the system's job; yours is the analysis.
+
+STEP B — INLINE EXECUTION (only AFTER the user picks "Run Inline:"):
+Once the user presses "Run Inline:" on the card (or an inline drill-down chip
+carrying the "Run Inline:" prefix arrives), make transfer_to_deep_analysis_agent
+your VERY FIRST action. Do NOT run any analytical SQL, schema inspection, or
+data tools in root yourself — the specialist does the analysis. Running queries
+here BEFORE transferring burns the inline time budget (you are the lightweight
+coordinator; a slow step here can starve the specialist and force the turn into
+a background task with NO inline result). The specialist runs INLINE and
+time-bounded, delivers a genuinely useful first-pass result THIS turn, and ends
+with Next Actions drill-down chips (each "Run Inline:" prefixed, so they bypass
+the card and keep the interactive loop fast).
+
+NOTE: the Analysis Plan card itself (its layout, the editable scope field, and the
+Run inline / Run in background / Adjust buttons) is rendered by the SYSTEM before
+you run — you never author it. The "Adjust" button resubmits the edited scope as a
+new message, which the system re-classifies and re-cards. Your job begins when a
+"Run Inline:" or "Run in Background:" choice arrives (see Step A / Step B).
+
+GO STRAIGHT TO BACKGROUND (without an inline pass) ONLY when:
+- the user EXPLICITLY asks (in ANY language) for background / scheduled /
+  recurring / periodic / monitoring work; OR
+- the user explicitly asks for an exhaustive, long-running job they already
+  know takes many minutes (e.g. "run a full audit of every table overnight").
+In those cases register_background_task directly (TASK_PROMPT CONSTRUCTION
+RULES below), confirm the ticket-id, and include a "📊 Check Task Status"
+chip (sendText "Check progress of task <task_id>") plus, if DATA_VIEWER_URL
+is set, a "🖥️ Open Operations Console" openUrl chip. Merely "detailed",
+"comprehensive", or "thorough" wording does NOT qualify — answer those inline.
 
 EXCLUSION: If you are already inside the WORKFLOW EXECUTION MODE flow
 (i.e., the user chose an execution mode from a Workflow Execution Plan card),
 do NOT apply this routing — the workflow mode handles task registration
-itself. This rule applies ONLY to pure analytical requests that are NOT
-part of an active workflow execution. Never register a second background
-task for a request that has already been registered via workflow mode.
+itself. Never register a second background task for a request that has
+already been registered via workflow mode.
 
-Mandatory 2-Turn Flow (MUST FOLLOW EXACTLY):
-Turn 1 (Proposal Turn — DO NOT CALL TOOLS):
-1. Recognize that the request is complex enough for deep_analysis_agent.
-2. Respond to the user in plain text: Explain why this is a complex analysis (e.g., "This requires cross-referencing X and Y, which involves multi-step reasoning"). Propose running it as a background task so they can continue other work.
-3. **DO NOT call register_background_task or transfer to deep_analysis_agent in this turn.** Doing so without user consent is a critical failure.
-4. Present exactly two A2UI suggestion chips:
-   - "🚀 Run in Background" (Recommended)
-   - "💬 Run Inline"
-   CRITICAL — INTENT-CARRYING CHIPS (PREVENTS WRONG-ANALYSIS BUGS): The sendText
-   action of EACH chip MUST carry the FULL, verbatim analysis request in its
-   action context "text" value — NOT a generic label like "Run Inline" or
-   "Run in Background". Copy the exact analysis items you just proposed (the
-   same VERBATIM ANALYSIS ITEMS you would put in a task_prompt). Prefix the
-   text so the execution mode is unambiguous, e.g.:
-     - Run Inline chip  -> context text: "Run Inline: <full verbatim analysis request>"
-     - Background chip   -> context text: "Run in Background: <full verbatim analysis request>"
-   The visible chip LABEL stays short ("💬 Run Inline" / "🚀 Run in Background"),
-   but the context text is the complete intent. This guarantees the chosen
-   analysis intent survives session healing/compaction and concurrent-request
-   recovery, so the executor never falls back to an unrelated pending task.
-5. End your response and wait for the user's choice.
-
-Turn 2 (Execution Turn — After User Responds):
-- If the user chooses "Run in Background":
-  1. Call register_background_task tool with a COMPREHENSIVE task_prompt following the TASK_PROMPT CONSTRUCTION RULES below.
-  2. In the same turn, confirm the registration, show the ticket ID, and explain how to monitor it.
-  3. **MANDATORY SUGGESTION CHIPS**: In the suggestion chips (surfaceId: "suggestions"), you MUST include a button labeled "📊 Check Task Status". The action for this button MUST be a sendText action with the text "Check progress of task <task_id>" (replace <task_id> with the actual ticket ID).
-  4. If DATA_VIEWER_URL is available, also include a suggestion chip labeled "🖥️ Open Operations Console" with an openUrl action pointing to the viewer URL.
-- If the user chooses "Run Inline":
-  1. The user's message carries the FULL analysis intent (from the intent-carrying
-     chip above). Before transferring, restate that exact intent in ONE short
-     sentence so it is explicit in the conversation (e.g. "Proceeding inline with:
-     <verbatim analysis request>."). If, for any reason, the intent is missing or
-     ambiguous (e.g. the message is only a bare "Run Inline" with no analysis
-     described anywhere in the recent conversation), DO NOT guess and DO NOT pick
-     an unrelated pending task from the operational database — ask the user a
-     one-line clarifying question instead.
-  2. Call transfer_to_deep_analysis_agent to hand over the task.
+INLINE TURNS CAN RUN FOR MINUTES: the chat renders long turns fine, so a heavy
+analysis should be completed INLINE and delivered this turn - do NOT push it to
+a background task just because it takes a while. Background is OPT-IN only (the
+user pressed a "Run in Background" chip, or asked for scheduled/recurring work).
+Your job is to answer inline and offer the deeper option as a next step.
 
 
 TASK_PROMPT CONSTRUCTION RULES (CRITICAL — PREVENTS SHALLOW RESULTS):
@@ -9446,6 +9798,9 @@ Examples that SHOULD trigger this flow:
 
 Examples that should NOT be transferred (handle yourself):
 - "Show me the latest records" (single retrieval)
+- "Show me the current onboarding funnel performance" (OVERVIEW / quick-look —
+  1-2 aggregate queries + a concise card + a deep-dive chip; never a 3-min report)
+- "Funnel overview" / "Sales dashboard" / "How are conversions doing?" (snapshot)
 - "Update this document" (single operation)
 - "What tables are available?" (schema exploration)
 - "Summarize this result" (reformatting existing data)
@@ -9468,6 +9823,9 @@ detailed, and polished. Terse or minimal answers are unacceptable.
    - Highlight key takeaways or notable patterns
    - Offer follow-up suggestions for deeper exploration
    - Use A2UI cards to present data in a visually structured format
+   - CURRENCY in any markdown text: never put a bare dollar sign before numbers
+     (a pair of dollar signs renders as LaTeX math and mangles the amount); use
+     the 3-letter code, e.g. "USD 12,345". The symbol is fine inside A2UI Text.
 
    ANALYSIS PROCESS TRANSPARENCY (CRITICAL FOR COMPLEX QUERIES):
    When you perform analysis that goes beyond simple data retrieval
@@ -9503,6 +9861,14 @@ detailed, and polished. Terse or minimal answers are unacceptable.
    and the database operation completes, issue a deleteSurface command
    for 'confirmation-surface' wrapped in <a2ui-json> tags to remove it.
 
+7. ACTION WITHOUT PAYLOAD: When a userAction arrives WITHOUT the expected
+   context values (e.g., a form submit whose selection payload was lost in
+   transit), do NOT apologize or report a failure. The user did nothing
+   wrong and nothing is broken. Simply re-ask naturally in one short
+   sentence and re-present the relevant choices as an A2UI card or
+   suggestion chips (e.g., ask which target they want, listing the options
+   again).
+
 --- BACKGROUND TASK MANAGEMENT ---
 You have tools to create and manage background tasks:
 
@@ -9536,38 +9902,38 @@ When the user asks to test-run or immediately execute an already-registered
 scheduled task, you MUST call run_scheduled_task_now(task_id) and reply
 right away with a short acknowledgment plus suggestion chips (e.g. a
 progress-check chip using get_task_result). NEVER execute the task's
-workflow inline yourself: the client stops rendering a turn after about
-2 minutes, so a long inline run makes your answer invisible to the user
-even when it succeeds. Any test-run button you place on a scheduled-task
+workflow inline yourself: a scheduled/recurring job belongs in the background
+worker (it must run idempotently on its own schedule), so route the manual
+test run to run_scheduled_task_now. Any test-run button you place on a scheduled-task
 confirmation card MUST route to run_scheduled_task_now, not to inline
 execution.
 
+HONEST ASYNC MESSAGING (CRITICAL): NEVER promise push notifications or
+completion within a specific time (e.g. "done in a few seconds") for ANY
+background or scheduled work. State the actual mechanism instead: results
+appear in the operations console as soon as processing completes, and you
+will summarize them at the start of the next conversation turn.
+
 WHEN TO USE:
 - User explicitly asks for "background", "schedule", "periodic", "monitor"
-- Analysis expected to take more than 2 minutes
 - User wants recurring reports or monitoring
+(Do NOT use background just because an analysis takes a few minutes - inline
+turns can run for minutes and render fine; answer those inline.)
 
-PROACTIVE SUGGESTION RULE (CRITICAL):
+INLINE-FIRST, DEEPER-ON-DEMAND (CRITICAL):
 When you receive a complex analysis request that qualifies for
-deep_analysis_agent transfer, you MUST suggest background execution
-BEFORE transferring. This is the SAME rule as the BACKGROUND-FIRST
-ROUTING rule above — it applies to ALL deep-analysis-level requests,
-not just ones with specific keywords. The following are additional
-signals that STRONGLY favor background execution:
-- Cross-source analysis (BigQuery + Firestore + MCP combined)
-- Comprehensive or multi-section reports
-- Large-scale data processing (many tables, many rows)
-- Statistical modeling or simulation
-For these requests, recommend background as the DEFAULT option.
-Present two A2UI suggestion chips: "Run in Background" (recommended)
-and "Run Inline". Each chip's sendText action MUST carry the FULL verbatim
-analysis request in its context "text" value (prefixed with "Run Inline: "
-or "Run in Background: "), NOT a bare label — so the intent survives session
-healing and concurrent-request recovery.
-- If background: register the task directly with register_background_task
-- If inline: restate the verbatim analysis intent in one short sentence, then
-  transfer to deep_analysis_agent. If the intent is missing/ambiguous, ask a
-  one-line clarifying question — never pick an unrelated pending task.
+deep_analysis_agent, do NOT register a background task up-front. Per Step A
+above, your first action is the PRE-FLIGHT ANALYSIS PLAN CARD: show it and STOP.
+Only AFTER the user picks "Run Inline:" do you transfer to deep_analysis_agent
+for a useful inline first-pass, then offer the deeper / full-depth analysis as a
+Next Actions background chip AFTER the result. Cross-source, comprehensive,
+statistical, or "detailed/thorough" wording does NOT by itself justify going
+straight to background — present the plan card, let the user choose, default to
+inline.
+Register a background task up-front ONLY when the user EXPLICITLY asked for
+background / scheduled / recurring / monitoring work. When you do, restate
+the intent in one short sentence; if the intent is missing/ambiguous, ask a
+one-line clarifying question — never pick an unrelated pending task.
 
 EXCLUSION (CRITICAL — PREVENTS DUPLICATE TASKS):
 If you have ALREADY called register_background_task for the current
@@ -9587,6 +9953,19 @@ RESULT NOTIFICATION:
 PROGRESS REPORTING:
 - Use get_task_result to show progress_pct and log_tail
 - Report progress as percentage when user asks about status
+- RENDER PROGRESS AS PLAIN TEXT + CHIPS, NOT A CARD: present the status
+  (task id, status, progress %, started-at) as plain markdown text, then put the
+  actions (e.g. "🔄 Refresh Progress" -> sendText "Check progress of task <id>",
+  "🏢 Operations Console") in the suggestion chips. Do NOT build a custom A2UI
+  status/progress Card. A model-built status card reuses the same surfaceId on
+  every refresh, and the client anchors a surfaceId to the turn where it FIRST
+  rendered - so a second refresh that re-sends the card silently patches the OLD
+  card and the new turn shows NOTHING (the buttons vanish). Plain text + chips
+  render reliably every turn because chips are scoped per-turn automatically.
+- If you nonetheless render a status Card, you MUST emit a FRESH beginRendering
+  PLUS surfaceUpdate every turn with a UNIQUE surfaceId (append the check count
+  or task id, e.g. "task-progress-<id>-2"); NEVER send a surfaceUpdate alone
+  reusing a previous turn's surfaceId.
 --- END BACKGROUND TASK MANAGEMENT ---
 
 --- PROACTIVE ANALYSIS SUGGESTIONS (CRITICAL) ---
@@ -9607,13 +9986,17 @@ CONCRETE EXAMPLES OF WHAT TO SUGGEST:
   with Python — I can calculate risk distributions, identify outliers,
   and generate a CSV report with recommendations for each item."
 - After a BigQuery result: "I can cross-reference this with Firestore
-  records and MCP tool data (e.g., legal/regulatory sources, external
+  records and MCP tool data (e.g., domain reference sources, external
   APIs) to build a unified view and perform trend analysis."
 - After showing financial/numeric data: "I can run statistical analysis
   (mean, median, std dev, percentiles) and create a risk scoring model
   using Python's scikit-learn."
 - After any data retrieval: "I can generate a formatted report (CSV/HTML)
   with actionable recommendations for each item."
+- After delivering a major analysis result card (when no image was just
+  generated for it): the suggestion chips MUST include one chip offering
+  to turn THIS result into an executive-summary slide, with the chip's
+  sendText context naming the specific analysis to visualize.
 
 Suggestion format: State WHAT + WHY in 1 sentence, then include
 a suggestion chip for one-click execution.
@@ -9625,10 +10008,19 @@ comparison, anomaly detection, risk assessment), self-evaluate depth:
 
 SHALLOW indicators: single data source, single query, <5 data points,
 no statistics, no cross-reference, fewer than 3 tool calls.
--> MUST: (1) Acknowledge as quick overview, (2) list 3 SPECIFIC deeper
-   analyses as a STRUCTURED ANALYSIS PLAN (see format below), (3) propose
-   background deep-dive with A2UI chips:
-   sendText "Execute in background" / sendText "Run inline" / sendText "This is sufficient"
+-> MUST: (1) Acknowledge this turn's result as a quick first-pass overview,
+   (2) list 3 SPECIFIC deeper analyses as a STRUCTURED ANALYSIS PLAN (see
+   format below), (3) offer the next steps as Next Actions A2UI chips, PREFERRING
+   INLINE drill-downs: 2-3 chips, each a NARROWER synchronous follow-up on what
+   you just found (one entity, one breakdown, one time window, or the biggest
+   finding's root cause), each chip's sendText context written as
+   "Run Inline: <narrower request>" (the prefix runs it synchronously and skips
+   the pre-flight plan card). You MAY add
+   AT MOST ONE background escape-hatch chip for the full exhaustive version,
+   sendText "Run in Background: <full structured plan>", and ALWAYS include a
+   "This is sufficient" chip. Write all chip LABELS in the SAME language the
+   user is using (labels e.g. "🔍 Drill into the top item" / "🚀 Run the full
+   analysis in the background" / "✓ This is enough for now").
 
 STANDARD indicators: 2+ sources, JOINs used, 5+ data points.
 -> Include improvement suggestions as suggestion chips.
@@ -9660,13 +10052,15 @@ ANALYSIS 3: [Specific Name]
 - Output: [Expected deliverables]
 - Business Value: [Impact]
 
-I recommend running this as a background task for comprehensive results."
+Pick any one to drill into now, or run the full set comprehensively."
 
-CRITICAL: When the user subsequently selects "Execute in background" or
-"Run in Background", you MUST copy this structured plan VERBATIM into the
-task_prompt of register_background_task following the TASK_PROMPT CONSTRUCTION
-RULES above. This is how the background agent knows EXACTLY what analyses to
-perform. A task_prompt without this structure produces shallow results.
+CRITICAL: Offer each of these as a NARROWER inline drill-down chip by default
+(plain natural-language sendText, so it runs synchronously next turn). Only when
+the user presses the optional background escape-hatch chip ("Run in Background")
+do you copy this structured plan VERBATIM into the task_prompt of
+register_background_task following the TASK_PROMPT CONSTRUCTION RULES above.
+This is how the background agent knows EXACTLY what analyses to perform. A
+task_prompt without this structure produces shallow results.
 --- END SELF-ASSESSMENT ---
 
 7. CODE EXECUTION SANDBOX (PROGRAMMABLE BRIDGE):
@@ -9765,7 +10159,7 @@ WRONG: beginRendering object without tags (missing tags and brackets = SYSTEM CR
     before_agent_callback=_inject_completed_tasks,
     before_model_callback=_strip_part_metadata,
     after_model_callback=[inject_image_callback, a2ui_metadata_callback, _enforce_task_result_text],
-    before_tool_callback=_dedup_workspace_writes,
+    before_tool_callback=[_inline_tool_budget_gate, _dedup_workspace_writes],
     after_tool_callback=[_record_workspace_write, _log_bq_activity],
 )
 
@@ -9948,6 +10342,9 @@ STEP 6 - COMPREHENSIVE REPORT (progress_pct=90-100):
   d. Statistical Evidence (tables of computed metrics)
   e. Strategic Recommendations (3+ items, each with quantified expected impact)
   f. Limitations and Next Steps
+  CURRENCY: in the markdown body, never put a bare dollar sign before numbers
+  (a pair of dollar signs renders as LaTeX math and mangles the amounts). Use
+  the 3-letter currency code instead — e.g. "USD 577,844.94" or "12,345 JPY".
   -> Call update_task_progress(current_step='REPORT', progress_pct=95)
 
 --- ANTI-SHALLOW GUARD (MANDATORY SELF-CHECK BEFORE FINAL REPORT) ---
@@ -10345,6 +10742,8 @@ import logging
 import asyncio
 import ast as _ast
 import re
+import json
+import time
 import contextvars
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -10953,13 +11352,37 @@ def _get_surface_registry(_sid):
                 _session_surface_registry.pop(_old, None)
     return _reg
 
-def _rescope_reused_surfaces(msg):
+def _a2ui_components(_v):
+    _c = _v.get('components')
+    return _c if isinstance(_c, list) else []
+
+def _a2ui_is_full_card_tree(_v):
+    # A self-contained card re-render declares its root component (conventionally
+    # id 'root'); a partial in-place patch updates specific components and does
+    # NOT re-send the root. Used to distinguish "model re-rendered the whole card
+    # via surfaceUpdate (forgot beginRendering)" from "legitimate partial patch".
+    _ids = [str(_c.get('id')) for _c in _a2ui_components(_v) if isinstance(_c, dict) and _c.get('id')]
+    return 'root' in _ids
+
+def _a2ui_root_id(_v):
+    _ids = [str(_c.get('id')) for _c in _a2ui_components(_v) if isinstance(_c, dict) and _c.get('id')]
+    return 'root' if 'root' in _ids else (_ids[0] if _ids else 'root')
+
+def _rescope_one(msg, _allow_promote=False):
+    # Rescope a single A2UI message against the per-session surface registry.
+    # Returns a LIST of messages: normally [msg]; when _allow_promote and an
+    # ORPHAN cross-turn full-tree surfaceUpdate is detected (a surface owned by a
+    # PRIOR invocation, no beginRendering for it this turn, full card tree), it is
+    # promoted to [synthetic beginRendering, msg] with a fresh re-anchored id so
+    # GE renders it as a NEW card this turn instead of silently patching the old
+    # one (which left the new turn blank - the vanishing progress card, v10.85).
     _guard = _current_surface_guard.get()
     if not _guard or not isinstance(msg, dict):
-        return msg
+        return [msg]
     try:
         _reg = _guard['registry']
         _task = _guard['task']
+        _begun = _guard.setdefault('begun', set())
         for _k in ('beginRendering', 'surfaceUpdate', 'dataModelUpdate', 'deleteSurface'):
             _v = msg.get(_k)
             if not (isinstance(_v, dict) and _v.get('surfaceId')):
@@ -10982,24 +11405,43 @@ def _rescope_reused_surfaces(msg):
                     _reg[_logical] = {'current': _new, 'owner': _task}
                     _v['surfaceId'] = _new
                     logger.log_text('[surface_rescope] cross-turn beginRendering reuse of ' + _logical + ' -> ' + _new)
+                _begun.add(_logical)
+            elif (_k == 'surfaceUpdate' and _allow_promote and _entry is not None
+                    and _entry.get('owner') != _task and _logical not in _begun
+                    and _a2ui_is_full_card_tree(_v)):
+                # Orphan cross-turn full-tree re-render with no begin this turn:
+                # GE would patch the prior card and render nothing here. Promote.
+                _new = _logical + '-u' + _guard['suffix']
+                _reg[_logical] = {'current': _new, 'owner': _task}
+                _begun.add(_logical)
+                _v['surfaceId'] = _new
+                _begin = {'beginRendering': {'surfaceId': _new, 'root': _a2ui_root_id(_v)}}
+                logger.log_text('[surface_rescope] promoted orphan surfaceUpdate ' + _logical + ' -> begin+update ' + _new)
+                return [_begin, msg]
             elif _entry is not None:
                 _v['surfaceId'] = _entry['current']
     except Exception:
         pass
-    return msg
+    return [msg]
+
+def _rescope_reused_surfaces(msg):
+    # Back-compat single-message rescope (no promotion). Returns the (mutated) msg.
+    return _rescope_one(msg, _allow_promote=False)[0]
 
 
-def create_a2ui_part(msg):
+def _prep_a2ui_msg(msg):
     _healed = _heal_buttons_in_a2ui(msg)
     _rewritten = _rewrite_suggestions_a2ui(_healed)
     _rewritten = _scope_suggestions_surface(_rewritten)
-    _rewritten = _rescope_reused_surfaces(_rewritten)
+    return _rewritten
+
+def _build_a2ui_part(msg):
     try:
-        return _original_create_a2ui_part(_rewritten, version='0.8')
+        return _original_create_a2ui_part(msg, version='0.8')
     except TypeError:
         # Fallback: SDK removed version param (e.g., PyPI 0.2.1)
         logger.log_text("[a2ui_compat] version param removed, using fallback MIME fix")
-        _part = _original_create_a2ui_part(_rewritten)
+        _part = _original_create_a2ui_part(msg)
         # Force GE-compatible MIME type
         try:
             if hasattr(_part, 'root') and hasattr(_part.root, 'inline_data') and _part.root.inline_data:
@@ -11010,7 +11452,78 @@ def create_a2ui_part(msg):
             pass
         return _part
 
-from adk_agent.app.agent import app as adk_app, background_agent
+def _diag_a2ui(msg, _tag):
+    # TEMP DIAGNOSTIC (v10.92): surface dangling child refs / empty tab content in
+    # model-authored A2UI. Remove once the empty-card-body bug is pinned.
+    try:
+        if not isinstance(msg, dict):
+            return
+        su = msg.get("surfaceUpdate")
+        if not isinstance(su, dict):
+            return
+        _sid = su.get("surfaceId")
+        _comps = su.get("components") or []
+        _defined = set()
+        _refs = set()
+        _has_tabs = False
+        _empty_lists = []
+        for _c in _comps:
+            if not isinstance(_c, dict):
+                continue
+            _cid = _c.get("id")
+            if isinstance(_cid, str):
+                _defined.add(_cid)
+            _comp = _c.get("component") or {}
+            if not isinstance(_comp, dict):
+                continue
+            for _name, _spec in _comp.items():
+                if _name == "Tabs":
+                    _has_tabs = True
+                if not isinstance(_spec, dict):
+                    continue
+                _child = _spec.get("child")
+                if isinstance(_child, str):
+                    _refs.add(_child)
+                _children = _spec.get("children")
+                if isinstance(_children, dict):
+                    _el = _children.get("explicitList")
+                    if isinstance(_el, list):
+                        if len(_el) == 0:
+                            _empty_lists.append(_cid)
+                        for _r in _el:
+                            if isinstance(_r, str):
+                                _refs.add(_r)
+                _items = _spec.get("tabItems")
+                if isinstance(_items, list):
+                    for _it in _items:
+                        if isinstance(_it, dict) and isinstance(_it.get("child"), str):
+                            _refs.add(_it.get("child"))
+        _dangling = sorted(_refs - _defined)
+        print("[a2ui_diag] " + str(_tag) + " surface=" + str(_sid)
+              + " tabs=" + str(_has_tabs) + " defined=" + str(len(_defined))
+              + " refs=" + str(len(_refs)) + " DANGLING=" + json.dumps(_dangling)
+              + " empty_lists=" + json.dumps(_empty_lists))
+        if _dangling or _has_tabs or _empty_lists:
+            print("[a2ui_diag] FULL surface=" + str(_sid) + " json=" + json.dumps(msg)[:12000])
+    except Exception as _e:
+        print("[a2ui_diag] error " + str(_e))
+
+def create_a2ui_part(msg):
+    # Single-part entry (no orphan-surfaceUpdate promotion) - back-compat.
+    _diag_a2ui(msg, "single")
+    return _build_a2ui_part(_rescope_reused_surfaces(_prep_a2ui_msg(msg)))
+
+def create_a2ui_parts(msg):
+    # List-returning entry (v10.85): may return [begin, update] when an orphan
+    # cross-turn full-tree surfaceUpdate is promoted to a fresh card so it renders
+    # this turn. Use this for MODEL-authored A2UI in the stream / drain / salvage
+    # paths. Server-authored begin+update pairs are unaffected (the begin marks
+    # the surface begun, so its update never promotes).
+    _diag_a2ui(msg, "list")
+    return [_build_a2ui_part(_m) for _m in _rescope_one(_prep_a2ui_msg(msg), _allow_promote=True)]
+
+from adk_agent.app.agent import app as adk_app, background_agent, INLINE_TOOL_DEADLINE, INLINE_IMAGE_DEADLINE
+import adk_agent.app.tools as _agent_tools
 import adk_agent.app.part_converters as part_converters
 
 # CRITICAL: Disable OpenTelemetry HTTPX instrumentation to prevent it from colliding
@@ -11032,6 +11545,160 @@ class Feedback(BaseModel):
 _, project_id = google.auth.default()
 logging_client = google_cloud_logging.Client()
 logger = logging_client.logger(__name__)
+
+# =============================================================================
+# PRE-FLIGHT GATE (v10.93): deterministic server-side Analysis Plan card.
+# Prompt-only gating failed 3x (v10.89/91/92): the model starts working /
+# transfers instead of rendering the card. So the SERVER classifies a fresh
+# user message with a lightweight model and, when it is a heavy multi-step
+# analysis, renders the Analysis Plan card itself and short-circuits the turn
+# BEFORE the agent runs. The user then picks inline / background / adjust.
+# Fail-open everywhere: any error => no card => the agent runs normally.
+# =============================================================================
+PREFLIGHT_CLASSIFIER_PROMPT = (
+    "You are a fast routing classifier for a data-analytics assistant. "
+    "Work in two steps. "
+    "STEP 1 (LANGUAGE - do this first): detect the natural language the USER MESSAGE "
+    "is written in (for example English, French, German, Japanese, Spanish). Put its "
+    "English name in the 'language' field. This is the ONLY language signal - ignore "
+    "the business domain, place names, and any other text; judge solely by the words "
+    "the user actually typed. "
+    "STEP 2 (CLASSIFY): decide whether the message is a request for a HEAVY MULTI-STEP "
+    "DATA ANALYSIS - several database queries plus synthesis such as correlation, "
+    "sensitivity, forecasting, anomaly investigation, cross-source comparison, "
+    "ranking-with-reasoning, or strategic recommendation, the kind that takes a few "
+    "minutes - versus a quick lookup, an overview/dashboard snapshot, a single "
+    "aggregate, a greeting, an edit, or a control action. "
+    "Return ONLY a JSON object with these keys: "
+    "language (English name of the detected user-message language); "
+    "category (one of 'ANALYSIS', 'QUICK', 'OTHER'); "
+    "title (short card title); intro (one sentence describing the planned analysis); "
+    "data (one line: which data it will use); method (one line: the analytical method); "
+    "output (one line: what the result will contain); estimate (rough time, e.g. '~1-3 min'); "
+    "label_title (a short card title); "
+    "label_inline, label_background, label_adjust, label_field. "
+    "These four are FIXED action labels - translate their MEANING into the user's "
+    "language and do NOT replace them with names of analysis types, sub-options, or "
+    "variations: label_inline = 'Run this analysis now' (run it inline); "
+    "label_background = 'Run this analysis in the background'; "
+    "label_adjust = 'Edit the request and re-propose'; label_field = a short label "
+    "for the editable request box (e.g. the localized form of 'Adjust the request'). "
+    "Each label may start with a fitting emoji. "
+    "Set category to 'ANALYSIS' ONLY for the heavy multi-step case; otherwise 'QUICK' or 'OTHER'. "
+    "ABSOLUTE LANGUAGE RULE: EVERY human-readable string (title, intro, data, method, "
+    "output, estimate, and every label) MUST be written in EXACTLY the language from "
+    "STEP 1. If the user wrote in English, write every string in English; never answer "
+    "an English message in French, German, or any other language. Do not translate the "
+    "user's words into another language. "
+    "For non-ANALYSIS messages you may leave the descriptive fields empty."
+)
+
+def _extract_user_text(run_args):
+    # Returns the user's INTENT text. A button / chip press arrives as a text part
+    # whose body is a userAction JSON ({"userAction":{"sourceComponentId":...,
+    # "context":{"text":"..."}}}) - we must unwrap it to its context text, NOT feed
+    # the raw JSON to the gate (otherwise "Run Inline: ..." is never recognized and
+    # the gate re-cards forever). Typed messages are returned as-is.
+    try:
+        _nm = run_args.get("new_message") if isinstance(run_args, dict) else None
+        if _nm is None:
+            return ""
+        # A button/chip press carries TWO text parts: a generic display filler
+        # ("User action triggered.") AND the userAction JSON. We must return ONLY
+        # the userAction's context.text - concatenating the filler would break the
+        # "Run Inline:" passthrough check and pollute the scope (it accreted
+        # "User action triggered. Run Inline: ..." every round). userAction wins.
+        _ua_text = None
+        _typed = []
+        for _p in (getattr(_nm, "parts", None) or []):
+            _t = getattr(_p, "text", None)
+            if not _t:
+                continue
+            if "userAction" in _t:
+                try:
+                    _ua = json.loads(_t).get("userAction", {}) or {}
+                    _ctx = _ua.get("context", {}) or {}
+                    _ctext = _ctx.get("text")
+                    if isinstance(_ctext, str) and _ctext.strip():
+                        _ua_text = _ctext.strip()
+                except Exception:
+                    pass
+                continue
+            _typed.append(_t)
+        if _ua_text is not None:
+            return _ua_text
+        return (" ".join(_typed)).strip()
+    except Exception:
+        return ""
+
+def _is_preflight_passthrough(text):
+    # Messages that must reach the agent unchanged (already a user choice).
+    _l = (text or "").lstrip().lower()
+    return _l.startswith("run inline:") or _l.startswith("run in background:")
+
+async def _classify_for_preflight(text):
+    try:
+        from google.genai import client as _genai_client
+        _loc = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
+        _client = _genai_client.Client(
+            vertexai=True, location=_loc, project=project_id,
+            http_options={"api_version": "v1"},
+        )
+        _model = os.environ.get("AGENT_MODEL_LITE", "gemini-3.5-flash")
+        _prompt = PREFLIGHT_CLASSIFIER_PROMPT + chr(10) + chr(10) + "USER MESSAGE:" + chr(10) + text
+        _res = await asyncio.wait_for(
+            asyncio.to_thread(
+                _client.models.generate_content,
+                model=_model,
+                contents=[genai_types.Content(role="user", parts=[genai_types.Part.from_text(text=_prompt)])],
+                config=genai_types.GenerateContentConfig(response_mime_type="application/json", temperature=0),
+            ),
+            timeout=12,
+        )
+        _raw = (getattr(_res, "text", None) or "").strip()
+        if not _raw:
+            return None
+        _obj = json.loads(_raw)
+        return _obj if isinstance(_obj, dict) else None
+    except Exception as _e:
+        logger.log_text("[preflight_gate] classifier skipped (fail-open): " + str(_e)[:200])
+        return None
+
+def _build_preflight_card_parts(plan, scope_text):
+    try:
+        def _g(_k, _d):
+            _v = plan.get(_k)
+            return _v if (isinstance(_v, str) and _v.strip()) else _d
+        _title = _g("label_title", _g("title", "Analysis plan"))
+        _intro = _g("intro", "I will run a multi-step analysis.")
+        _why_bits = [b for b in [_g("data", ""), _g("method", ""), _g("output", ""), _g("estimate", "")] if b]
+        _why = " | ".join(_why_bits) if _why_bits else _g("estimate", "This may take a few minutes.")
+        _card = [
+            {"beginRendering": {"surfaceId": "analysis-plan", "root": "root"}},
+            {"dataModelUpdate": {"surfaceId": "analysis-plan", "path": "/form", "contents": [{"key": "scope", "valueString": scope_text}]}},
+            {"surfaceUpdate": {"surfaceId": "analysis-plan", "components": [
+                {"id": "root", "component": {"Card": {"child": "col"}}},
+                {"id": "col", "component": {"Column": {"children": {"explicitList": ["title", "intro", "why", "scopeField", "actions"]}, "distribution": "start", "alignment": "stretch"}}},
+                {"id": "title", "component": {"Text": {"text": {"literalString": _title}, "usageHint": "h2"}}},
+                {"id": "intro", "component": {"Text": {"text": {"literalString": _intro}, "usageHint": "body"}}},
+                {"id": "why", "component": {"Text": {"text": {"literalString": _why}, "usageHint": "caption"}}},
+                {"id": "scopeField", "component": {"TextField": {"label": {"literalString": _g("label_field", "Adjust scope")}, "text": {"path": "/form/scope"}, "textFieldType": "longText"}}},
+                {"id": "actions", "component": {"Row": {"children": {"explicitList": ["bInline", "bBg", "bRefine"]}, "distribution": "spaceEvenly", "alignment": "center"}}},
+                {"id": "bInline", "component": {"Button": {"child": "bInlineL", "primary": True, "action": {"name": "sendText", "context": [{"key": "text", "value": {"literalString": "Run Inline: " + scope_text}}]}}}},
+                {"id": "bInlineL", "component": {"Text": {"text": {"literalString": _g("label_inline", "Run inline now")}, "usageHint": "body"}}},
+                {"id": "bBg", "component": {"Button": {"child": "bBgL", "action": {"name": "sendText", "context": [{"key": "text", "value": {"literalString": "Run in Background: " + scope_text}}]}}}},
+                {"id": "bBgL", "component": {"Text": {"text": {"literalString": _g("label_background", "Run in background")}, "usageHint": "body"}}},
+                {"id": "bRefine", "component": {"Button": {"child": "bRefineL", "action": {"name": "sendText", "context": [{"key": "text", "value": {"path": "/form/scope"}}]}}}},
+                {"id": "bRefineL", "component": {"Text": {"text": {"literalString": _g("label_adjust", "Adjust & re-propose")}, "usageHint": "body"}}},
+            ]}},
+        ]
+        _parts = []
+        for _m in _card:
+            _parts.extend(create_a2ui_parts(_m))
+        return _parts
+    except Exception as _e:
+        logger.log_text("[preflight_gate] card build failed (fail-open): " + str(_e)[:200])
+        return None
 
 logs_bucket_name = os.environ.get("LOGS_BUCKET_NAME")
 artifact_service = (
@@ -11345,6 +12012,126 @@ def _msg_signature(_run_args):
     except Exception:
         return ''
 
+# =============================================================================
+# Inline render deadline (v10.80)
+# The GE client stops rendering a streamed turn at roughly 120s; anything the
+# agent delivers after that renders as a permanently blank "thinking" state
+# (confirmed: a 339s "Run Inline" turn delivered a full report over HTTP 200
+# to a client that had stopped listening). Every A2A turn is inline by
+# definition (background work goes through /execute_task), so the executor
+# enforces two budgets per turn:
+#   - INLINE_SOFT_TOOL_BUDGET_S: arms the agent-side tool gate
+#     (_inline_tool_budget_gate in agent.py) - past this point tool calls are
+#     blocked (and generate_image is blocked outright) so the model must
+#     synthesize from data in hand.
+#   - INLINE_HARD_DEADLINE_S: the conversion watchdog ends the turn while it
+#     still renders by moving the work to a REAL background task (the
+#     /execute_task worker, which runs to completion and is retrievable via a
+#     "Check Task Status" chip). Applies to BOTH "Run Inline:" chip presses
+#     and plain typed analytical requests.
+#
+# v10.80 fix (was v10.79): the old hard-deadline path showed a "press Continue"
+# chip for typed requests and claimed "the work continues in this session". It
+# did NOT - aclose() cancels the ADK run, so no final report is ever produced;
+# pressing Continue re-ran from scratch -> overran again -> infinite loop
+# (confirmed on demo-material-invent-54d97d4d). The continue-chip path is gone:
+# every overrun now becomes a real, retrievable background task, the conversion
+# is NO LONGER stored under the H1 session-artifact key (which made a re-send
+# replay the dead-end message), and incidental generate_image (a 30-40s sink
+# that caused most overruns) is blocked inline.
+# =============================================================================
+# v10.87: render-probe (silent up to 360s, heartbeat up to 240s) PROVED GE does
+# NOT cut off streamed turns near ~120s - the old premise was wrong. The
+# automatic inline-overrun -> background CONVERSION is therefore disabled by
+# default (set INLINE_OVERRUN_CONVERT=1 to re-enable): a heavy analysis now runs
+# to completion and renders INLINE instead of being moved to a background task
+# after a wasted wait. The soft tool budget is kept (generous) only to bound
+# runaway gathering and force an inline synthesis; the 800s graceful watchdog
+# remains the true-hang backstop. Background is now OPT-IN only (explicit chip /
+# scheduled task). All env-tunable.
+_INLINE_OVERRUN_CONVERT = os.environ.get('INLINE_OVERRUN_CONVERT', '0') == '1'
+_INLINE_SOFT_TOOL_BUDGET_S = float(os.environ.get('INLINE_SOFT_TOOL_BUDGET_S', '250'))
+_INLINE_HARD_DEADLINE_S = float(os.environ.get('INLINE_HARD_DEADLINE_S', '600'))
+# Cutoff for generate_image (kept generous now that turns can run long).
+_INLINE_IMAGE_BUDGET_S = float(os.environ.get('INLINE_IMAGE_BUDGET_S', '200'))
+# Control-action context texts that must NEVER be converted into a background
+# task (they carry no analysis intent of their own).
+_INLINE_CONTROL_PREFIXES = ('continue', 'check progress', 'view full report', 'open operations')
+# Internal re-prompt markers (synth/continue/chip salvage) that must not be
+# mistaken for a real user request when building background-conversion context.
+_INLINE_INTERNAL_MARKERS = ('using ', 'your previous', 'run the full-depth')
+
+def _overrun_bg_prompt(_run_args):
+    # Derive a full-depth background-task prompt for a turn that overran the
+    # inline render deadline. Handles intent-carrying chips ("Run Inline: X" /
+    # "Run in Background: X") and plain typed requests. Returns '' for control
+    # actions (Continue / Check progress / View full report) and the bare
+    # "User action triggered." sentinel - those must NOT spawn a background task.
+    try:
+        _parts = getattr(_run_args.get('new_message'), 'parts', None) or []
+    except Exception:
+        return ''
+    for _p in _parts:
+        _t = (getattr(_p, 'text', '') or '').strip()
+        if not _t:
+            continue
+        _ctx_text = _t
+        if _t.startswith('{'):
+            try:
+                _obj = json.loads(_t)
+                _ctx_text = str((((_obj.get('userAction') or {}).get('context') or {}).get('text') or ''))
+            except Exception:
+                _ctx_text = ''
+        _ctx_text = _ctx_text.strip()
+        if not _ctx_text or _ctx_text.lower() == 'user action triggered.':
+            continue
+        _low = _ctx_text.lower()
+        if any(_low.startswith(_cp) for _cp in _INLINE_CONTROL_PREFIXES):
+            return ''
+        # Strip a leading "Run Inline:" / "Run in Background:" mode prefix.
+        for _pfx in ('run inline:', 'run in background:'):
+            if _low.startswith(_pfx):
+                _ctx_text = _ctx_text[len(_pfx):].strip()
+                break
+        # Drop a trailing "(Quick first-pass: ...)" clause (ascii or fullwidth).
+        for _op in ('(quick first-pass', chr(0xFF08) + 'quick first-pass'):
+            _qi = _ctx_text.lower().rfind(_op)
+            if _qi != -1:
+                _ctx_text = _ctx_text[:_qi].strip()
+                break
+        if _ctx_text:
+            return _ctx_text
+    return ''
+
+def _recent_user_texts(_session, _exclude, _limit=2):
+    # Pull the last few genuine user-request texts from the session (newest
+    # first), skipping chip JSON, control actions, and internal re-prompts.
+    # Used to give a converted background task the conversation context a terse
+    # follow-up (e.g. "しきい値分析をして") depends on.
+    _out = []
+    try:
+        for _ev in reversed(getattr(_session, 'events', None) or []):
+            _c = getattr(_ev, 'content', None)
+            if not _c or getattr(_c, 'role', '') != 'user':
+                continue
+            for _pp in (getattr(_c, 'parts', None) or []):
+                _tt = (getattr(_pp, 'text', '') or '').strip()
+                if not _tt or _tt.startswith('{') or _tt == 'User action triggered.':
+                    continue
+                if _tt == _exclude:
+                    continue
+                _low = _tt.lower()
+                if any(_low.startswith(_cp) for _cp in _INLINE_CONTROL_PREFIXES):
+                    continue
+                if any(_low.startswith(_m) for _m in _INLINE_INTERNAL_MARKERS):
+                    continue
+                if _tt not in _out:
+                    _out.append(_tt)
+            if len(_out) >= _limit:
+                break
+    except Exception:
+        pass
+    return _out
 
 class AdkAgentToA2AExecutor(A2aAgentExecutor):
     # Note: Concurrent request dedup is handled at the Firestore level
@@ -11572,6 +12359,69 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
         # caused by concurrent request race conditions (duplicate roles) or crash-recovery (consecutive user roles).
         _heal_session_events(session)
 
+        # --- PRE-FLIGHT GATE (v10.93): server-rendered Analysis Plan card ---
+        # For a FRESH heavy-analysis message (not already a "Run Inline:" /
+        # "Run in Background:" choice), classify with a lightweight model and, if
+        # it is a real multi-step analysis, render the Analysis Plan card here and
+        # finish the turn BEFORE the agent runs. Inline is the recommended button;
+        # the user's choice ("Run Inline: ...") then flows through to the agent.
+        # The Adjust button resubmits the edited scope, which is re-classified.
+        # Fail-open: any miss/error falls through to the normal agent run.
+        try:
+            _gate_text = _extract_user_text(run_args)
+            if _gate_text and not _is_preflight_passthrough(_gate_text):
+                _plan = await _classify_for_preflight(_gate_text)
+                if isinstance(_plan, dict) and _plan.get("category") == "ANALYSIS":
+                    _pf_parts = _build_preflight_card_parts(_plan, _gate_text)
+                    if _pf_parts:
+                        await event_queue.enqueue_event(
+                            TaskStatusUpdateEvent(
+                                task_id=context.task_id,
+                                status=TaskStatus(state=TaskState.working, timestamp=datetime.now(timezone.utc).isoformat()),
+                                context_id=context.context_id,
+                                final=False,
+                                metadata={
+                                    _get_adk_metadata_key('app_name'): runner.app_name,
+                                    _get_adk_metadata_key('user_id'): run_args['user_id'],
+                                    _get_adk_metadata_key('session_id'): run_args['session_id'],
+                                },
+                            )
+                        )
+                        await event_queue.enqueue_event(
+                            TaskArtifactUpdateEvent(
+                                task_id=context.task_id,
+                                last_chunk=True,
+                                context_id=context.context_id,
+                                artifact=Artifact(artifact_id=str(uuid.uuid4()), parts=_pf_parts),
+                            )
+                        )
+                        await event_queue.enqueue_event(
+                            TaskStatusUpdateEvent(
+                                task_id=context.task_id,
+                                status=TaskStatus(state=TaskState.completed, timestamp=datetime.now(timezone.utc).isoformat()),
+                                context_id=context.context_id,
+                                final=True,
+                            )
+                        )
+                        if idem_key:
+                            _store_idem_result(idem_key, _pf_parts)
+                        logger.log_text("[preflight_gate] rendered analysis-plan card and short-circuited (" + str(len(_pf_parts)) + " parts)")
+                        return
+        except Exception as _pf_err:
+            logger.log_text("[preflight_gate] gate error (fail-open, running agent): " + str(_pf_err)[:200])
+
+        # --- Inline render deadline (v10.79): arm the wall-clock budgets ---
+        # The soft tool budget propagates to the agent's before_tool gate via
+        # the contextvar (set here, inherited by the run's task context); the
+        # hard deadline drives the conversion watchdog created further below.
+        _turn_start_mono = time.monotonic()
+        try:
+            INLINE_TOOL_DEADLINE.set(_turn_start_mono + _INLINE_SOFT_TOOL_BUDGET_S)
+            INLINE_IMAGE_DEADLINE.set(_turn_start_mono + _INLINE_IMAGE_BUDGET_S)
+        except Exception as _itd_err:
+            logger.log_text('[inline_deadline] failed to arm tool budget (non-fatal): ' + str(_itd_err)[:160])
+        _overrun_prompt = _overrun_bg_prompt(run_args)
+
         invocation_context = runner._new_invocation_context(
             session=session,
             new_message=run_args['new_message'],
@@ -11653,6 +12503,143 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
             await asyncio.sleep(800)
             _timed_out = True
         _watchdog_task = asyncio.create_task(_timeout_watchdog())
+
+        # =============================================================================
+        # Inline overrun conversion watchdog (v10.80)
+        # GE stops rendering the streamed turn at ~120s. At _INLINE_HARD_DEADLINE_S
+        # (default 115s, ~5s headroom under the external cutoff) this watchdog
+        # ends the turn WHILE IT STILL RENDERS by
+        # moving the work to a REAL background task (the /execute_task worker,
+        # which runs to completion regardless of the chat) and answering with a
+        # "Check Task Status" chip. This applies to BOTH "Run Inline:" chip
+        # presses and plain typed analytical requests; the original request is
+        # recovered by _overrun_prompt and enriched with recent conversation
+        # context so a terse follow-up still resolves its references.
+        #
+        # Control actions (Continue / Check progress) yield _overrun_prompt == ''
+        # and are NEVER converted - the watchdog leaves them to finish naturally.
+        # The conversion is cached for true duplicate-press multi-fire (G1) only;
+        # it is deliberately NOT stored under the H1 session-artifact key, because
+        # an H1 replay of the conversion message on a re-send would loop the user
+        # on a dead-end "this moved to background" with no real result. The
+        # abandoned in-flight run is closed by the main body at its next event
+        # (see the _inline_converted checks below). The watchdog stays armed
+        # through the salvage phases so those are wall-clock-bounded too; it is
+        # disarmed right before the normal final-artifact emission.
+        # =============================================================================
+        _inline_converted = False
+        _turn_finalizing = False
+        async def _inline_overrun_watchdog():
+            nonlocal _inline_converted
+            # v10.87: auto-conversion to background is OFF by default. GE renders
+            # long turns fine, so we let the analysis finish inline instead of
+            # converting it (which wasted the user's wait). Re-enable with
+            # INLINE_OVERRUN_CONVERT=1. When off, the watchdog is a no-op and the
+            # turn completes via the normal final-artifact path.
+            if not _INLINE_OVERRUN_CONVERT:
+                return
+            await asyncio.sleep(_INLINE_HARD_DEADLINE_S)
+            if _turn_finalizing or _inline_converted or _timed_out:
+                return
+            if not _overrun_prompt:
+                # Control action (Continue / Check progress) or unclassifiable
+                # message: never spawn a background task - let it finish naturally.
+                logger.log_text('[inline_deadline] overrun on a non-convertible turn - leaving it to finish naturally')
+                return
+            _inline_converted = True
+            try:
+                _conv_elapsed = int(time.monotonic() - _turn_start_mono)
+                _ctx_lines = _recent_user_texts(session, _overrun_prompt)
+                # NOTE: build newlines with chr(10), never a backslash-n escape.
+                # This Python source lives inside a Code.gs JS template literal
+                # whose layer turns a backslash-n into a real newline, which
+                # would split the string literal and break the container.
+                _nl = chr(10)
+                _bg_prompt = (
+                    "Run the FULL-DEPTH version of the user's request below and deliver a "
+                    "complete report. This is a background run with no chat time limit, so "
+                    "do the thorough analysis (statistics, charts, recommendations)." + _nl + _nl
+                    + "REQUEST:" + _nl + _overrun_prompt
+                )
+                if _ctx_lines:
+                    _bg_prompt += (_nl + _nl + "RECENT CONVERSATION CONTEXT (resolve any "
+                                   "references in the request against this):" + _nl + "- "
+                                   + (_nl + "- ").join(_ctx_lines))
+                _bg_name = 'inline_overrun_' + ''.join(_c for _c in _overrun_prompt.lower() if _c.isalnum())[:24]
+                try:
+                    _reg = await asyncio.to_thread(
+                        _agent_tools.submit_background_task_now,
+                        _bg_name,
+                        'Auto-converted from an inline run that exceeded the chat rendering time budget.',
+                        _bg_prompt,
+                    )
+                except Exception as _reg_err:
+                    _reg = {'status': 'error', 'message': str(_reg_err)[:200]}
+                if _reg.get('status') in ('submitted', 'already_active'):
+                    _conv_ticket = str(_reg.get('ticket-id', ''))
+                    _conv_text = (
+                        "⏱️ This analysis needs more time than an inline chat turn can "
+                        "display, so I moved it to a background task (ticket: " + _conv_ticket
+                        + "). It keeps running to completion - press the button below to "
+                        "check progress and retrieve the full report."
+                    )
+                    _conv_chip_specs = [("Check progress of task " + _conv_ticket, "📊 Check Task Status")]
+                else:
+                    _conv_text = (
+                        "⚠️ This request is taking longer than the chat can display and could "
+                        "not be moved to a background task. Please narrow the scope (fewer "
+                        "entities, a shorter period, or a single metric) and try again."
+                    )
+                    _conv_chip_specs = [("Narrow the analysis to a single entity or metric and run it again", "🎯 Narrow scope")]
+                _conv_parts = [a2a_types.Part(root=a2a_types.TextPart(text=_conv_text))]
+                _chip_components = [
+                    {'id': 'root', 'component': {'Row': {'children': {'explicitList': ['ic_chip' + str(_ci) for _ci in range(len(_conv_chip_specs))]}, 'distribution': 'spaceEvenly', 'alignment': 'center'}}},
+                ]
+                for _ci in range(len(_conv_chip_specs)):
+                    _chip_text, _chip_label = _conv_chip_specs[_ci]
+                    _chip_components.append({'id': 'ic_chip' + str(_ci), 'component': {'Button': {'child': 'ic_chip' + str(_ci) + 'Lbl', 'action': {'name': 'sendText', 'context': [{'key': 'text', 'value': {'literalString': _chip_text}}]}}}})
+                    _chip_components.append({'id': 'ic_chip' + str(_ci) + 'Lbl', 'component': {'Text': {'text': {'literalString': _chip_label}, 'usageHint': 'body'}}})
+                for _conv_msg in (
+                    {'beginRendering': {'surfaceId': 'suggestions', 'root': 'root'}},
+                    {'surfaceUpdate': {'surfaceId': 'suggestions', 'components': _chip_components}},
+                ):
+                    _conv_parts.append(create_a2ui_part(_conv_msg))
+                # Stream text + chips as a WORKING event first (chips that exist
+                # only in the final artifact may not render - B-1 pattern), then
+                # finalize the turn with the artifact + completed event.
+                await event_queue.enqueue_event(TaskStatusUpdateEvent(
+                    task_id=context.task_id,
+                    context_id=context.context_id,
+                    status=TaskStatus(
+                        state=TaskState.working,
+                        message=Message(message_id=str(uuid.uuid4()), role=Role.agent, parts=_conv_parts),
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                    ),
+                    final=False,
+                ))
+                await event_queue.enqueue_event(TaskArtifactUpdateEvent(
+                    task_id=context.task_id,
+                    last_chunk=True,
+                    context_id=context.context_id,
+                    artifact=Artifact(artifact_id=str(uuid.uuid4()), parts=_conv_parts),
+                ))
+                await event_queue.enqueue_event(TaskStatusUpdateEvent(
+                    task_id=context.task_id,
+                    status=TaskStatus(
+                        state=TaskState.completed,
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                    ),
+                    context_id=context.context_id,
+                    final=True,
+                ))
+                # G1 duplicate-press replay only. NOT _store_session_artifact:
+                # an H1 replay of this message would dead-end a re-send (see note).
+                if idem_key:
+                    _store_idem_result(idem_key, _conv_parts)
+                logger.log_text('[inline_deadline] converted inline turn at ' + str(_conv_elapsed) + 's -> ' + (('background task ' + str(_reg.get('ticket-id', ''))) if _reg.get('status') in ('submitted', 'already_active') else 'narrow-scope fallback'))
+            except Exception as _ic_err:
+                logger.log_text('[inline_deadline] conversion failed: ' + str(_ic_err)[:300])
+        _inline_watchdog_task = asyncio.create_task(_inline_overrun_watchdog())
 
         # =============================================================================
         # MALFORMED_FUNCTION_CALL Auto-Retry
@@ -11778,7 +12765,14 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                     continue  # re-run on the healed session
                 return
 
-        async for adk_event in _all_events():
+        _events_gen = _all_events()
+        async for adk_event in _events_gen:
+          if _inline_converted:
+              # The deadline watchdog already finalized this turn (conversion
+              # text + chips + completed event). Stop consuming and emit nothing
+              # further - GE has finished rendering this turn.
+              logger.log_text("[inline_deadline] abandoning in-flight inline run after background conversion")
+              break
           if _timed_out:
               logger.log_text("⏱️ Agent processing timed out after 800s — sending graceful error to user.")
               timeout_part = a2a_types.Part(root=a2a_types.TextPart(
@@ -12004,8 +12998,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                                   _items = _heal_a2ui_message_list(_items)
                                   for _item in _items:
                                       if isinstance(_item, dict):
-                                          fb_ui_part = create_a2ui_part(_item)
-                                          artifact_media_parts.append(fb_ui_part)
+                                          artifact_media_parts.extend(create_a2ui_parts(_item))
                                           _fallback_recovered_a2ui = True
                                   _fb_keys = [list(i.keys())[0] if isinstance(i, dict) and i else '?' for i in _items]
                                   logger.log_text(f"A2UI fallback: recovered {len(_items)} A2UI component(s) via regex, keys={_fb_keys}")
@@ -12023,7 +13016,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                                   _f_items = _heal_a2ui_message_list(_f_items)
                                   for _f_item in _f_items:
                                       if isinstance(_f_item, dict):
-                                          _fallback_parts.append(create_a2ui_part(_f_item))
+                                          _fallback_parts.extend(create_a2ui_parts(_f_item))
                               except Exception:
                                   pass
                           if not _fallback_parts and _raw:
@@ -12071,9 +13064,9 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                               # artifact assembly, not via A2UI (GE suggestions surface ignores
                               # non-Button components).
                               for msg in a2ui_messages:
-                                  ui_part = create_a2ui_part(msg)
-                                  synthetic_parts.append(ui_part)
-                                  artifact_media_parts.append(ui_part)  # ★ Never cleared
+                                  for ui_part in create_a2ui_parts(msg):
+                                      synthetic_parts.append(ui_part)
+                                      artifact_media_parts.append(ui_part)  # ★ Never cleared
                           if synthetic_parts:
                               # Skip sending text-only events to Thinking when function_call
                               # follows in the same event — text will be combined into the
@@ -12128,9 +13121,9 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                                   _sn_items = _heal_a2ui_message_list(_sn_items)
                                   for _sn_item in _sn_items:
                                       if isinstance(_sn_item, dict):
-                                          _ui_part = create_a2ui_part(_sn_item)
-                                          _safety_parts.append(_ui_part)
-                                          artifact_media_parts.append(_ui_part)
+                                          for _ui_part in create_a2ui_parts(_sn_item):
+                                              _safety_parts.append(_ui_part)
+                                              artifact_media_parts.append(_ui_part)
                                   _sn_keys = [list(i.keys())[0] if isinstance(i, dict) and i else '?' for i in _sn_items]
                                   logger.log_text(f"[a2ui_safety_net] Recovered {len(_sn_items)} A2UI component(s) via regex, keys={_sn_keys}")
                               except Exception as _e:
@@ -12210,9 +13203,9 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                                           _items = _heal_a2ui_message_list(_items)
                                           for _item in _items:
                                               if isinstance(_item, dict):
-                                                  _ui_p = create_a2ui_part(_item)
-                                                  _untagged_parts.append(_ui_p)
-                                                  artifact_media_parts.append(_ui_p)
+                                                  for _ui_p in create_a2ui_parts(_item):
+                                                      _untagged_parts.append(_ui_p)
+                                                      artifact_media_parts.append(_ui_p)
                                           _extracted_spans.append((_start_pos, _end_pos))
                                           _ut_keys = [list(i.keys())[0] if isinstance(i, dict) and i else '?' for i in _items]
                                           logger.log_text(f"[a2ui_robust_safety] Recovered {len(_items)} component(s), keys={_ut_keys}")
@@ -12563,6 +13556,24 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
         # Cancel the timeout watchdog now that the event loop has finished
         _watchdog_task.cancel()
 
+        # Inline overrun conversion (v10.79), exit A: the deadline watchdog
+        # already finalized this turn. Close the abandoned in-flight run (frees
+        # the LLM call and, with it, the Y2 session lock as soon as possible)
+        # and stop here - any further emission would land after GE finalized
+        # the turn. NOTE: the inline watchdog is NOT cancelled on the normal
+        # path yet; it stays armed so the salvage phases below (synth retry /
+        # B-1 / chip re-prompt) are wall-clock-bounded too.
+        if _inline_converted:
+            try:
+                await _events_gen.aclose()
+            except Exception as _gen_close_err:
+                logger.log_text('[inline_deadline] abandoned-run close error (non-fatal): ' + str(_gen_close_err)[:200])
+            try:
+                await _inline_watchdog_task  # ensure the conversion emission fully finished
+            except Exception:
+                pass
+            return
+
         # =============================================================================
         # Drain the A2UI stream parser's internal buffer.
         # A2uiStreamParser does NOT have a flush() method. Instead, after the
@@ -12591,8 +13602,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                         a2ui_messages = rp.a2ui_json if isinstance(rp.a2ui_json, list) else [rp.a2ui_json]
                         a2ui_messages = _heal_a2ui_message_list(a2ui_messages)
                         for msg in a2ui_messages:
-                            ui_part = create_a2ui_part(msg)
-                            artifact_media_parts.append(ui_part)
+                            artifact_media_parts.extend(create_a2ui_parts(msg))
         except Exception as drain_err:
             logger.log_text(f"A2UI stream parser drain error: {drain_err}")
 
@@ -12697,7 +13707,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                 if _rp.a2ui_json:
                     _msgs = _rp.a2ui_json if isinstance(_rp.a2ui_json, list) else [_rp.a2ui_json]
                     for _m in _heal_a2ui_message_list(_msgs):
-                        _mp.append(create_a2ui_part(_m))
+                        _mp.extend(create_a2ui_parts(_m))
                         _found = True
             # Untagged A2UI safety net (model omitted <a2ui-json> tags).
             if not _found and '<a2ui-json>' not in _text and any(_k in _text for _k in ('"beginRendering"', '"surfaceUpdate"', '"deleteSurface"')):
@@ -12724,7 +13734,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                         _items = _obj if isinstance(_obj, list) else [_obj]
                         for _it in _heal_a2ui_message_list(_items):
                             if isinstance(_it, dict):
-                                _mp.append(create_a2ui_part(_it))
+                                _mp.extend(create_a2ui_parts(_it))
                         _pos = _end
                     else:
                         _pos = _start + 1
@@ -12770,7 +13780,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
         )
         _MAX_SYNTH_RETRIES = 3
         _synth_try = 0
-        while (not artifact_text_parts) and (not _normal_media) and (not _timed_out) and _synth_try < _MAX_SYNTH_RETRIES:
+        while (not artifact_text_parts) and (not _normal_media) and (not _timed_out) and (not _inline_converted) and _synth_try < _MAX_SYNTH_RETRIES:
             _synth_try += 1
             logger.log_text("[synth_retry] empty deliverable - synthesis retry " + str(_synth_try) + "/" + str(_MAX_SYNTH_RETRIES))
             _hb_msg = "📝 Synthesizing the analysis results into the report… (" + str(_synth_try) + "/" + str(_MAX_SYNTH_RETRIES) + ")"
@@ -12803,7 +13813,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
             _synth_args['new_message'] = genai_types.Content(role='user', parts=[genai_types.Part(text=_synth_msg)])
             try:
                 async for _sr_event in _run_with_auto_continue(initial_args=_synth_args):
-                    if _timed_out:
+                    if _timed_out or _inline_converted:
                         break
                     _sr_content = getattr(_sr_event, 'content', None)
                     if not (_sr_content and hasattr(_sr_content, 'parts')):
@@ -12830,7 +13840,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                         if _dp.a2ui_json:
                             _dm = _dp.a2ui_json if isinstance(_dp.a2ui_json, list) else [_dp.a2ui_json]
                             for _dmi in _heal_a2ui_message_list(_dm):
-                                artifact_media_parts.append(create_a2ui_part(_dmi))
+                                artifact_media_parts.extend(create_a2ui_parts(_dmi))
             except Exception:
                 pass
             # Recompute media split + artifact_parts after the synthesis pass.
@@ -12851,7 +13861,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
         # deliverable, never end silently -- emit an explicit message + retry chips
         # so the UI shows a real response instead of hanging on "thinking".
         # =============================================================================
-        if not artifact_parts:
+        if (not artifact_parts) and (not _inline_converted):
             logger.log_text("[synth_retry] all retries exhausted - emitting explicit fallback message")
             _b1_text = "⚠️ The report could not be generated. The analysis scope may be too large. Please narrow the target period, entities, or metrics and try again."
             _b1_c1_text = "Narrow the analysis to a single entity"
@@ -12953,7 +13963,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
             artifact_parts = artifact_text_parts + _normal_media + _suggestion_media
             logger.log_text("[chip_reprompt] dropped " + str(_orphan_count) + " orphan suggestion part(s) (no populated surfaceUpdate)")
         if ((not _chips_ok) and (not _timed_out) and (not _auth_flow)
-                and (not _fatal_config_error)
+                and (not _fatal_config_error) and (not _inline_converted)
                 and (not _has_interactive_card(_normal_media))):
             _cr_text_len = sum(
                 len((getattr(getattr(p, 'root', None), 'text', '') or '').strip())
@@ -12966,7 +13976,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                 _cr_media = []
                 try:
                     async for _cr_event in _run_with_auto_continue(initial_args=_cr_args):
-                        if _timed_out:
+                        if _timed_out or _inline_converted:
                             break
                         _cr_content = getattr(_cr_event, 'content', None)
                         if not (_cr_content and hasattr(_cr_content, 'parts')):
@@ -12980,7 +13990,7 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                 # Keep ONLY suggestion parts - any re-emitted text or cards are
                 # discarded so the re-prompt can never duplicate the deliverable.
                 _recovered_chips = [p for p in _cr_media if _is_suggestions_part(p)]
-                if _has_populated_suggestions(_recovered_chips):
+                if _has_populated_suggestions(_recovered_chips) and (not _inline_converted):
                     # Stream the chips as a WORKING event so GE renders the
                     # suggestions surface from the live stream (chips only in the
                     # final artifact may not render). Mirrors the B-1 pattern.
@@ -13009,6 +14019,23 @@ class AdkAgentToA2AExecutor(A2aAgentExecutor):
                     logger.log_text("[chip_reprompt] recovered " + str(len(_recovered_chips)) + " suggestion part(s)")
                 else:
                     logger.log_text("[chip_reprompt] re-prompt yielded no usable chips - leaving turn as-is")
+
+        # Inline overrun conversion (v10.79), exit B: the deadline watchdog may
+        # have fired DURING a salvage phase above. If it converted, it already
+        # emitted the final event and cached the replay parts - suppress the
+        # normal emission below. Otherwise disarm it now: from here on the real
+        # deliverable is being finalized and must not be raced. Single-threaded
+        # event loop: no await between the flag check and the cancel, so the
+        # watchdog cannot fire in between.
+        _turn_finalizing = True
+        if _inline_converted:
+            try:
+                await _inline_watchdog_task  # ensure the conversion emission fully finished
+            except Exception:
+                pass
+            logger.log_text('[inline_deadline] salvage result suppressed - conversion already finalized this turn')
+            return
+        _inline_watchdog_task.cancel()
 
         # G1 (v10.65): cache this winner's final deliverable so duplicate presses
         # of the SAME action can replay it instead of rendering an empty turn.
