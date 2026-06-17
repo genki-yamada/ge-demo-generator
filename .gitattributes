@@ -1,0 +1,4 @@
+# Shell scripts must keep LF endings, or `sh` breaks on the CR (\r).
+*.sh text eol=lf
+.claude/hooks/** text eol=lf
+deploy.sh text eol=lf
