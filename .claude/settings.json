@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "grep -qi ryotat7 && printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"変更前リポジトリ ryotat7/ge-demo-generator への参照・書き込みは禁止されています。フォーク genki-yamada/ge-demo-generator を使用してください。\"}}' || true",
+            "statusMessage": "Checking for forbidden upstream repo reference..."
+          }
+        ]
+      }
+    ]
+  }
+}
