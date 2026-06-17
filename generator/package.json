@@ -1,0 +1,21 @@
+{
+  "name": "ge-demo-generator-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.10.0",
+    "express": "^4.21.2",
+    "google-auth-library": "^9.15.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.0.0",
+    "vitest": "^2.1.8"
+  }
+}
