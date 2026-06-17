@@ -22,7 +22,7 @@ export function iapAuth({ audience, verify = verifyIapJwt, devUserEmail = null }
     const token = req.header(IAP_JWT_HEADER);
     if (!token) {
       if (devUserEmail) {
-        req.user = { email: devUserEmail };
+        req.user = { email: devUserEmail, sub: 'dev' };
         return next();
       }
       return res.status(401).json({ error: 'missing IAP assertion' });
