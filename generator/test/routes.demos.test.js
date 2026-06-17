@@ -21,8 +21,8 @@ describe('demos routes', () => {
     app = buildApp({ registry, authMiddleware: passThroughAuth });
   });
 
-  it('GET /healthz is public and returns ok', async () => {
-    const res = await request(app).get('/healthz');
+  it('GET /health is public and returns ok', async () => {
+    const res = await request(app).get('/health');
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
   });

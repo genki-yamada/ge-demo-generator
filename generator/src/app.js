@@ -5,8 +5,10 @@ export function buildApp({ registry, authMiddleware }) {
   const app = express();
   app.use(express.json());
 
-  // 認証不要のヘルスチェック
-  app.get('/healthz', (req, res) => res.json({ status: 'ok' }));
+  // 認証不要のヘルスチェック。
+  // 注意: 厳密パス /healthz は GCP の GFE がヘルスチェック用に予約しており、
+  // 外部からアクセスするとコンテナに届かず常に 404 になる。そのため /health を使う。
+  app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
   // /api 配下は認証必須
   app.use('/api', authMiddleware);
