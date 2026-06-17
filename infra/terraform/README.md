@@ -38,6 +38,10 @@ gcloud beta iap web add-iam-policy-binding \
   --role="roles/iap.httpsResourceAccessor"
 ```
 
+> **重要（IAP_AUDIENCE）**: バックエンド（`server.js`）は IAP の JWT を検証する際に環境変数 `IAP_AUDIENCE` を使う。これが未設定だと、IAP を有効化しても `/api` への全リクエストが検証失敗で 401 になる。IAP 有効化後、対象の audience を取得して Cloud Run サービスに設定すること（その後 `terraform apply` で env を反映するか、`gcloud run services update generator --update-env-vars IAP_AUDIENCE=...` で直接設定）。
+> - Cloud Run 直接 IAP の audience 形式は環境依存（例: `/projects/PROJECT_NUMBER/global/backendServices/SERVICE_ID`）。`gcloud iap` / コンソールの IAP 設定画面で確認する。
+> - audience を Terraform 管理にする場合は `main.tf` の Cloud Run `containers.env` に `IAP_AUDIENCE` を追加する（Plan C で本格運用時に対応予定）。
+
 ## 破棄
 ```bash
 terraform destroy -var "project_id=YOUR_PROJECT_ID"
