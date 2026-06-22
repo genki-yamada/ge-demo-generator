@@ -34,7 +34,9 @@ import { generateSetupScript } from './codegen/generate-setup-script.js';
 import {
   researchCompanyByDomain,
   optimizeGoalWithMagicWand,
+  regenerateGoalForWorkflows,
 } from './planning/research.js';
+import { updateSystemInstruction } from './codegen/update-system-instruction.js';
 import { analyzeMcpRepository } from './planning/mcp.js';
 import { generateDemo as generateDemoImpl } from './planning/generate-demo.js';
 import { makeSecretStore as makeSecretStoreImpl } from './provision/secrets.js';
@@ -112,6 +114,19 @@ export function buildServices({ vertexClient, bqClient, jobsClient, secretManage
       ...routeDeps, // userEmail, registry, now
     });
 
+  // research.js: regenerateGoalForWorkflows(companyInfo, selectedWorkflows, { vertexClient })
+  const regenerateGoal = (companyInfo, workflows) =>
+    regenerateGoalForWorkflows(companyInfo, workflows, { vertexClient });
+
+  // codegen/update-system-instruction.js: pure synchronous string transform
+  const updateInstruction = (s, b, t) => updateSystemInstruction(s, b, t);
+
+  // App metadata for /api/config
+  const appConfig = {
+    appVersion: config.appVersion ?? 'v10.100-public',
+    model: config.model,
+  };
+
   const services = {
     generateDemo,
     deinteractivize,
@@ -121,6 +136,9 @@ export function buildServices({ vertexClient, bqClient, jobsClient, secretManage
     optimizeGoal,
     analyzeMcp,
     now,
+    regenerateGoal,
+    updateInstruction,
+    appConfig,
   };
 
   return { services };
