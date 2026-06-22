@@ -26,8 +26,11 @@ function makeStubServices(overrides = {}) {
   const deinteractivize = vi.fn((s) => s + '\n# headless');
   const runProvision = vi.fn().mockResolvedValue({ ok: true });
   const jobRunner = { runProvision };
+  // Per-request secret store factory (W-B): makeSecretStore(demoSuffix) → { putSecret }.
+  // We share ONE putSecret spy across requests so tests can assert on it, while
+  // recording the suffix each factory call received.
   const putSecret = vi.fn().mockResolvedValue(undefined);
-  const secretStore = { putSecret };
+  const makeSecretStore = vi.fn((demoSuffix) => ({ demoSuffix, putSecret }));
   const research = vi.fn().mockResolvedValue({ success: true, companyName: 'Acme' });
   const optimizeGoal = vi.fn().mockResolvedValue({ success: true, optimizedGoal: 'refined goal' });
   const analyzeMcp = vi.fn().mockResolvedValue({ success: true, data: { is_supported: true } });
@@ -37,7 +40,7 @@ function makeStubServices(overrides = {}) {
     generateDemo,
     deinteractivize,
     jobRunner,
-    secretStore,
+    makeSecretStore,
     research,
     optimizeGoal,
     analyzeMcp,
@@ -142,7 +145,7 @@ describe('POST /api/demos — build start', () => {
     expect(typeof arg.now).toBe('function');
   });
 
-  it('calls secretStore.putSecret for each credential when options.credentials present', async () => {
+  it('builds a per-request secretStore with result.suffix and putSecret for each credential', async () => {
     await request(app)
       .post('/api/demos')
       .send({
@@ -155,19 +158,24 @@ describe('POST /api/demos — build start', () => {
     // Flush microtasks in case putSecret was delayed (it shouldn't be, but be safe)
     await Promise.resolve();
 
-    expect(services.secretStore.putSecret).toHaveBeenCalledTimes(2);
-    const calls = services.secretStore.putSecret.mock.calls;
-    const keys = calls.map((c) => c[0]);
+    // makeSecretStore must be invoked with the demo's suffix (from generateDemo result).
+    expect(services.makeSecretStore).toHaveBeenCalledOnce();
+    expect(services.makeSecretStore.mock.calls[0][0]).toBe('abcd1234');
+
+    // The store returned by the factory must receive each credential.
+    const store = services.makeSecretStore.mock.results[0].value;
+    expect(store.putSecret).toHaveBeenCalledTimes(2);
+    const keys = store.putSecret.mock.calls.map((c) => c[0]);
     expect(keys).toContain('SLACK_TOKEN');
     expect(keys).toContain('GITHUB_PAT');
   });
 
-  it('does not call secretStore.putSecret when no credentials', async () => {
+  it('does not build a secretStore or call putSecret when no credentials', async () => {
     await request(app)
       .post('/api/demos')
       .send({ userGoal: 'agent' });
 
-    expect(services.secretStore.putSecret).not.toHaveBeenCalled();
+    expect(services.makeSecretStore).not.toHaveBeenCalled();
   });
 
   it('returns 401 when auth middleware rejects', async () => {

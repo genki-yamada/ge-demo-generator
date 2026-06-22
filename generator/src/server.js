@@ -1,66 +1,80 @@
+import { BigQuery } from '@google-cloud/bigquery';
+import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
+import { JobsClient } from '@google-cloud/run';
+import { GoogleAuth } from 'google-auth-library';
+
 import { buildApp } from './app.js';
 import { DemoRegistry } from './registry/registry.js';
 import { FirestoreStore } from './registry/firestore-store.js';
 import { iapAuth } from './auth/iap.js';
+import { loadConfig } from './config.js';
+import { makeVertexClient } from './planning/vertex.js';
+import { makeBqClient } from './provision/bq-client.js';
+import { buildServices } from './services.js';
 
-// ─── Infrastructure ────────────────────────────────────────────────────────────
+// ─── Configuration ──────────────────────────────────────────────────────────────
 
 const port = process.env.PORT || 8080;
-const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-const databaseId = process.env.FIRESTORE_DATABASE_ID || 'generator';
 const iapAudience = process.env.IAP_AUDIENCE;
 const devUserEmail = process.env.DEV_USER_EMAIL || null;
 
-const store = new FirestoreStore({ projectId, databaseId });
+// loadConfig covers projectId/region/vertexLocation/model/searchModel/retries/
+// databaseId/githubToken. jobName + appVersion are W-B additions (not in loadConfig),
+// so we merge them in here for buildServices.
+const config = {
+  ...loadConfig(process.env),
+  jobName: process.env.GENERATOR_JOB_NAME || 'provisioner',
+  appVersion: process.env.APP_VERSION || 'v10.100-public',
+};
+
+// ─── Registry / auth (unchanged) ─────────────────────────────────────────────────
+
+const store = new FirestoreStore({ projectId: config.projectId, databaseId: config.databaseId });
 const registry = new DemoRegistry(store);
 const authMiddleware = iapAuth({ audience: iapAudience, devUserEmail });
 
-// ─── Plan C services (injection points) ───────────────────────────────────────
-//
-// Each entry is a TODO placeholder for the real client / function binding.
-// Wire up in follow-up tasks when real Vertex / Secret Manager / Cloud Run
-// clients are available in production.
-//
-// Shape must match buildApp({ services }) expectations in app.js.
+// ─── Real GCP clients (W-B composition root inputs) ──────────────────────────────
 
-// TODO(plan-c-wiring): import makeVertexClient from './planning/vertex.js'
-//   and bind: research = (d) => researchCompanyByDomain(d, { vertexClient })
-//             optimizeGoal = (g) => optimizeGoalWithMagicWand(g, { vertexClient })
-//             analyzeMcp = (u) => analyzeMcpRepository(u, { vertexClient })
-const research = null;     // TODO: bind researchCompanyByDomain
-const optimizeGoal = null; // TODO: bind optimizeGoalWithMagicWand
-const analyzeMcp = null;   // TODO: bind analyzeMcpRepository
-
-// TODO(plan-c-wiring): import makeSecretStore from './provision/secrets.js'
-//   and provide a per-request factory (demoSuffix varies per request).
-//   For now, POST /api/demos will receive secretStore from request context.
-const secretStore = null;  // TODO: per-request factory via makeSecretStore
-
-// TODO(plan-c-wiring): import makeJobRunner from './provision/job-runner.js'
-//   jobRunner = makeJobRunner({ jobsClient, projectId, region, jobName })
-const jobRunner = null;    // TODO: bind makeJobRunner
-
-// TODO(plan-c-wiring): import generateDemo from './planning/generate-demo.js'
-//   and bind all its sub-deps (planAndGenerateData, classifyTaxonomy, etc.)
-const generateDemoFn = null; // TODO: bind generateDemo with all deps
-
-const deinteractivizeFn = null; // TODO: import deinteractivize from './provision/deinteractivize.js'
-
-const services = {
-  generateDemo: generateDemoFn,
-  deinteractivize: deinteractivizeFn,
-  jobRunner,
-  secretStore,
-  research,
-  optimizeGoal,
-  analyzeMcp,
-  now: () => new Date().toISOString(),
+// Vertex AI auth: GoogleAuth.getAccessToken() resolves to string | null | undefined.
+// vertexClient expects getToken: async () => string, so adapt by throwing when absent.
+const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
+const getToken = async () => {
+  const token = await auth.getAccessToken();
+  if (!token) {
+    throw new Error('Failed to obtain a Google access token (getAccessToken returned empty)');
+  }
+  return token;
 };
+
+const vertexClient = makeVertexClient({
+  projectId: config.projectId,
+  location: config.vertexLocation,
+  model: config.model,
+  searchModel: config.searchModel,
+  getToken,
+  maxRetries: config.maxRetries,
+  retryDelayMs: config.retryDelayMs,
+});
+
+const bqClient = makeBqClient({ bigquery: new BigQuery({ projectId: config.projectId }) });
+const secretManagerClient = new SecretManagerServiceClient();
+const jobsClient = new JobsClient();
+
+// generateImage (Vertex image model) is DEFERRED — not wired here. planAndGenerateData
+// no-ops the image-gen branch when its generateImage dep is undefined (see services.js).
+
+const { services } = buildServices({
+  vertexClient,
+  bqClient,
+  jobsClient,
+  secretManagerClient,
+  config,
+});
 
 // ─── App ───────────────────────────────────────────────────────────────────────
 
 const app = buildApp({ registry, authMiddleware, services });
 
 app.listen(port, () => {
-  console.log(`generator backend listening on ${port} (db=${databaseId})`);
+  console.log(`generator backend listening on ${port} (db=${config.databaseId})`);
 });

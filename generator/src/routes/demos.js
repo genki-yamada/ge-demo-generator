@@ -8,7 +8,7 @@ import { Router } from 'express';
  * @param {object} registry  - DemoRegistry instance
  * @param {object} [services={}] - Optional injected services (Plan C routes).
  *   When omitted, POST and /status routes return 501 (not reached in Plan A tests).
- *   Shape: { generateDemo, deinteractivize, jobRunner, secretStore, now }
+ *   Shape: { generateDemo, deinteractivize, jobRunner, makeSecretStore, now }
  *
  *   IMPORTANT — `services.generateDemo` is a partial bound with all planning sub-deps
  *   (planAndGenerateData, classifyTaxonomy, generateSetupScript, callVertexAI, etc.).
@@ -72,7 +72,7 @@ export function demosRouter(registry, services = {}) {
         return res.status(400).json({ error: 'userGoal is required' });
       }
 
-      const { generateDemo, deinteractivize, jobRunner, secretStore, now } = services;
+      const { generateDemo, deinteractivize, jobRunner, makeSecretStore, now } = services;
 
       // Guard: if build services are not configured, return an honest 503 rather
       // than a confusing TypeError→500 (production wiring in server.js still TODO).
@@ -87,10 +87,16 @@ export function demosRouter(registry, services = {}) {
         now: now ?? (() => new Date().toISOString()),
       });
 
-      // 2. Store credentials in Secret Manager if provided
+      // 2. Store credentials in Secret Manager if provided.
+      //    The secret store is PER-REQUEST: secret names embed result.suffix
+      //    (cleanup-grep invariant), so we build it only after generateDemo
+      //    yields the suffix. Skipped entirely when the factory is absent.
       if (options.credentials && typeof options.credentials === 'object') {
-        for (const [key, value] of Object.entries(options.credentials)) {
-          await secretStore.putSecret(key, value);
+        const secretStore = makeSecretStore ? makeSecretStore(result.suffix) : null;
+        if (secretStore) {
+          for (const [key, value] of Object.entries(options.credentials)) {
+            await secretStore.putSecret(key, value);
+          }
         }
       }
 
