@@ -60,7 +60,10 @@ export function installRpcFacade({ win = window, fetchImpl = window.fetch.bind(w
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
       .then(data => {
         const result = transform ? transform(data) : data;
         if (runner._onSuccess) runner._onSuccess(result);
@@ -195,7 +198,10 @@ export function installRpcFacade({ win = window, fetchImpl = window.fetch.bind(w
    * @returns {Promise<{appVersion:string|null, model:string|null, userEmail:string|null}>}
    */
   win.loadAppConfig = async function loadAppConfig() {
-    const cfg = await fetchImpl('/api/config').then(r => r.json());
+    const cfg = await fetchImpl('/api/config').then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
     win.__APP_CONFIG__ = cfg;
 
     // Update DOM version label (scriptlet @1299)

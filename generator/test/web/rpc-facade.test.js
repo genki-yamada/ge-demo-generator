@@ -26,6 +26,7 @@ function setup(jsonResponse = {}) {
 
   const fetchImpl = vi.fn(() =>
     Promise.resolve({
+      ok: true,
       json: () => Promise.resolve(jsonResponse),
     }),
   );
@@ -119,6 +120,26 @@ describe('installRpcFacade', () => {
 
       await new Promise(r => setTimeout(r, 0));
       expect(onFailure).toHaveBeenCalledWith(expect.any(Error));
+    });
+
+    it('calls onFailure (not onSuccess) when server responds with HTTP 500', async () => {
+      const win = { document: { getElementById: vi.fn(() => null) } };
+      const fetchImpl = vi.fn(() =>
+        Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({ error: 'boom' }) }),
+      );
+      installRpcFacade({ win, fetchImpl });
+
+      const onSuccess = vi.fn();
+      const onFailure = vi.fn();
+      win.google.script.run
+        .withSuccessHandler(onSuccess)
+        .withFailureHandler(onFailure)
+        .researchCompanyByDomain('error.com');
+
+      await new Promise(r => setTimeout(r, 0));
+
+      expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({ message: 'HTTP 500' }));
+      expect(onSuccess).not.toHaveBeenCalled();
     });
   });
 
@@ -317,7 +338,7 @@ describe('installRpcFacade', () => {
       const cfg = { appVersion: 'v1.2.3', model: 'gemini-pro', userEmail: 'user@example.com' };
       const win = { document: { getElementById: vi.fn(() => null) } };
       const fetchImpl = vi.fn(() =>
-        Promise.resolve({ json: () => Promise.resolve(cfg) }),
+        Promise.resolve({ ok: true, json: () => Promise.resolve(cfg) }),
       );
       installRpcFacade({ win, fetchImpl });
 
@@ -331,7 +352,7 @@ describe('installRpcFacade', () => {
       const cfg = { appVersion: 'v0.1', model: 'gemini-flash', userEmail: 'a@b.com' };
       const win = { document: { getElementById: vi.fn(() => null) } };
       const fetchImpl = vi.fn(() =>
-        Promise.resolve({ json: () => Promise.resolve(cfg) }),
+        Promise.resolve({ ok: true, json: () => Promise.resolve(cfg) }),
       );
       installRpcFacade({ win, fetchImpl });
 
@@ -353,7 +374,7 @@ describe('installRpcFacade', () => {
         },
       };
       const fetchImpl = vi.fn(() =>
-        Promise.resolve({ json: () => Promise.resolve(cfg) }),
+        Promise.resolve({ ok: true, json: () => Promise.resolve(cfg) }),
       );
       installRpcFacade({ win, fetchImpl });
 
@@ -363,6 +384,18 @@ describe('installRpcFacade', () => {
       expect(modelEl.textContent).toBe('gemini-2.0');
       expect(win.GENERATOR_MODEL).toBe('gemini-2.0');
       expect(win.CURRENT_USER_EMAIL).toBe('x@y.com');
+    });
+
+    it('rejects on non-ok response and does not populate __APP_CONFIG__ or GENERATOR_MODEL', async () => {
+      const win = { document: { getElementById: vi.fn(() => null ) } };
+      const fetchImpl = vi.fn(() =>
+        Promise.resolve({ ok: false, status: 503, json: () => Promise.resolve({ error: 'Service Unavailable' }) }),
+      );
+      installRpcFacade({ win, fetchImpl });
+
+      await expect(win.loadAppConfig()).rejects.toThrow('HTTP 503');
+      expect(win.__APP_CONFIG__).toBeUndefined();
+      expect(win.GENERATOR_MODEL).toBeUndefined();
     });
   });
 });
