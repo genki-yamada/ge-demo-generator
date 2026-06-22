@@ -5,10 +5,26 @@
  * ALL external deps are stubbed. Pure helpers (buildPlanningPrompt,
  * repairTruncatedJson, parseCSVLine, validateGeneratedData,
  * getTechnicalInstruction, resolvePlannedPublicDatasetId) are imported real.
+ *
+ * validate-data.js is vi.mock'd so that validateGeneratedData is a spy that
+ * calls through to the real implementation by default; the no-csvData test
+ * overrides it once to suppress the validator so the dataPreview skip branch
+ * can be observed before validation runs.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Mock validate-data so validateGeneratedData is a controllable spy
+vi.mock('../../src/planning/validate-data.js', async (importOriginal) => {
+  const real = await importOriginal();
+  return {
+    ...real,
+    validateGeneratedData: vi.fn((...args) => real.validateGeneratedData(...args)),
+  };
+});
+
 import { planAndGenerateData } from '../../src/planning/plan-and-generate.js';
 import { getTechnicalInstruction } from '../../src/planning/technical-instruction.js';
+import { validateGeneratedData } from '../../src/planning/validate-data.js';
 
 // ---------------------------------------------------------------------------
 // Canned LLM response — minimal valid plan JSON
@@ -316,7 +332,7 @@ describe('dataPreview construction (source lines 41-61)', () => {
     expect(result.dataPreview[0].headers).toEqual(['order_id', 'amount', 'note']);
   });
 
-  it('returns empty dataPreview when no tables', async () => {
+  it('throws via validateGeneratedData when parsed.tables is empty', async () => {
     const plan = { ...CANNED_PLAN, tables: [] };
     const deps = makeDefaultDeps({
       vertexClient: { generateContent: vi.fn().mockResolvedValue(JSON.stringify(plan)) },
@@ -326,15 +342,26 @@ describe('dataPreview construction (source lines 41-61)', () => {
   });
 
   it('skips dataPreview entry for table without csvData', async () => {
-    const tableNoCsv = { tableName: 'no_csv_table', schema: [] };
-    // validateGeneratedData will throw for a table without csvData — use only valid table
-    const plan = { ...CANNED_PLAN, tables: [CANNED_TABLE] };
+    // Two tables: one WITH csvData, one WITHOUT — only the former should appear in dataPreview.
+    // validateGeneratedData is suppressed for this test (it would throw on the csvData-less table)
+    // so we can observe the if (table.csvData) skip branch in plan-and-generate.js line 107.
+    const tableWithCsv = { ...CANNED_TABLE };
+    const tableNoCsv = {
+      tableName: 'no_csv_table',
+      schema: [{ name: 'id', type: 'INTEGER', description: 'ID' }],
+      // csvData intentionally absent — JSON.stringify will omit this key
+    };
+    const plan = { ...CANNED_PLAN, tables: [tableWithCsv, tableNoCsv] };
+    // Suppress validateGeneratedData for this test only so the throw on missing csvData
+    // doesn't prevent us from observing the dataPreview result.
+    validateGeneratedData.mockImplementationOnce(() => {});
     const deps = makeDefaultDeps({
       vertexClient: { generateContent: vi.fn().mockResolvedValue(JSON.stringify(plan)) },
     });
     const result = await planAndGenerateData('goal', {}, deps);
-    // All valid tables show up in dataPreview
-    expect(result.dataPreview.length).toBeGreaterThanOrEqual(1);
+    // Only the table WITH csvData should appear in dataPreview (the skip branch was exercised)
+    expect(result.dataPreview).toHaveLength(1);
+    expect(result.dataPreview[0].tableName).toBe('orders');
   });
 });
 
