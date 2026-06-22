@@ -85,3 +85,73 @@ resource "google_cloud_run_v2_service" "generator" {
     google_project_iam_member.generator_firestore,
   ]
 }
+
+# ── Provisioner runner service account (separate from generator_runtime) ──────
+# Carries the elevated build-time permissions the provisioner Job needs.
+# Must NOT be mixed with the runtime SA to preserve least-privilege separation.
+
+resource "google_service_account" "generator_runner" {
+  account_id   = "generator-runner"
+  display_name = "GE Demo Generator provisioner Job runner"
+  depends_on   = [google_project_service.enabled]
+}
+
+resource "google_project_iam_member" "runner_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${google_service_account.generator_runner.email}"
+}
+
+resource "google_project_iam_member" "runner_bq_admin" {
+  project = var.project_id
+  role    = "roles/bigquery.admin"
+  member  = "serviceAccount:${google_service_account.generator_runner.email}"
+}
+
+resource "google_project_iam_member" "runner_datastore_user" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.generator_runner.email}"
+}
+
+resource "google_project_iam_member" "runner_secretmanager_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.generator_runner.email}"
+}
+
+resource "google_project_iam_member" "runner_serviceusage_admin" {
+  project = var.project_id
+  role    = "roles/serviceusage.serviceUsageAdmin"
+  member  = "serviceAccount:${google_service_account.generator_runner.email}"
+}
+
+resource "google_project_iam_member" "runner_aiplatform_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.generator_runner.email}"
+}
+
+# ── Cloud Run Job: headless provisioner ───────────────────────────────────────
+# Runs the deinteractivized setup script. Dispatched by job-runner.js (Plan C
+# Task 6). env overrides (secrets, SCRIPT_REF, ASSUME_YES) injected at runtime.
+
+resource "google_cloud_run_v2_job" "provisioner" {
+  name                = "provisioner"
+  location            = var.region
+  deletion_protection = false
+
+  template {
+    template {
+      service_account = google_service_account.generator_runner.email
+      containers {
+        image = var.provisioner_image
+      }
+    }
+  }
+
+  depends_on = [
+    google_project_service.enabled,
+    google_service_account.generator_runner,
+  ]
+}
