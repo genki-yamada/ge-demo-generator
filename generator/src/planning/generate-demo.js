@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 /**
  * planning/generate-demo.js — Node port of generateDemo orchestration.
  *
@@ -42,7 +44,6 @@ export async function generateDemo(userGoal, options = {}, deps) {
   // Replacement 1: Date.now() → clock()  (source line 2)
   const clock = deps.clock ?? (() => Date.now());
   // Replacement 2: Utilities.getUuid()...  → makeSuffix()  (source line 46)
-  const { randomUUID } = await import('node:crypto');
   const makeSuffix = deps.makeSuffix ?? (() => randomUUID().replace(/-/g, '').slice(0, 8));
 
   const {
