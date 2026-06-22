@@ -9,6 +9,11 @@ import { Router } from 'express';
  * @param {object} [services={}] - Optional injected services (Plan C routes).
  *   When omitted, POST and /status routes return 501 (not reached in Plan A tests).
  *   Shape: { generateDemo, deinteractivize, jobRunner, secretStore, now }
+ *
+ *   IMPORTANT — `services.generateDemo` is a partial bound with all planning sub-deps
+ *   (planAndGenerateData, classifyTaxonomy, generateSetupScript, callVertexAI, etc.).
+ *   The route supplies only `{ userEmail, registry, now }` and merges them at call time.
+ *   Do NOT assign the raw `generateDemo` export here — it needs ~12 deps and will crash.
  */
 export function demosRouter(registry, services = {}) {
   const router = Router();
@@ -69,6 +74,12 @@ export function demosRouter(registry, services = {}) {
 
       const { generateDemo, deinteractivize, jobRunner, secretStore, now } = services;
 
+      // Guard: if build services are not configured, return an honest 503 rather
+      // than a confusing TypeError→500 (production wiring in server.js still TODO).
+      if (typeof generateDemo !== 'function') {
+        return res.status(503).json({ error: 'build service not configured' });
+      }
+
       // 1. Orchestrate demo generation (registers building state internally)
       const result = await generateDemo(userGoal, options, {
         userEmail: req.user?.email,
@@ -94,7 +105,7 @@ export function demosRouter(registry, services = {}) {
           scriptRef: headlessScript,
           secrets: options.credentials ?? {},
           registry,
-          now: (now ?? (() => new Date().toISOString()))(),
+          now: now ?? (() => new Date().toISOString()),
         })
       ).catch((err) => {
         console.error('[runProvision] async kick failed:', err?.message ?? err);

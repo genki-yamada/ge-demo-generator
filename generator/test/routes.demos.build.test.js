@@ -125,6 +125,23 @@ describe('POST /api/demos — build start', () => {
     expect(arg.demo.id).toBe('demo-x-abcd1234');
   });
 
+  it('passes now as a FUNCTION (not a string) to runProvision', async () => {
+    // Guards Fix 1: the route must pass the callable, not the invoked result.
+    // job-runner calls now() internally; passing a string would throw TypeError.
+    await request(app)
+      .post('/api/demos')
+      .send({ userGoal: 'agent' });
+
+    // Flush microtasks so the fire-and-forget Promise.resolve().then(...) runs
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(services.jobRunner.runProvision).toHaveBeenCalledOnce();
+    const arg = services.jobRunner.runProvision.mock.calls[0][0];
+    expect(typeof arg.now).toBe('function');
+  });
+
   it('calls secretStore.putSecret for each credential when options.credentials present', async () => {
     await request(app)
       .post('/api/demos')
@@ -161,6 +178,17 @@ describe('POST /api/demos — build start', () => {
       .send({ userGoal: 'agent' });
 
     expect(res.status).toBe(401);
+  });
+
+  it('returns 503 when build services are not configured (generateDemo absent)', async () => {
+    // Guard: honest 503 instead of TypeError→500 when server.js wiring is not yet done.
+    const unconfiguredApp = buildApp({ registry, authMiddleware: passThroughAuth, services: {} });
+    const res = await request(unconfiguredApp)
+      .post('/api/demos')
+      .send({ userGoal: 'agent' });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/build service not configured/i);
   });
 });
 
