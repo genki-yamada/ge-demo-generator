@@ -14,6 +14,21 @@
 - 上記は誤操作防止のため `.claude/settings.json` の PreToolUse フックでも機械的にブロックしている
   （`ryotat7` を含む Bash / WebFetch 呼び出しは拒否される）。フックを無効化・回避しないこと。
 
+## Google Cloud 運用ルール（厳守）
+
+検証・デプロイに使う GCP プロジェクトは **`ge-work-osaka`**。操作は ADC（Application Default
+Credentials）で行う。**ローカルの gcloud config（既定プロジェクト・アカウント・configuration）は
+変更しないこと。**
+
+- `gcloud config set` / `gcloud config unset` / `gcloud config configurations ...` / `gcloud init`
+  等、ローカル config を書き換えるコマンドは実行してはならない。
+- `gcloud` でリソースを操作するコマンドは **毎回 `--project ge-work-osaka` を明示**する。
+  config の既定プロジェクトに依存した実行をしてはならない
+  （プロジェクト指定が不要な `gcloud auth` / `components` / `emulators` / `projects` /
+  `config get-value|list|get` / `--version` 等は例外）。
+- 上記は `.claude/settings.json` の PreToolUse フック（`.claude/hooks/gcloud-guard.sh`）でも
+  機械的にブロックしている。フックを無効化・回避しないこと。
+
 ## プロジェクト概要
 
 GE Demo Generator — 顧客の業務課題から Gemini Enterprise 向けのデモ用 AI エージェントと

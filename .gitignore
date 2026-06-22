@@ -38,3 +38,12 @@ logs/
 # Test and debug scripts
 test_*.sh
 test_*.py
+
+# Terraform (keep .terraform.lock.hcl tracked)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.auto.tfvars
+override.tf
+override.tf.json
