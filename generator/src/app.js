@@ -1,7 +1,7 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
-import { demosRouter } from './routes/demos.js';
+import { demosRouter, generateRouter } from './routes/demos.js';
 import { planningRouter } from './routes/planning.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -47,6 +47,9 @@ export function buildApp({ registry, authMiddleware, services = {} }) {
 
   // demos routes: Plan A (GET /) + Plan C (POST /, GET /:id/status)
   app.use('/api/demos', demosRouter(registry, services));
+
+  // generate route: POST /api/generate — sync, returns full generateDemo result, no job kick
+  app.use('/api/generate', generateRouter(registry, services));
 
   // planning routes (Plan C): only mounted when services are provided
   if (services.research || services.optimizeGoal || services.analyzeMcp ||
