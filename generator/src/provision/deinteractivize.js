@@ -53,6 +53,11 @@ export function deinteractivize(scriptText, { assumeYesVar = 'ASSUME_YES' } = {}
         // No read -p with a var in this while-true block; leave untouched.
         return fullMatch;
       }
+      // Only collapse PURE single-read validation loops (e.g. EXAMPLE_API_KEY, CHOICE).
+      // Multi-read menu loops (like the project-confirmation menu with REPLY + CHOOSE_LITE)
+      // must keep their while…done scaffolding; the per-line steps handle each read.
+      const allReadMatches = [...body.matchAll(/^\s*read\s+(?:-[^\s]+\s+)*-p\s+"[^"]*"\s+(\w+)\s*$/gm)];
+      if (allReadMatches.length !== 1) return fullMatch; // multi-read menu loops: handled per-line
       const varName = readMatch[1];
       const defaultVal = guessDefault(varName, body);
       return `${indent}${varName}="\${${varName}:-${defaultVal}}"`;

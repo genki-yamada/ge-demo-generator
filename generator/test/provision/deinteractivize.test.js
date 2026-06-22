@@ -24,7 +24,7 @@ describe('pattern 1: y/n confirmation (read -p ... -n 1 -r)', () => {
     const input = `    read -p "Are you sure you want to proceed? (y/n) " -n 1 -r\n    echo\n    if [[ ! $REPLY =~ ^[Yy]$ ]]; then exit 1; fi`;
     const result = deinteractivize(input);
     expect(result).toMatch(/REPLY=/);
-    expect(result).toMatch(/['"y'"]/); // y value present
+    expect(result).toMatch(/REPLY=.*y/); // auto-yes sets REPLY to y
   });
 
   it('respects custom assumeYesVar', () => {
@@ -143,34 +143,10 @@ describe('pattern 4: while read (non-interactive, must be untouched)', () => {
 
 describe('safety: unknown interactive read -p → throws', () => {
   it('throws when an unrecognized read -p pattern would remain', () => {
-    // A contrived pattern that doesn't match any known category
-    const input = `read -p "Enter some completely novel thing: " NOVEL_VAR_XYZ_UNKNOWN_PATTERN_ZZZZZ`;
-    // deinteractivize should either handle it (env injection) or throw.
-    // Because the variable name doesn't match any special-case, it falls into
-    // the generic var-capture path → env injection → no throw.
-    // To test the throw path we need an explicitly uncategorizable fragment
-    // that the implementation cannot match at all.
-    // We simulate that by making the function not know how to handle a flag combination.
-    // Real test: inject a read -p pattern with NO variable and NO pause-marker
-    // to check the guard.
-    const weirdPause = `read -p "Something we forgot to handle"`;
-    // No VAR, no (y/n), no "Press [Enter]" — this is a bare pause with no recognized marker.
-    // Implementation must detect it as "unhandled interactive read" OR handle it as pause.
-    // For the purposes of the throw test, we construct something that definitively can't match:
-    // A multi-line heredoc-like pattern that has read -p embedded after transform somehow.
-    // Actually: we test the GUARD directly by checking what happens when an artificial
-    // script has a read -p that our transformer emits unchanged (i.e., we call the guard
-    // function with a post-transform result that still has read -p).
-    // Since we can't call internal functions directly, we test via a script where the
-    // transformer produces a result that still has read -p (by testing a deliberately
-    // malformed/unmatched case and confirming the guard fires).
-    // The easiest approach: a read -p with backtick-quoted prompt and unusual flags
-    // that no regex covers.
+    // The backtick-quoted prompt escapes all four transform rules (y/n, value-capture,
+    // pause, and while-loop collapse), so this line survives to the safety guard intact.
+    // That triggers the expected throw, confirming the guard is enforced.
     const unhandleable = `read -p \`some-cmd\` -z WEIRD_FLAG_VAR`;
-    // This is contrived; the transformer must throw if any `read -p` remains after all rules.
-    // We just assert it doesn't silently pass.
-    // Implementation detail: if the transformer can't match a line, it leaves it in place,
-    // and the FINAL guard catches it.
     expect(() => deinteractivize(unhandleable)).toThrow(/un-deinteractivized read -p/i);
   });
 });
