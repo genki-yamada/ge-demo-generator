@@ -24,7 +24,7 @@ export function buildApp({ registry, authMiddleware, services = {} }) {
 
   // 静的UI（generator/web/）は IAP がエッジで保護するため authMiddleware の外で配信する。
   // generator/web/ はまだ存在しない（U-2 が作成）。存在しなくても起動は問題ない。
-  const webDir = join(__dirname, '..', '..', 'web');
+  const webDir = join(__dirname, '..', 'web');
   app.use(express.static(webDir));
 
   // 認証不要のヘルスチェック。
