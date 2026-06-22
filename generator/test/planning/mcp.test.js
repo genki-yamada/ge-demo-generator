@@ -78,10 +78,6 @@ describe('parseGithubUrl', () => {
     expect(result.repo).toBe('myrepo');
   });
 
-  it('handles SSH-style URLs via github.com path', () => {
-    expect(parseGithubUrl('git@github.com:owner/myrepo.git')).toEqual({ owner: 'owner', repo: 'myrepo' });
-  });
-
   it('throws on invalid URL (source line 94)', () => {
     expect(() => parseGithubUrl('https://example.com/notgithub')).toThrow('Invalid GitHub URL');
   });

@@ -27,7 +27,7 @@
  * @returns {{ owner: string, repo: string }}
  */
 export function parseGithubUrl(url) {
-  const match = url.match(/github\.com[/:]\s*([^/]+)\/([^/]+)/);
+  const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
   if (!match) throw new Error('Invalid GitHub URL');
   return { owner: match[1], repo: match[2].replace(/\.git$/, '') };
 }
@@ -66,7 +66,7 @@ async function getRepositoryFiles(owner, repo, branch, fetchImpl, githubToken) {
   const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
   try {
     const response = await fetchImpl(apiUrl, { headers: getGithubHeaders(githubToken) });
-    if (response.ok || response.status === 200) {
+    if (response.status === 200) {
       const json = await response.json();
       return json.tree || [];
     }
@@ -93,7 +93,7 @@ async function getDefaultBranch(owner, repo, fetchImpl, githubToken) {
   const apiUrl = `https://api.github.com/repos/${owner}/${repo}`;
   try {
     const response = await fetchImpl(apiUrl, { headers: getGithubHeaders(githubToken) });
-    if (response.ok || response.status === 200) {
+    if (response.status === 200) {
       const json = await response.json();
       return json.default_branch || 'main';
     }
@@ -124,7 +124,7 @@ async function fetchFileFromGithub(owner, repo, defaultBranch, path, fetchImpl, 
     const apiUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
     try {
       const response = await fetchImpl(apiUrl, { headers: getGithubHeaders(githubToken) });
-      if (response.ok || response.status === 200) {
+      if (response.status === 200) {
         return await response.text();
       }
     } catch (e) {
