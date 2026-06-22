@@ -1,6 +1,6 @@
 #!/bin/bash
 # ===========================================
-# GE Demo Generator - Setup Script (2.0.0)
+# GE Demo Generator - Setup Script (v10.100-public)
 # Generated: 2025-01-01T00:00:00.000Z
 # Demo: ge-demo-retail
 # ===========================================
@@ -368,7 +368,7 @@ for coll_name in ['ge-demo-retail_task_definitions', 'ge-demo-retail_task_execut
 while true; do
   echo "========================================================="
   echo "⚡ GE Demo Generator - Setup Script"
-  echo "   Version:      2.0.0"
+  echo "   Version:      v10.100-public"
   echo "   Generated At: 2025-01-01T00:00:00.000Z"
   echo "   Options:      --help | --cleanup | --model-analysis-agent | --model-root-agent"
   echo "========================================================="
