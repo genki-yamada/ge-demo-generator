@@ -100,19 +100,25 @@ Expected output:
 ✅ .gitattributes written
 ```
 
-Each golden starts with `#!/bin/bash` and ends with `exit 0`.
+Each golden starts with `#!/bin/bash` and ends with `exit 0` (indented inside
+the script's main function body, so grep for `exit 0`, not `^exit 0`).
 
 ## Step 4 — Verify determinism
 
-Run the harness a second time and compare SHA-256 hashes:
+Save the first run's hashes, run the harness a second time (it overwrites the
+fixtures), then diff — the comparison must be against the *saved* first-run
+hashes, not a fresh read of the just-overwritten files:
 
 ```bash
+# After the Step 3 run, snapshot the hashes:
+sha256sum generator/test/codegen/equivalence/fixtures/*.golden.sh > /tmp/golden.sha256
+# Re-run (overwrites fixtures) and diff against the snapshot:
 node capture.mjs
-sha256sum generator/test/codegen/equivalence/fixtures/*.golden.sh
+sha256sum generator/test/codegen/equivalence/fixtures/*.golden.sh | diff /tmp/golden.sha256 -
 ```
 
-The hashes must be identical to the first run.  If they differ, the harness has
-a non-deterministic element (e.g. unfixed `Date`).
+`diff` must report no differences.  If it does, the harness has a
+non-deterministic element (e.g. unfixed `Date`).
 
 ## Fixture cases
 
@@ -131,9 +137,10 @@ Fixed params across all cases:
 
 - **No EOL normalization**: `generator/test/codegen/equivalence/fixtures/.gitattributes`
   contains `*.golden.sh -text` to prevent git from touching line endings.
-- **No content mutation**: golden files are saved byte-for-byte as returned by
-  the function (after normalizing any `\r\n` → `\n` that Node on Windows might
-  produce).
+- **No content mutation**: golden files are saved as the function returns — no
+  whitespace added or stripped. On Windows the harness normalizes `\r\n` → `\n`
+  before writing; the Task 3 equivalence test must apply the same normalization
+  so both sides compare on LF.
 
 ## Port contract (Task 3)
 
