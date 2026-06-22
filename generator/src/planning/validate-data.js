@@ -3,13 +3,9 @@
  *
  * Faithful port of:
  *   validateGeneratedData   Code.gs:1458-1609
- *
- * Also contains helper functions called within validateGeneratedData:
- *   parseCSVLine            (Code.gs: companion helper, not in pre-extracted source)
- *   validateAndRepairValue  (Code.gs:1611+ JSDoc visible; body not in pre-extracted source)
- *
- * Both helpers are implemented here based on their usage context in validateGeneratedData.
- * No BigQuery API calls — "BigQuery" appears only in comments (as in the original).
+ *   validateAndRepairValue  Code.gs:1610-1709
+ *   generateDefaultValue    Code.gs:1710-1759
+ *   parseCSVLine            Code.gs:1761-1788
  *
  * getDataProfile is imported from plan-helpers (replaces getDataProfile_ call at Code.gs:1460).
  */
@@ -17,69 +13,113 @@
 import { getDataProfile } from './plan-helpers.js';
 
 // ---------------------------------------------------------------------------
-// parseCSVLine — CSV line parser handling quoted fields
-// (Code.gs companion helper; not in pre-extracted source, inferred from usage)
+// parseCSVLine — CSV line parser handling quoted fields (Code.gs:1761-1788)
 // ---------------------------------------------------------------------------
 
 /**
  * Parses a single CSV line into an array of field strings.
  * Handles fields enclosed in double-quotes (including commas within quotes).
  * Unescapes "" → " within quoted fields.
+ * Fields are trimmed (matching the real source's current.trim() calls).
  *
  * @param {string} line
  * @returns {string[]}
  */
 export function parseCSVLine(line) {
-  const fields = [];
+  const result = [];
   let current = '';
   let inQuotes = false;
-  let i = 0;
 
-  while (i < line.length) {
-    const ch = line[i];
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const nextChar = line[i + 1];
 
-    if (inQuotes) {
-      if (ch === '"') {
-        // Peek ahead: "" is an escaped quote
-        if (i + 1 < line.length && line[i + 1] === '"') {
-          current += '"';
-          i += 2;
-          continue;
-        } else {
-          inQuotes = false;
-          i++;
-          continue;
-        }
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // Handle escaped double quotes: ""
+        current += '"';
+        i++; // Skip the next quote
       } else {
-        current += ch;
-        i++;
-        continue;
+        inQuotes = !inQuotes;
       }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
     } else {
-      if (ch === '"') {
-        inQuotes = true;
-        i++;
-        continue;
-      } else if (ch === ',') {
-        fields.push(current);
-        current = '';
-        i++;
-        continue;
-      } else {
-        current += ch;
-        i++;
-        continue;
-      }
+      current += char;
     }
   }
-
-  fields.push(current);
-  return fields;
+  result.push(current.trim());
+  return result;
 }
 
 // ---------------------------------------------------------------------------
-// validateAndRepairValue — per-cell type validation and repair
-// (Code.gs:1611+ JSDoc visible; body inferred from usage in validateGeneratedData)
+// generateDefaultValue — context-aware default generation (Code.gs:1710-1759)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates a sensible default value for a given type and column.
+ *
+ * @param {string} type - The column type
+ * @param {string} columnName - Column name for context-aware generation
+ * @param {number} rowIndex - Row index for sequential IDs
+ * @returns {string} A valid default value
+ */
+export function generateDefaultValue(type, columnName, rowIndex) {
+  const upperType = type.toUpperCase();
+  const lowerColName = columnName.toLowerCase();
+
+  switch (upperType) {
+    case 'INT64':
+    case 'INTEGER':
+      // ID columns get sequential values
+      if (lowerColName.endsWith('_id') || lowerColName === 'id') {
+        return String(rowIndex + 1);
+      }
+      // Count/quantity columns
+      if (lowerColName.includes('count') || lowerColName.includes('quantity') || lowerColName.includes('num')) {
+        return String(Math.floor(Math.random() * 100) + 1);
+      }
+      // Default integer
+      return String(Math.floor(Math.random() * 1000));
+
+    case 'FLOAT64':
+    case 'FLOAT':
+    case 'DOUBLE':
+    case 'NUMBER':
+      // Price/amount columns
+      if (lowerColName.includes('price') || lowerColName.includes('amount') || lowerColName.includes('cost')) {
+        return (Math.random() * 1000 + 10).toFixed(2);
+      }
+      // Rating/score columns
+      if (lowerColName.includes('rating') || lowerColName.includes('score')) {
+        return (Math.random() * 4 + 1).toFixed(1);
+      }
+      // Default float
+      return (Math.random() * 100).toFixed(2);
+
+    case 'DATE': {
+      // Generate a date within the past year
+      const d = new Date();
+      d.setDate(d.getDate() - Math.floor(Math.random() * 365));
+      return d.toISOString().split('T')[0];
+    }
+
+    case 'TIMESTAMP':
+    case 'DATETIME': {
+      const dt = new Date();
+      dt.setDate(dt.getDate() - Math.floor(Math.random() * 365));
+      return dt.toISOString();
+    }
+
+    default:
+      // STRING type
+      return `${columnName}_${rowIndex + 1}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// validateAndRepairValue — per-cell type validation and repair (Code.gs:1610-1709)
 // ---------------------------------------------------------------------------
 
 /**
@@ -93,38 +133,100 @@ export function parseCSVLine(line) {
  * @returns {{value: string, repaired: boolean}}
  */
 export function validateAndRepairValue(value, type, columnName, rowIndex) {
-  // Strip surrounding quotes that may have come from the raw CSV
-  const stripped = value.replace(/^"|"$/g, '').trim();
   const upperType = type.toUpperCase();
+  const trimmedVal = value.trim();
 
-  if (['INTEGER', 'INT64'].includes(upperType)) {
-    const n = parseInt(stripped, 10);
-    if (!isNaN(n)) {
-      return { value: String(n), repaired: false };
-    }
-    // Repair: default to sequential integer
-    return { value: String(rowIndex + 1), repaired: true };
+  // Empty values are allowed (NULL)
+  if (trimmedVal === '') {
+    return { value: '', repaired: false };
   }
 
-  if (['FLOAT', 'FLOAT64', 'DOUBLE', 'NUMBER'].includes(upperType)) {
-    const n = parseFloat(stripped);
-    if (!isNaN(n)) {
-      return { value: String(n), repaired: false };
+  switch (upperType) {
+    case 'INT64':
+    case 'INTEGER': {
+      // Check for range expressions like "51-100"
+      const rangeMatch = trimmedVal.match(/^(\d+)\s*[-–—]\s*\d+$/);
+      if (rangeMatch) {
+        return { value: rangeMatch[1], repaired: true };
+      }
+      // Check for valid integer
+      if (/^-?\d+$/.test(trimmedVal)) {
+        return { value: trimmedVal, repaired: false };
+      }
+      // Try to extract a number
+      const intMatch = trimmedVal.match(/-?\d+/);
+      if (intMatch) {
+        return { value: intMatch[0], repaired: true };
+      }
+      // Generate fallback
+      return { value: generateDefaultValue(upperType, columnName, rowIndex), repaired: true };
     }
-    // Repair: default to 0.0
-    return { value: '0.0', repaired: true };
-  }
 
-  if (upperType === 'BOOLEAN') {
-    const lower = stripped.toLowerCase();
-    if (lower === 'true' || lower === 'false') {
-      return { value: lower, repaired: false };
+    case 'FLOAT64':
+    case 'FLOAT':
+    case 'DOUBLE':
+    case 'NUMBER': {
+      // Check for valid float
+      if (/^-?\d*\.?\d+$/.test(trimmedVal)) {
+        return { value: trimmedVal, repaired: false };
+      }
+      // Try to extract a number
+      const floatMatch = trimmedVal.match(/-?\d+\.?\d*/);
+      if (floatMatch) {
+        return { value: floatMatch[0], repaired: true };
+      }
+      // Generate fallback
+      return { value: generateDefaultValue(upperType, columnName, rowIndex), repaired: true };
     }
-    return { value: 'false', repaired: true };
-  }
 
-  // DATE, DATETIME, TIMESTAMP, STRING, and other types: pass through as-is
-  return { value: stripped, repaired: false };
+    case 'DATE': {
+      // Check for valid date format YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmedVal)) {
+        return { value: trimmedVal, repaired: false };
+      }
+      // Try to extract a date pattern
+      const dateMatch = trimmedVal.match(/\d{4}-\d{2}-\d{2}/);
+      if (dateMatch) {
+        return { value: dateMatch[0], repaired: true };
+      }
+      // Generate fallback
+      return { value: generateDefaultValue(upperType, columnName, rowIndex), repaired: true };
+    }
+
+    case 'TIMESTAMP':
+    case 'DATETIME': {
+      // Accept ISO format or similar, then validate time ranges
+      if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(trimmedVal)) {
+        // Validate hour/minute/second ranges (hour 0-23, min/sec 0-59)
+        const tsTimeMatch = trimmedVal.match(/(\d{2}):(\d{2})(?::(\d{2}))?/);
+        if (tsTimeMatch) {
+          const h = parseInt(tsTimeMatch[1], 10);
+          const m = parseInt(tsTimeMatch[2], 10);
+          const s = tsTimeMatch[3] ? parseInt(tsTimeMatch[3], 10) : 0;
+          if (h > 23 || m > 59 || s > 59) {
+            // Clamp to valid range
+            const fixedH = String(Math.min(h, 23)).padStart(2, '0');
+            const fixedM = String(Math.min(m, 59)).padStart(2, '0');
+            const fixedS = String(Math.min(s, 59)).padStart(2, '0');
+            const fixedTs = trimmedVal.replace(/\d{2}:\d{2}(:\d{2})?/, `${fixedH}:${fixedM}:${fixedS}`);
+            return { value: fixedTs, repaired: true };
+          }
+        }
+        return { value: trimmedVal, repaired: false };
+      }
+      // If it's a date, convert to timestamp
+      const tsDateMatch = trimmedVal.match(/^(\d{4}-\d{2}-\d{2})$/);
+      if (tsDateMatch) {
+        return { value: `${tsDateMatch[1]} 00:00:00 UTC`, repaired: true };
+      }
+      // Generate fallback as timestamp
+      return { value: generateDefaultValue('TIMESTAMP', columnName, rowIndex), repaired: true };
+    }
+
+    default:
+      // STRING type - accept as-is
+      return { value: trimmedVal, repaired: false };
+  }
 }
 
 // ---------------------------------------------------------------------------

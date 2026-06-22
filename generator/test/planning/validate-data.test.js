@@ -5,8 +5,8 @@
  * Uses getDataProfile (from plan-helpers) internally.
  * ALL tests are synchronous/no-network.
  */
-import { describe, it, expect } from 'vitest';
-import { validateGeneratedData } from '../../src/planning/validate-data.js';
+import { describe, it, expect, vi } from 'vitest';
+import { validateGeneratedData, validateAndRepairValue, parseCSVLine } from '../../src/planning/validate-data.js';
 
 // ---------------------------------------------------------------------------
 // Helpers to build planResult fixtures
@@ -368,5 +368,206 @@ describe('parseCSVLine handles quoted fields with commas', () => {
     const firstDataLine = lines[1];
     // Should be: 1,"hello, world",100 form
     expect(firstDataLine.split(',').length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (l) Focused parseCSVLine unit tests — pins faithful (real source) behavior
+// Real source: Code.gs:1761-1788
+// ---------------------------------------------------------------------------
+
+describe('parseCSVLine — faithful port unit tests (Code.gs:1761-1788)', () => {
+  it('splits a plain CSV line into trimmed fields', () => {
+    expect(parseCSVLine('a,b,c')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('trims whitespace from unquoted fields (real source uses current.trim())', () => {
+    // Real source trims: result.push(current.trim()) and final push also trims
+    expect(parseCSVLine('  a ,  b , c  ')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('handles quoted field containing a comma', () => {
+    expect(parseCSVLine('"hello, world",foo')).toEqual(['hello, world', 'foo']);
+  });
+
+  it('unescapes doubled double-quotes inside quoted fields', () => {
+    // "" inside quotes → single "
+    expect(parseCSVLine('"say ""hi""",bar')).toEqual(['say "hi"', 'bar']);
+  });
+
+  it('handles empty fields', () => {
+    expect(parseCSVLine('a,,c')).toEqual(['a', '', 'c']);
+  });
+
+  it('handles empty quoted field', () => {
+    expect(parseCSVLine('"",b')).toEqual(['', 'b']);
+  });
+
+  it('handles a single field with no comma', () => {
+    expect(parseCSVLine('hello')).toEqual(['hello']);
+  });
+
+  it('handles quoted field that starts mid-value (real source toggles inQuotes)', () => {
+    // Quote toggles inQuotes state on open/close
+    expect(parseCSVLine('"foo bar",baz')).toEqual(['foo bar', 'baz']);
+  });
+
+  it('returns trimmed result for trailing whitespace in last field', () => {
+    expect(parseCSVLine('a,b,c  ')).toEqual(['a', 'b', 'c']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (m) Focused validateAndRepairValue unit tests — pins faithful behavior
+// Real source: Code.gs:1610-1709
+// ---------------------------------------------------------------------------
+
+describe('validateAndRepairValue — faithful port unit tests (Code.gs:1610-1709)', () => {
+  // --- Empty value ---
+  it('returns empty string with repaired=false for empty input', () => {
+    expect(validateAndRepairValue('', 'INTEGER', 'id', 0)).toEqual({ value: '', repaired: false });
+  });
+
+  it('returns empty string with repaired=false for whitespace-only input', () => {
+    expect(validateAndRepairValue('   ', 'INTEGER', 'id', 0)).toEqual({ value: '', repaired: false });
+  });
+
+  // --- INTEGER ---
+  it('accepts valid integer string', () => {
+    expect(validateAndRepairValue('42', 'INTEGER', 'count', 0)).toEqual({ value: '42', repaired: false });
+  });
+
+  it('accepts negative integer string', () => {
+    expect(validateAndRepairValue('-7', 'INTEGER', 'delta', 0)).toEqual({ value: '-7', repaired: false });
+  });
+
+  it('repairs range expression "51-100" → first number (real source: rangeMatch[1])', () => {
+    const result = validateAndRepairValue('51-100', 'INTEGER', 'age_range', 0);
+    expect(result).toEqual({ value: '51', repaired: true });
+  });
+
+  it('accepts INT64 alias', () => {
+    expect(validateAndRepairValue('10', 'INT64', 'n', 0)).toEqual({ value: '10', repaired: false });
+  });
+
+  it('repairs "abc123def" by extracting embedded number', () => {
+    const result = validateAndRepairValue('abc123def', 'INTEGER', 'qty', 0);
+    expect(result.value).toBe('123');
+    expect(result.repaired).toBe(true);
+  });
+
+  it('falls back to generateDefaultValue for fully non-numeric INTEGER (returns a string)', () => {
+    const result = validateAndRepairValue('not-a-number', 'INTEGER', 'id', 2);
+    // generateDefaultValue for 'id' column → sequential: rowIndex+1 = 3
+    expect(result.repaired).toBe(true);
+    expect(result.value).toBe('3');
+  });
+
+  it('context-aware default: column ending with _id gets rowIndex+1', () => {
+    const result = validateAndRepairValue('xyz', 'INTEGER', 'customer_id', 4);
+    expect(result.value).toBe('5'); // rowIndex+1
+    expect(result.repaired).toBe(true);
+  });
+
+  // --- FLOAT ---
+  it('accepts valid float string', () => {
+    expect(validateAndRepairValue('3.14', 'FLOAT', 'score', 0)).toEqual({ value: '3.14', repaired: false });
+  });
+
+  it('accepts integer as FLOAT (matches /^-?\\d*\\.?\\d+$/)', () => {
+    expect(validateAndRepairValue('5', 'FLOAT', 'val', 0)).toEqual({ value: '5', repaired: false });
+  });
+
+  it('repairs "~12.5kg" by extracting float', () => {
+    const result = validateAndRepairValue('~12.5kg', 'FLOAT', 'weight', 0);
+    expect(result.value).toBe('12.5');
+    expect(result.repaired).toBe(true);
+  });
+
+  it('accepts FLOAT64 alias', () => {
+    expect(validateAndRepairValue('1.0', 'FLOAT64', 'x', 0)).toEqual({ value: '1.0', repaired: false });
+  });
+
+  it('accepts NUMBER alias', () => {
+    expect(validateAndRepairValue('99.9', 'NUMBER', 'x', 0)).toEqual({ value: '99.9', repaired: false });
+  });
+
+  // --- DATE ---
+  it('accepts valid YYYY-MM-DD date', () => {
+    expect(validateAndRepairValue('2025-01-15', 'DATE', 'event_date', 0)).toEqual({ value: '2025-01-15', repaired: false });
+  });
+
+  it('extracts date from string with prefix', () => {
+    const result = validateAndRepairValue('Date: 2025-03-10T00:00:00', 'DATE', 'dt', 0);
+    expect(result.value).toBe('2025-03-10');
+    expect(result.repaired).toBe(true);
+  });
+
+  it('falls back to generated date for non-parseable DATE value', () => {
+    const result = validateAndRepairValue('tomorrow', 'DATE', 'event_date', 0);
+    expect(result.repaired).toBe(true);
+    // Generated date matches YYYY-MM-DD pattern
+    expect(result.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  // --- TIMESTAMP / DATETIME ---
+  it('accepts valid ISO timestamp', () => {
+    const result = validateAndRepairValue('2025-01-01T12:00:00Z', 'TIMESTAMP', 'ts', 0);
+    expect(result.repaired).toBe(false);
+    expect(result.value).toBe('2025-01-01T12:00:00Z');
+  });
+
+  it('accepts timestamp with space separator', () => {
+    const result = validateAndRepairValue('2025-01-01 08:30:00', 'DATETIME', 'ts', 0);
+    expect(result.repaired).toBe(false);
+    expect(result.value).toBe('2025-01-01 08:30:00');
+  });
+
+  it('repairs out-of-range hours by clamping to 23', () => {
+    const result = validateAndRepairValue('2025-01-01T25:00:00', 'TIMESTAMP', 'ts', 0);
+    expect(result.repaired).toBe(true);
+    expect(result.value).toContain('23:');
+  });
+
+  it('repairs out-of-range minutes by clamping to 59', () => {
+    const result = validateAndRepairValue('2025-01-01T10:65:00', 'TIMESTAMP', 'ts', 0);
+    expect(result.repaired).toBe(true);
+    expect(result.value).toContain(':59:');
+  });
+
+  it('converts bare date to timestamp with 00:00:00 UTC suffix (real source behavior)', () => {
+    const result = validateAndRepairValue('2025-06-15', 'TIMESTAMP', 'created_at', 0);
+    expect(result.value).toBe('2025-06-15 00:00:00 UTC');
+    expect(result.repaired).toBe(true);
+  });
+
+  it('falls back to generated timestamp for non-parseable TIMESTAMP value', () => {
+    const result = validateAndRepairValue('now', 'TIMESTAMP', 'ts', 0);
+    expect(result.repaired).toBe(true);
+    // Generated ISO timestamp
+    expect(result.value).toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+
+  // --- STRING (default case) ---
+  it('accepts STRING value as-is (trimmed)', () => {
+    expect(validateAndRepairValue('  hello world  ', 'STRING', 'name', 0)).toEqual({ value: 'hello world', repaired: false });
+  });
+
+  it('accepts BOOLEAN string as STRING (real source has no BOOLEAN case — falls to default)', () => {
+    // Real source has no BOOLEAN case; it falls through to default STRING handling
+    expect(validateAndRepairValue('true', 'BOOLEAN', 'flag', 0)).toEqual({ value: 'true', repaired: false });
+  });
+
+  it('accepts unknown type as STRING pass-through', () => {
+    expect(validateAndRepairValue('some value', 'JSONB', 'data', 0)).toEqual({ value: 'some value', repaired: false });
+  });
+
+  // --- Real vs inferred: no quote-stripping (real source uses value.trim() only) ---
+  it('does NOT strip surrounding quotes from value (real source has no quote strip)', () => {
+    // Inferred implementation stripped leading/trailing " — real source does NOT
+    // parseCSVLine already handles quotes; validateAndRepairValue receives the raw field
+    const result = validateAndRepairValue('"hello"', 'STRING', 'name', 0);
+    expect(result.value).toBe('"hello"');
+    expect(result.repaired).toBe(false);
   });
 });
