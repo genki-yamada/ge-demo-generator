@@ -158,6 +158,29 @@ describe('makeJobRunner / runProvision', () => {
     });
   });
 
+  describe('on failed execution (operation resolves but failedCount > 0)', () => {
+    it('transitions demo state to build_failed', async () => {
+      // Stub: operation resolves (no infra error) but execution reports task failures
+      const execName = 'exec-001';
+      const operation = {
+        promise: vi.fn().mockResolvedValue([{ name: execName, failedCount: 1 }]),
+      };
+      const jobsClient = { runJob: vi.fn().mockResolvedValue([operation]) };
+      const registry = makeStubRegistry();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      const result = await runner.runProvision({ demo: DEMO, scriptRef: SCRIPT_REF, secrets: SECRETS, registry, now: NOW_FN });
+
+      expect(registry.transition).toHaveBeenCalledOnce();
+      expect(registry.transition).toHaveBeenCalledWith(DEMO.id, 'build_failed', NOW_STRING);
+      expect(result.state).toBe('build_failed');
+      expect(result.ok).toBe(false);
+      // executionId is populated because the operation resolved (execution.name is available)
+      expect(result.executionId).toBe(execName);
+      expect(result.demoId).toBe(DEMO.id);
+    });
+  });
+
   describe('with empty secrets', () => {
     it('still passes ASSUME_YES and SCRIPT_REF even with no secrets', async () => {
       const jobsClient = makeStubJobsClient();
