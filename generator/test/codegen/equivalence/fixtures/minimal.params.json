@@ -1,0 +1,15 @@
+{
+  "datasetId": "ge_demo_minimal_ds",
+  "systemInstruction": "You are a helpful assistant.",
+  "referenceDate": "2025-01-01",
+  "publicDatasetId": "",
+  "suffix": "min01",
+  "tables": [],
+  "firestore": null,
+  "userGoal": "Demonstrate minimal setup with no BQ tables and no Firestore.",
+  "dirName": "ge-demo-minimal",
+  "agentShortName": "MinimalAgent",
+  "oneSentenceSummary": "A minimal demo agent with no data.",
+  "enableWorkspaceMcp": false,
+  "metadata": null
+}
