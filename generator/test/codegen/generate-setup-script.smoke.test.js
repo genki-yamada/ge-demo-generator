@@ -26,7 +26,9 @@ const base = {
 
 describe('generateSetupScript smoke', () => {
   it('produces a bash script with cleanup wiring', () => {
-    const out = generateSetupScript(base, DEPS);
+    // spread so the test stays isolated if `base` ever gains importedMcpList
+    // (generateSetupScript mutates that field in place)
+    const out = generateSetupScript({ ...base }, DEPS);
     expect(out.startsWith('#!/bin/bash')).toBe(true);
     expect(out).toContain('--cleanup');
     expect(out).toContain('CLEANUP_MODE');

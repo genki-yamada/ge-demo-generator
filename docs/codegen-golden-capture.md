@@ -157,6 +157,12 @@ injectably** (so the equivalence test can pin them):
 - **`callVertexAI`** → accept as an injected dependency; the equivalence test
   injects a stub that throws so the deterministic `userGoal` fallback is taken.
   (Production — Plan C — injects the real Vertex client.)
+  - **Untested in Plan B:** the `callVertexAI`-*succeeds* branch (a real
+    string result, `.trim()`'d and embedded into the generated Firestore viewer
+    app) is intentionally NOT covered here — a non-deterministic LLM result
+    cannot be a stable golden. When **Plan C** wires the real Vertex client, it
+    owns a unit test that injects a fixed-string `callVertexAI` and asserts the
+    result is trimmed and correctly escaped into the heredoc.
 
 The `bashEscape` helper (verbatim `Code.gs:1892`,
 `(str) => str ? str.replace(/'/g, "'\\''") : ''` — **no** surrounding quotes)
