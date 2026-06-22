@@ -1,7 +1,19 @@
 import express from 'express';
 import { demosRouter } from './routes/demos.js';
+import { planningRouter } from './routes/planning.js';
 
-export function buildApp({ registry, authMiddleware }) {
+/**
+ * Build the Express application.
+ *
+ * @param {object} opts
+ * @param {object} opts.registry         - DemoRegistry instance
+ * @param {Function} opts.authMiddleware - Authentication middleware (req, res, next)
+ * @param {object} [opts.services={}]    - Optional injected services for Plan C routes.
+ *   When omitted or empty, Plan A GET routes and /health continue to work unchanged.
+ *   Shape: { generateDemo, deinteractivize, jobRunner, secretStore,
+ *            research, optimizeGoal, analyzeMcp, now }
+ */
+export function buildApp({ registry, authMiddleware, services = {} }) {
   const app = express();
   app.use(express.json());
 
@@ -12,7 +24,14 @@ export function buildApp({ registry, authMiddleware }) {
 
   // /api 配下は認証必須
   app.use('/api', authMiddleware);
-  app.use('/api/demos', demosRouter(registry));
+
+  // demos routes: Plan A (GET /) + Plan C (POST /, GET /:id/status)
+  app.use('/api/demos', demosRouter(registry, services));
+
+  // planning routes (Plan C): only mounted when services are provided
+  if (services.research || services.optimizeGoal || services.analyzeMcp) {
+    app.use('/api', planningRouter(services));
+  }
 
   // 集約エラーハンドラ
   // eslint-disable-next-line no-unused-vars

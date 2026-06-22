@@ -26,3 +26,9 @@ variable "generator_image" {
   description = "Generator バックエンドのコンテナイメージ。初回は placeholder、以降は Task 8 のビルド成果物を指す"
   default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
+
+variable "provisioner_image" {
+  type        = string
+  description = "ヘッドレスプロビジョナー Job のコンテナイメージ（gcloud/bq/uv 入り実行環境）。初回は placeholder"
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+}
