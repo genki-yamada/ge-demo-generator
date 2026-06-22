@@ -1,0 +1,64 @@
+{
+  "datasetId": "ge_demo_mcp_ds",
+  "systemInstruction": "You are an MCP-enabled agent with access to external tools and Google Workspace.",
+  "referenceDate": "2025-01-01",
+  "publicDatasetId": "",
+  "suffix": "mcp01",
+  "tables": [
+    {
+      "tableName": "tasks",
+      "csvData": "task_id,title,priority,status\nT001,Setup Cloud,high,pending\nT002,Test Agent,medium,pending",
+      "schema": [
+        {
+          "name": "task_id",
+          "type": "STRING"
+        },
+        {
+          "name": "title",
+          "type": "STRING"
+        },
+        {
+          "name": "priority",
+          "type": "STRING"
+        },
+        {
+          "name": "status",
+          "type": "STRING"
+        }
+      ]
+    }
+  ],
+  "firestore": null,
+  "userGoal": "Integrate external tools via MCP for enhanced automation workflows.",
+  "dirName": "ge-demo-mcp",
+  "agentShortName": "McpAgent",
+  "oneSentenceSummary": "An MCP-enabled agent with GitHub and Workspace integrations.",
+  "enableWorkspaceMcp": true,
+  "metadata": null,
+  "importedMcpList": [
+    {
+      "type": "github",
+      "github_url": "https://github.com/example-org/my-mcp-server",
+      "name": "ExampleMCP",
+      "required_env_vars": [
+        {
+          "key": "EXAMPLE_API_KEY",
+          "description": "API key for ExampleMCP service",
+          "is_required": true,
+          "is_secret": true
+        },
+        {
+          "key": "EXAMPLE_API_URL",
+          "description": "Base URL for ExampleMCP service",
+          "is_required": false,
+          "is_secret": false
+        }
+      ],
+      "capabilities": [
+        "search",
+        "write"
+      ],
+      "credential_file": null
+    }
+  ]
+}

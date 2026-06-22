@@ -1,0 +1,85 @@
+{
+  "datasetId": "ge_demo_retail_ds",
+  "systemInstruction": "You are a retail analytics assistant. Answer questions about sales and inventory.",
+  "referenceDate": "2025-01-01",
+  "publicDatasetId": "bigquery-public-data.thelook_ecommerce",
+  "suffix": "ret01",
+  "tables": [
+    {
+      "tableName": "orders",
+      "csvData": "order_id,customer_id,amount,status\n1001,C001,250.00,completed\n1002,C002,89.50,pending",
+      "schema": [
+        {
+          "name": "order_id",
+          "type": "INTEGER"
+        },
+        {
+          "name": "customer_id",
+          "type": "STRING"
+        },
+        {
+          "name": "amount",
+          "type": "FLOAT"
+        },
+        {
+          "name": "status",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "tableName": "products",
+      "csvData": "product_id,name,category,price\nP001,Widget A,Electronics,99.99\nP002,Gadget B,Electronics,149.99",
+      "schema": [
+        {
+          "name": "product_id",
+          "type": "STRING"
+        },
+        {
+          "name": "name",
+          "type": "STRING"
+        },
+        {
+          "name": "category",
+          "type": "STRING"
+        },
+        {
+          "name": "price",
+          "type": "FLOAT"
+        }
+      ]
+    }
+  ],
+  "firestore": {
+    "collectionName": "retail-ops",
+    "dashboardTitle": "Retail Operations Console",
+    "documents": [
+      {
+        "id": "order-101",
+        "data": {
+          "order_id": "order-101",
+          "status": "pending",
+          "amount": 250,
+          "customer": "ACME Corp"
+        }
+      },
+      {
+        "id": "order-102",
+        "data": {
+          "order_id": "order-102",
+          "status": "resolved",
+          "amount": 89.5,
+          "customer": "Beta Ltd"
+        }
+      }
+    ]
+  },
+  "userGoal": "Analyze retail sales trends and inventory levels to optimize stock management.",
+  "dirName": "ge-demo-retail",
+  "agentShortName": "RetailAgent",
+  "oneSentenceSummary": "A retail analytics agent with BQ tables and Firestore.",
+  "enableWorkspaceMcp": false,
+  "metadata": {
+    "currencySymbol": "¥"
+  }
+}
