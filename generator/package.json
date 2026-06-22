@@ -10,7 +10,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@google-cloud/bigquery": "^7.9.1",
     "@google-cloud/firestore": "^7.10.0",
+    "@google-cloud/run": "^1.4.0",
+    "@google-cloud/secret-manager": "^5.6.0",
     "express": "^4.21.2",
     "google-auth-library": "^9.15.0"
   },
