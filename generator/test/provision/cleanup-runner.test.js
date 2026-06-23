@@ -5,6 +5,7 @@ const DEMO_ID = 'demo-retail-acme';
 const DEMO = { id: DEMO_ID, state: 'deleting' };
 const SCRIPT_TEXT = '#!/bin/bash\nread -p "Delete? (y/n)" -n 1 -r\n';
 const HEADLESS_SCRIPT = '#!/bin/bash\nREPLY="${ASSUME_YES:+y}"; REPLY="${REPLY:-y}"  # auto-yes (headless)\n';
+const CLEANUP_SCRIPT_REF = `gs://test-bucket/scripts/${DEMO_ID}-cleanup.sh`;
 const EXEC_ID = 'projects/p/locations/r/jobs/j/executions/exec-cleanup-1';
 const NOW_STRING = '2026-06-22T00:00:00.000Z';
 const NOW_FN = () => NOW_STRING;
@@ -13,6 +14,8 @@ function makeStubs({ runCleanupOk = true } = {}) {
   const scriptStore = {
     fetch: vi.fn().mockResolvedValue(SCRIPT_TEXT),
     remove: vi.fn().mockResolvedValue(undefined),
+    saveCleanup: vi.fn().mockResolvedValue(CLEANUP_SCRIPT_REF),
+    removeCleanup: vi.fn().mockResolvedValue(undefined),
   };
 
   const deinteractivize = vi.fn().mockReturnValue(HEADLESS_SCRIPT);
@@ -54,7 +57,17 @@ describe('makeCleanupRunner / runCleanup', () => {
       expect(deinteractivize).toHaveBeenCalledWith(SCRIPT_TEXT);
     });
 
-    it('calls jobRunner.runCleanup with the headless (deinteractivized) script', async () => {
+    it('saves the headless script to GCS via scriptStore.saveCleanup', async () => {
+      const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs();
+      const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
+
+      await runner.runCleanup({ demo: DEMO });
+
+      expect(scriptStore.saveCleanup).toHaveBeenCalledOnce();
+      expect(scriptStore.saveCleanup).toHaveBeenCalledWith(DEMO_ID, HEADLESS_SCRIPT);
+    });
+
+    it('calls jobRunner.runCleanup with the GCS scriptRef (not inline script)', async () => {
       const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs();
       const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
 
@@ -63,7 +76,8 @@ describe('makeCleanupRunner / runCleanup', () => {
       expect(jobRunner.runCleanup).toHaveBeenCalledOnce();
       const callArg = jobRunner.runCleanup.mock.calls[0][0];
       expect(callArg.demo).toBe(DEMO);
-      expect(callArg.script).toBe(HEADLESS_SCRIPT);
+      expect(callArg.scriptRef).toBe(CLEANUP_SCRIPT_REF);
+      expect(callArg).not.toHaveProperty('script');
     });
 
     it('calls registry.finishCleanup with demo.id, ok, and now() result', async () => {
@@ -75,10 +89,22 @@ describe('makeCleanupRunner / runCleanup', () => {
       expect(registry.finishCleanup).toHaveBeenCalledOnce();
       expect(registry.finishCleanup).toHaveBeenCalledWith(DEMO_ID, true, NOW_STRING);
     });
+
+    it('always calls scriptStore.removeCleanup regardless of ok', async () => {
+      for (const runCleanupOk of [true, false]) {
+        const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs({ runCleanupOk });
+        const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
+
+        await runner.runCleanup({ demo: DEMO });
+
+        expect(scriptStore.removeCleanup).toHaveBeenCalledOnce();
+        expect(scriptStore.removeCleanup).toHaveBeenCalledWith(DEMO_ID);
+      }
+    });
   });
 
   describe('on successful cleanup (ok=true)', () => {
-    it('calls scriptStore.remove after finishCleanup', async () => {
+    it('calls scriptStore.remove (original) after finishCleanup and removeCleanup', async () => {
       const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs({ runCleanupOk: true });
       const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
 
@@ -109,7 +135,17 @@ describe('makeCleanupRunner / runCleanup', () => {
       expect(registry.finishCleanup).toHaveBeenCalledWith(DEMO_ID, false, NOW_STRING);
     });
 
-    it('does NOT call scriptStore.remove when ok=false', async () => {
+    it('calls scriptStore.removeCleanup even when ok=false (temp object always cleaned up)', async () => {
+      const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs({ runCleanupOk: false });
+      const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
+
+      await runner.runCleanup({ demo: DEMO });
+
+      expect(scriptStore.removeCleanup).toHaveBeenCalledOnce();
+      expect(scriptStore.removeCleanup).toHaveBeenCalledWith(DEMO_ID);
+    });
+
+    it('does NOT call scriptStore.remove (original) when ok=false', async () => {
       const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs({ runCleanupOk: false });
       const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
 

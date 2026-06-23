@@ -4,23 +4,27 @@
  * Lifecycle (all deps injected, fully testable without network):
  *   1. Fetch saved setup script from GCS via scriptStore.
  *   2. Deinteractivize the script (strip read -p prompts) so it runs headlessly.
- *   3. Collect secrets (optional; secretStore not yet implemented — defaults to {}).
- *   4. Dispatch the Cloud Run Job with --cleanup arg via jobRunner.runCleanup.
- *   5. Transition lifecycle state via registry.finishCleanup (deleting → deleted | delete_failed).
- *   6. On success only: remove the script from GCS (ADR-0004 — keep GCS clean).
- *   7. Return { demoId, executionId, allOk }.
+ *   3. Upload the headless script to GCS as a temporary cleanup object via scriptStore.saveCleanup.
+ *   4. Collect secrets (optional; secretStore not yet implemented — defaults to {}).
+ *   5. Dispatch the Cloud Run Job with --cleanup arg and SCRIPT_REF (GCS URI) via jobRunner.runCleanup.
+ *   6. Transition lifecycle state via registry.finishCleanup (deleting → deleted | delete_failed).
+ *   7. Always: remove the temporary cleanup script from GCS (scriptStore.removeCleanup).
+ *   8. On success only: remove the original setup script from GCS (ADR-0004 — keep GCS clean).
+ *   9. Return { demoId, executionId, allOk }.
  *
  * Per-resource structured results (which GCP resource was deleted/failed) are DEFERRED.
  * They require Cloud Logging integration to parse Job task output. This is tracked as a
  * follow-up task. For now, allOk is the single success signal.
  *
- * Script delivery: the headless script is passed as SCRIPT_CONTENT (base64 env var) to
- * the Cloud Run Job. See job-runner.runCleanup for the rationale and size considerations.
+ * Script delivery: the headless cleanup script is uploaded to GCS as a temporary object
+ * (scripts/<demoId>-cleanup.sh) and delivered via the SCRIPT_REF env var. This matches the
+ * provisioning flow and avoids Cloud Run env var size limits (~32 KiB), which real generated
+ * scripts (~600 KB / ~800 KB base64) would exceed.
  *
  * @param {object} opts
- * @param {object} opts.scriptStore      - { fetch(demoId), remove(demoId) }
+ * @param {object} opts.scriptStore      - { fetch(demoId), remove(demoId), saveCleanup(demoId, text), removeCleanup(demoId) }
  * @param {Function} opts.deinteractivize - (scriptText) => headlessScript
- * @param {object} opts.jobRunner        - { runCleanup({ demo, script, secrets, now }) }
+ * @param {object} opts.jobRunner        - { runCleanup({ demo, scriptRef, secrets }) }
  * @param {object} opts.registry         - { finishCleanup(id, ok, now) }
  * @param {object} [opts.secretStore]    - Optional. Not yet implemented; reserved for future.
  * @param {Function} opts.now            - () => ISO date string
@@ -41,22 +45,28 @@ export function makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, reg
       // 2. Deinteractivize: strip read -p prompts so it runs headlessly with ASSUME_YES
       const headless = deinteractivize(script);
 
-      // 3. Collect secrets for the Job (secretStore integration is deferred; use empty map)
+      // 3. Upload headless cleanup script to GCS (temp object; removed after job regardless of outcome)
+      const scriptRef = await scriptStore.saveCleanup(demo.id, headless);
+
+      // 4. Collect secrets for the Job (secretStore integration is deferred; use empty map)
       // TODO: when secretStore is wired, collect demo-scoped secrets here.
       const secrets = {};
 
-      // 4. Dispatch the Cloud Run Job with --cleanup arg
-      const { ok, executionId } = await jobRunner.runCleanup({ demo, script: headless, secrets, now });
+      // 5. Dispatch the Cloud Run Job with --cleanup arg and SCRIPT_REF (GCS URI)
+      const { ok, executionId } = await jobRunner.runCleanup({ demo, scriptRef, secrets });
 
-      // 5. Transition lifecycle: deleting → deleted (ok) | delete_failed (!ok)
+      // 6. Transition lifecycle: deleting → deleted (ok) | delete_failed (!ok)
       await registry.finishCleanup(demo.id, ok, now());
 
-      // 6. On success only: remove the script from GCS (keep storage clean; ADR-0004)
+      // 7. Always remove the temporary cleanup script (keep storage clean regardless of outcome)
+      await scriptStore.removeCleanup(demo.id);
+
+      // 8. On success only: remove the original setup script from GCS (keep storage clean; ADR-0004)
       if (ok) {
         await scriptStore.remove(demo.id);
       }
 
-      // 7. Return summary. Per-resource structured results are deferred (need Cloud Logging).
+      // 9. Return summary. Per-resource structured results are deferred (need Cloud Logging).
       return { demoId: demo.id, executionId, allOk: ok };
     },
   };

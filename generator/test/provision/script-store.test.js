@@ -5,6 +5,8 @@ const BUCKET = 'test-scripts-bucket';
 const DEMO_ID = 'demo-retail-abcd1234';
 const OBJECT_NAME = `scripts/${DEMO_ID}.sh`;
 const GCS_URI = `gs://${BUCKET}/${OBJECT_NAME}`;
+const CLEANUP_OBJECT_NAME = `scripts/${DEMO_ID}-cleanup.sh`;
+const CLEANUP_GCS_URI = `gs://${BUCKET}/${CLEANUP_OBJECT_NAME}`;
 
 function makeFakeStorage() {
   const fakeFile = {
@@ -83,6 +85,41 @@ describe('makeScriptStore', () => {
 
     it('calls delete() with { ignoreNotFound: true }', async () => {
       await store.remove(DEMO_ID);
+      expect(fakeFile.delete).toHaveBeenCalledWith({ ignoreNotFound: true });
+    });
+  });
+
+  describe('saveCleanup(demoId, scriptText)', () => {
+    it('calls storage.bucket with the correct bucket name', async () => {
+      await store.saveCleanup(DEMO_ID, '#!/bin/bash\necho cleanup');
+      expect(storage.bucket).toHaveBeenCalledWith(BUCKET);
+    });
+
+    it('calls file() with the cleanup object name (demoId-cleanup.sh)', async () => {
+      await store.saveCleanup(DEMO_ID, '#!/bin/bash\necho cleanup');
+      expect(fakeBucket.file).toHaveBeenCalledWith(CLEANUP_OBJECT_NAME);
+    });
+
+    it('calls save() with the script text and correct contentType', async () => {
+      const script = '#!/bin/bash\necho cleanup';
+      await store.saveCleanup(DEMO_ID, script);
+      expect(fakeFile.save).toHaveBeenCalledWith(script, { contentType: 'text/x-shellscript' });
+    });
+
+    it('returns the gs:// URI for the cleanup object', async () => {
+      const uri = await store.saveCleanup(DEMO_ID, '#!/bin/bash\necho cleanup');
+      expect(uri).toBe(CLEANUP_GCS_URI);
+    });
+  });
+
+  describe('removeCleanup(demoId)', () => {
+    it('calls file() with the cleanup object name (demoId-cleanup.sh)', async () => {
+      await store.removeCleanup(DEMO_ID);
+      expect(fakeBucket.file).toHaveBeenCalledWith(CLEANUP_OBJECT_NAME);
+    });
+
+    it('calls delete() with { ignoreNotFound: true }', async () => {
+      await store.removeCleanup(DEMO_ID);
       expect(fakeFile.delete).toHaveBeenCalledWith({ ignoreNotFound: true });
     });
   });

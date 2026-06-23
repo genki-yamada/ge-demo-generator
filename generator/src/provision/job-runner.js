@@ -92,12 +92,11 @@ export function makeJobRunner({ jobsClient, projectId, region, jobName }) {
     /**
      * Dispatch a Cloud Run Job execution to run the --cleanup pass of a provisioning script.
      *
-     * Script delivery: the headless script text is base64-encoded and passed as the
-     * SCRIPT_CONTENT env var. The Job entrypoint is expected to decode it (e.g.
-     * `echo "$SCRIPT_CONTENT" | base64 -d > /tmp/script.sh && bash /tmp/script.sh --cleanup`).
-     * This avoids a second GCS round-trip and keeps the job self-contained. Env-var size
-     * (Cloud Run limit: 32 KiB per var) is sufficient for typical generated scripts; a
-     * production hardening path (temp GCS ref) can be wired in a follow-up if needed.
+     * Script delivery: the headless cleanup script is uploaded to GCS by the caller
+     * (cleanup-runner.js via scriptStore.saveCleanup) before this method is called. The
+     * GCS URI is passed as the SCRIPT_REF env var, matching how runProvision delivers the
+     * provisioning script. This avoids Cloud Run env var size limits (~32 KiB per var),
+     * which real generated scripts (~600 KB / ~800 KB base64) would exceed.
      *
      * State transition: NOT performed here. The caller (cleanup-runner.js) calls
      * registry.finishCleanup after this resolves, decoupling job dispatch from lifecycle.
@@ -107,18 +106,16 @@ export function makeJobRunner({ jobsClient, projectId, region, jobName }) {
      *
      * @param {object} opts
      * @param {object} opts.demo       - Demo object (must have .id)
-     * @param {string} opts.script     - Headless (deinteractivized) script text
+     * @param {string} opts.scriptRef  - GCS URI of the headless cleanup script
      * @param {object} [opts.secrets]  - Key→value map of env vars to inject
-     * @param {Function} opts.now      - () => ISO date string (injected for testability)
      * @returns {Promise<{ demoId: string, executionId: string|null, ok: boolean }>}
      */
-    async runCleanup({ demo, script, secrets = {}, now }) {
+    async runCleanup({ demo, scriptRef, secrets = {} }) {
       // Build env overrides: secrets first, then script delivery + cleanup flags
       const secretEnvs = Object.entries(secrets).map(([name, value]) => ({ name, value }));
-      const scriptBase64 = Buffer.from(script, 'utf8').toString('base64');
       const env = [
         ...secretEnvs,
-        { name: 'SCRIPT_CONTENT', value: scriptBase64 },
+        { name: 'SCRIPT_REF', value: scriptRef },
         { name: 'ASSUME_YES', value: '1' },
         { name: 'CLEANUP_MODE', value: '1' },
       ];
