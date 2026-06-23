@@ -78,6 +78,34 @@ resource "google_cloud_run_v2_service" "generator" {
         name  = "FIRESTORE_DATABASE_ID"
         value = var.generator_database_id
       }
+      env {
+        name  = "GENERATOR_SCRIPTS_BUCKET"
+        value = "${var.project_id}-generator-scripts"
+      }
+      env {
+        name  = "GENERATOR_JOB_NAME"
+        value = "provisioner"
+      }
+      env {
+        name  = "GENERATOR_REGION"
+        value = var.region
+      }
+      env {
+        name  = "VERTEX_LOCATION"
+        value = "global"
+      }
+      env {
+        name  = "AGENT_MODEL"
+        value = "gemini-3.5-flash"
+      }
+      env {
+        name  = "AGENT_SEARCH_MODEL"
+        value = "gemini-3.1-flash-lite"
+      }
+      env {
+        name  = "IAP_AUDIENCE"
+        value = var.iap_audience
+      }
     }
   }
 
@@ -151,6 +179,47 @@ resource "google_storage_bucket_iam_member" "runtime_scripts_object_admin" {
   bucket = google_storage_bucket.generator_scripts.name
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.generator_runtime.email}"
+}
+
+# ── Runtime SA: additional project-level IAM roles ────────────────────────────
+# The generator app (runtime SA) needs these to orchestrate provisioning jobs.
+
+resource "google_project_iam_member" "runtime_aiplatform_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.generator_runtime.email}"
+}
+
+resource "google_project_iam_member" "runtime_bq_data_viewer" {
+  project = var.project_id
+  role    = "roles/bigquery.dataViewer"
+  member  = "serviceAccount:${google_service_account.generator_runtime.email}"
+}
+
+resource "google_project_iam_member" "runtime_bq_job_user" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${google_service_account.generator_runtime.email}"
+}
+
+resource "google_project_iam_member" "runtime_secretmanager_admin" {
+  project = var.project_id
+  role    = "roles/secretmanager.admin"
+  member  = "serviceAccount:${google_service_account.generator_runtime.email}"
+}
+
+resource "google_project_iam_member" "runtime_run_developer" {
+  project = var.project_id
+  role    = "roles/run.developer"
+  member  = "serviceAccount:${google_service_account.generator_runtime.email}"
+}
+
+# Runtime SA must be able to impersonate the runner SA when dispatching the Job
+# (actAs / serviceAccountUser on the runner SA resource).
+resource "google_service_account_iam_member" "runtime_act_as_runner" {
+  service_account_id = google_service_account.generator_runner.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.generator_runtime.email}"
 }
 
 # ── Cloud Run Job: headless provisioner ───────────────────────────────────────
