@@ -112,17 +112,22 @@ export function demosRouter(registry, services = {}) {
     try {
       const { confirmName } = req.body ?? {};
       const { cleanupRunner, now } = services;
+      // Fix 4: guard misconfigured deployment BEFORE the DB read to avoid a wasted roundtrip.
+      if (typeof cleanupRunner?.runCleanup !== 'function') return res.status(503).json({ error: 'cleanup service not configured' });
       const demo = await registry.get(req.params.id);
       if (!demo) return res.status(404).json({ error: 'not found' });
       if (confirmName !== demo.id) return res.status(400).json({ error: 'confirmName must match the demo id' });
       if (demo.state === 'building') return res.status(409).json({ error: 'cannot cleanup while building' });
       if (demo.state === 'deleting') return res.status(409).json({ error: 'cleanup already in progress' });
-      if (typeof cleanupRunner?.runCleanup !== 'function') return res.status(503).json({ error: 'cleanup service not configured' });
       let updated;
       try {
         updated = await registry.startCleanup(req.params.id, (now ?? (() => new Date().toISOString()))());
       } catch (e) {
-        return res.status(409).json({ error: `cannot start cleanup: ${e.message}` });
+        // Fix 3: only map state-conflict errors to 409; genuine infra errors become 500 via next(err).
+        if (/cannot cleanup while building|invalid transition/i.test(e.message)) {
+          return res.status(409).json({ error: `cannot start cleanup: ${e.message}` });
+        }
+        return next(e);
       }
       // Non-blocking fire-and-forget: runCleanup transitions deleting → deleted|delete_failed.
       Promise.resolve()

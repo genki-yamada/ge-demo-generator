@@ -176,4 +176,65 @@ describe('makeCleanupRunner / runCleanup', () => {
       expect(callArg.secrets).toEqual({});
     });
   });
+
+  describe('robustness: pre-job failure (e.g. scriptStore.fetch rejects)', () => {
+    it('calls registry.finishCleanup(demoId, false, now) even when scriptStore.fetch throws', async () => {
+      // Simulates the case where scriptGcsUri was never set (non-fatal script save in build route)
+      // so scriptStore.fetch rejects. The demo must NOT be left stuck in `deleting`.
+      const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs();
+      const fetchError = new Error('GCS object not found');
+      scriptStore.fetch = vi.fn().mockRejectedValue(fetchError);
+      registry.finishCleanup = vi.fn().mockResolvedValue({ ...DEMO, state: 'delete_failed' });
+
+      const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
+
+      // runCleanup should not throw — it resolves (finishCleanup was called)
+      await runner.runCleanup({ demo: DEMO });
+
+      // Demo is transitioned to delete_failed, NOT stuck in deleting
+      expect(registry.finishCleanup).toHaveBeenCalledOnce();
+      expect(registry.finishCleanup).toHaveBeenCalledWith(DEMO_ID, false, NOW_STRING);
+    });
+
+    it('still calls scriptStore.removeCleanup (try/finally) even when scriptStore.fetch throws', async () => {
+      const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs();
+      scriptStore.fetch = vi.fn().mockRejectedValue(new Error('GCS object not found'));
+      registry.finishCleanup = vi.fn().mockResolvedValue({ ...DEMO, state: 'delete_failed' });
+
+      const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
+
+      await runner.runCleanup({ demo: DEMO });
+
+      // removeCleanup must always run regardless of where the failure happened
+      expect(scriptStore.removeCleanup).toHaveBeenCalledOnce();
+      expect(scriptStore.removeCleanup).toHaveBeenCalledWith(DEMO_ID);
+    });
+
+    it('does NOT call scriptStore.remove (original) when scriptStore.fetch throws', async () => {
+      const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs();
+      scriptStore.fetch = vi.fn().mockRejectedValue(new Error('GCS object not found'));
+      registry.finishCleanup = vi.fn().mockResolvedValue({ ...DEMO, state: 'delete_failed' });
+
+      const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
+
+      await runner.runCleanup({ demo: DEMO });
+
+      expect(scriptStore.remove).not.toHaveBeenCalled();
+    });
+
+    it('propagates if finishCleanup itself throws (concurrent-finish guard)', async () => {
+      // If finishCleanup throws (e.g. concurrent job already finished → invalid transition),
+      // runCleanup should let it propagate. removeCleanup still runs first (try/finally).
+      const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs();
+      scriptStore.fetch = vi.fn().mockRejectedValue(new Error('fetch failed'));
+      const finishError = new Error('invalid transition');
+      registry.finishCleanup = vi.fn().mockRejectedValue(finishError);
+
+      const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
+
+      await expect(runner.runCleanup({ demo: DEMO })).rejects.toThrow('invalid transition');
+      // removeCleanup still ran before the propagation
+      expect(scriptStore.removeCleanup).toHaveBeenCalledOnce();
+    });
+  });
 });

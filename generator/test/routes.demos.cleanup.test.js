@@ -136,7 +136,52 @@ describe('POST /api/demos/:id/cleanup', () => {
     expect(res.body.error).toMatch(/cannot start cleanup/i);
   });
 
-  it('returns 503 when cleanupRunner is not configured', async () => {
+  it('returns 500 (not 409) when startCleanup throws a non-conflict error', async () => {
+    // Fix 3: genuine infra errors from startCleanup must not be swallowed as 409.
+    await registerDemo();
+    await registry.transition(DEMO_ID, 'active', NOW);
+
+    // Stub registry.startCleanup to throw a generic (non-state-conflict) error
+    const infraError = new Error('Firestore unavailable');
+    const stubbedRegistry = {
+      ...registry,
+      get: registry.get.bind(registry),
+      startCleanup: vi.fn().mockRejectedValue(infraError),
+    };
+
+    const stubbedApp = buildApp({
+      registry: stubbedRegistry,
+      authMiddleware: passThroughAuth,
+      services,
+    });
+
+    const res = await request(stubbedApp)
+      .post(`/api/demos/${DEMO_ID}/cleanup`)
+      .send({ confirmName: DEMO_ID });
+
+    // Generic infra error → 500, not 409
+    expect(res.status).toBe(500);
+  });
+
+  it('returns 503 when cleanupRunner is not configured (checked before DB read — unknown id also returns 503)', async () => {
+    // Fix 4: 503 guard now fires BEFORE registry.get, so even an unknown id returns 503
+    // rather than 404 when the service is absent. This is intentional: a misconfigured
+    // deployment returns 503 for all requests, not just known demos.
+    const unconfiguredApp = buildApp({
+      registry,
+      authMiddleware: passThroughAuth,
+      services: makeStubServices({ cleanupRunner: undefined }),
+    });
+
+    const res = await request(unconfiguredApp)
+      .post('/api/demos/demo-unknown-xyz/cleanup')
+      .send({ confirmName: 'demo-unknown-xyz' });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/cleanup service not configured/i);
+  });
+
+  it('returns 503 when cleanupRunner is not configured (known id also returns 503)', async () => {
     await registerDemo();
     await registry.transition(DEMO_ID, 'active', NOW);
 

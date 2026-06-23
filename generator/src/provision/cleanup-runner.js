@@ -39,27 +39,46 @@ export function makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, reg
      * @returns {Promise<{ demoId: string, executionId: string|null, allOk: boolean }>}
      */
     async runCleanup({ demo }) {
-      // 1. Fetch the saved provisioning script from GCS
-      const script = await scriptStore.fetch(demo.id);
+      let ok = false;
+      let executionId = null;
 
-      // 2. Deinteractivize: strip read -p prompts so it runs headlessly with ASSUME_YES
-      const headless = deinteractivize(script);
+      // Steps 1–5: fetch, deinteractivize, save, dispatch. Any failure here is caught
+      // below so finishCleanup is still reached (demo never stuck in `deleting`).
+      try {
+        // 1. Fetch the saved provisioning script from GCS
+        const script = await scriptStore.fetch(demo.id);
 
-      // 3. Upload headless cleanup script to GCS (temp object; removed after job regardless of outcome)
-      const scriptRef = await scriptStore.saveCleanup(demo.id, headless);
+        // 2. Deinteractivize: strip read -p prompts so it runs headlessly with ASSUME_YES
+        const headless = deinteractivize(script);
 
-      // 4. Collect secrets for the Job (secretStore integration is deferred; use empty map)
-      // TODO: when secretStore is wired, collect demo-scoped secrets here.
-      const secrets = {};
+        // 3. Upload headless cleanup script to GCS (temp object; removed in finally regardless of outcome)
+        const scriptRef = await scriptStore.saveCleanup(demo.id, headless);
 
-      // 5. Dispatch the Cloud Run Job with --cleanup arg and SCRIPT_REF (GCS URI)
-      const { ok, executionId } = await jobRunner.runCleanup({ demo, scriptRef, secrets });
+        // 4. Collect secrets for the Job (secretStore integration is deferred; use empty map)
+        // TODO: when secretStore is wired, collect demo-scoped secrets here.
+        const secrets = {};
 
-      // 6. Transition lifecycle: deleting → deleted (ok) | delete_failed (!ok)
+        // 5. Dispatch the Cloud Run Job with --cleanup arg and SCRIPT_REF (GCS URI)
+        ({ ok, executionId } = await jobRunner.runCleanup({ demo, scriptRef, secrets }));
+      } catch (err) {
+        // Pre-job failure (e.g. scriptStore.fetch threw because scriptGcsUri was never set).
+        // ok stays false; fall through to finishCleanup(false) so demo is never stuck in `deleting`.
+        console.error('cleanup run failed before job completion:', err?.message ?? err);
+      } finally {
+        // 7. Always remove the temporary cleanup script (keep storage clean regardless of outcome).
+        // Guard so a removeCleanup failure does not mask the primary outcome.
+        try {
+          await scriptStore.removeCleanup(demo.id);
+        } catch (e) {
+          console.error('removeCleanup failed:', e?.message ?? e);
+        }
+      }
+
+      // 6. Transition lifecycle: deleting → deleted (ok) | delete_failed (!ok).
+      // This is ALWAYS reached, so the demo is never left stuck in `deleting`.
+      // If finishCleanup itself throws (e.g. concurrent job already finished → invalid transition),
+      // we let it propagate — the finally above has already run removeCleanup.
       await registry.finishCleanup(demo.id, ok, now());
-
-      // 7. Always remove the temporary cleanup script (keep storage clean regardless of outcome)
-      await scriptStore.removeCleanup(demo.id);
 
       // 8. On success only: remove the original setup script from GCS (keep storage clean; ADR-0004)
       if (ok) {
