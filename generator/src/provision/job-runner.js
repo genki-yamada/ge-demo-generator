@@ -25,7 +25,7 @@
  * @param {string} opts.projectId    - GCP project ID
  * @param {string} opts.region       - Cloud Run region (e.g. 'asia-northeast1')
  * @param {string} opts.jobName      - Cloud Run Job name (e.g. 'provisioner')
- * @returns {{ runProvision: Function }}
+ * @returns {{ runProvision: Function, runCleanup: Function }}
  */
 export function makeJobRunner({ jobsClient, projectId, region, jobName }) {
   const jobResourceName = `projects/${projectId}/locations/${region}/jobs/${jobName}`;
@@ -85,6 +85,74 @@ export function makeJobRunner({ jobsClient, projectId, region, jobName }) {
         demoId: demo.id,
         executionId,
         state: updatedDemo.state,
+        ok,
+      };
+    },
+
+    /**
+     * Dispatch a Cloud Run Job execution to run the --cleanup pass of a provisioning script.
+     *
+     * Script delivery: the headless script text is base64-encoded and passed as the
+     * SCRIPT_CONTENT env var. The Job entrypoint is expected to decode it (e.g.
+     * `echo "$SCRIPT_CONTENT" | base64 -d > /tmp/script.sh && bash /tmp/script.sh --cleanup`).
+     * This avoids a second GCS round-trip and keeps the job self-contained. Env-var size
+     * (Cloud Run limit: 32 KiB per var) is sufficient for typical generated scripts; a
+     * production hardening path (temp GCS ref) can be wired in a follow-up if needed.
+     *
+     * State transition: NOT performed here. The caller (cleanup-runner.js) calls
+     * registry.finishCleanup after this resolves, decoupling job dispatch from lifecycle.
+     *
+     * Per-resource structured results are deferred (require Cloud Logging integration)
+     * and will be added in a follow-up task. This method returns allOk only.
+     *
+     * @param {object} opts
+     * @param {object} opts.demo       - Demo object (must have .id)
+     * @param {string} opts.script     - Headless (deinteractivized) script text
+     * @param {object} [opts.secrets]  - Key→value map of env vars to inject
+     * @param {Function} opts.now      - () => ISO date string (injected for testability)
+     * @returns {Promise<{ demoId: string, executionId: string|null, ok: boolean }>}
+     */
+    async runCleanup({ demo, script, secrets = {}, now }) {
+      // Build env overrides: secrets first, then script delivery + cleanup flags
+      const secretEnvs = Object.entries(secrets).map(([name, value]) => ({ name, value }));
+      const scriptBase64 = Buffer.from(script, 'utf8').toString('base64');
+      const env = [
+        ...secretEnvs,
+        { name: 'SCRIPT_CONTENT', value: scriptBase64 },
+        { name: 'ASSUME_YES', value: '1' },
+        { name: 'CLEANUP_MODE', value: '1' },
+      ];
+
+      let executionId = null;
+      let ok = false;
+
+      try {
+        // 1. Create the Cloud Run Job execution with --cleanup arg (LRO)
+        const [operation] = await jobsClient.runJob({
+          name: jobResourceName,
+          overrides: {
+            containerOverrides: [{ args: ['--cleanup'], env }],
+          },
+        });
+
+        // 2. Wait for the operation to complete
+        const [execution] = await operation.promise();
+
+        // 3. Record execution ID from the returned execution resource
+        executionId = execution.name ?? null;
+
+        // 4. Check application-level failure (failedCount > 0 means task failures)
+        const failed = typeof execution.failedCount === 'number' && execution.failedCount > 0;
+        ok = !failed;
+      } catch (_err) {
+        // Operation-level failure (infra error, timeout, etc.)
+        ok = false;
+      }
+
+      // NOTE: No registry.transition here — cleanup-runner calls registry.finishCleanup.
+      return {
+        demoId: demo.id,
+        executionId,
         ok,
       };
     },

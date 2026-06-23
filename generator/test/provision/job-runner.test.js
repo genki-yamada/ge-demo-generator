@@ -196,3 +196,156 @@ describe('makeJobRunner / runProvision', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// runCleanup
+// ---------------------------------------------------------------------------
+
+const SCRIPT_TEXT = '#!/bin/bash\necho "cleanup script"';
+
+describe('makeJobRunner / runCleanup', () => {
+  describe('calls jobsClient.runJob with correct arguments', () => {
+    it('uses the fully-qualified job resource name', async () => {
+      const jobsClient = makeStubJobsClient();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runCleanup({ demo: DEMO, script: SCRIPT_TEXT, secrets: {}, now: NOW_FN });
+
+      expect(jobsClient.runJob).toHaveBeenCalledOnce();
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      expect(callArg.name).toBe(EXPECTED_JOB_RESOURCE_NAME);
+    });
+
+    it('passes args: ["--cleanup"] in containerOverrides', async () => {
+      const jobsClient = makeStubJobsClient();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runCleanup({ demo: DEMO, script: SCRIPT_TEXT, secrets: {}, now: NOW_FN });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const override = callArg.overrides.containerOverrides[0];
+      expect(override.args).toEqual(['--cleanup']);
+    });
+
+    it('passes ASSUME_YES=1 in container env overrides', async () => {
+      const jobsClient = makeStubJobsClient();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runCleanup({ demo: DEMO, script: SCRIPT_TEXT, secrets: {}, now: NOW_FN });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const envVars = callArg.overrides.containerOverrides[0].env;
+      const assumeYes = envVars.find(e => e.name === 'ASSUME_YES');
+      expect(assumeYes).toBeDefined();
+      expect(assumeYes.value).toBe('1');
+    });
+
+    it('passes CLEANUP_MODE=1 in container env overrides', async () => {
+      const jobsClient = makeStubJobsClient();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runCleanup({ demo: DEMO, script: SCRIPT_TEXT, secrets: {}, now: NOW_FN });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const envVars = callArg.overrides.containerOverrides[0].env;
+      const cleanupMode = envVars.find(e => e.name === 'CLEANUP_MODE');
+      expect(cleanupMode).toBeDefined();
+      expect(cleanupMode.value).toBe('1');
+    });
+
+    it('passes SCRIPT_CONTENT as base64 in container env overrides', async () => {
+      const jobsClient = makeStubJobsClient();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runCleanup({ demo: DEMO, script: SCRIPT_TEXT, secrets: {}, now: NOW_FN });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const envVars = callArg.overrides.containerOverrides[0].env;
+      const scriptContent = envVars.find(e => e.name === 'SCRIPT_CONTENT');
+      expect(scriptContent).toBeDefined();
+      const decoded = Buffer.from(scriptContent.value, 'base64').toString('utf8');
+      expect(decoded).toBe(SCRIPT_TEXT);
+    });
+
+    it('passes all secrets keys as env vars in container overrides', async () => {
+      const jobsClient = makeStubJobsClient();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runCleanup({ demo: DEMO, script: SCRIPT_TEXT, secrets: SECRETS, now: NOW_FN });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const envVars = callArg.overrides.containerOverrides[0].env;
+
+      for (const [key, value] of Object.entries(SECRETS)) {
+        const envEntry = envVars.find(e => e.name === key);
+        expect(envEntry, `env var ${key} should be present`).toBeDefined();
+        expect(envEntry.value).toBe(value);
+      }
+    });
+  });
+
+  describe('does NOT call registry.transition', () => {
+    it('never touches any registry on success', async () => {
+      const jobsClient = makeStubJobsClient();
+      const registry = makeStubRegistry();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runCleanup({ demo: DEMO, script: SCRIPT_TEXT, secrets: {}, now: NOW_FN });
+
+      expect(registry.transition).not.toHaveBeenCalled();
+    });
+
+    it('never touches any registry on failure', async () => {
+      const jobsClient = makeStubJobsClient({ fail: true });
+      const registry = makeStubRegistry();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runCleanup({ demo: DEMO, script: SCRIPT_TEXT, secrets: {}, now: NOW_FN });
+
+      expect(registry.transition).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('on successful execution', () => {
+    it('returns ok=true and executionId', async () => {
+      const execName = 'projects/test-project/locations/asia-northeast1/jobs/provisioner/executions/exec-cleanup-1';
+      const jobsClient = makeStubJobsClient({ execName });
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      const result = await runner.runCleanup({ demo: DEMO, script: SCRIPT_TEXT, secrets: {}, now: NOW_FN });
+
+      expect(result.ok).toBe(true);
+      expect(result.executionId).toBe(execName);
+      expect(result.demoId).toBe(DEMO.id);
+    });
+  });
+
+  describe('on failed execution (operation rejects)', () => {
+    it('returns ok=false and demoId', async () => {
+      const jobsClient = makeStubJobsClient({ fail: true });
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      const result = await runner.runCleanup({ demo: DEMO, script: SCRIPT_TEXT, secrets: {}, now: NOW_FN });
+
+      expect(result.ok).toBe(false);
+      expect(result.demoId).toBe(DEMO.id);
+    });
+  });
+
+  describe('on failed execution (operation resolves but failedCount > 0)', () => {
+    it('returns ok=false', async () => {
+      const execName = 'exec-cleanup-fail';
+      const operation = {
+        promise: vi.fn().mockResolvedValue([{ name: execName, failedCount: 1 }]),
+      };
+      const jobsClient = { runJob: vi.fn().mockResolvedValue([operation]) };
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      const result = await runner.runCleanup({ demo: DEMO, script: SCRIPT_TEXT, secrets: {}, now: NOW_FN });
+
+      expect(result.ok).toBe(false);
+      expect(result.executionId).toBe(execName);
+      expect(result.demoId).toBe(DEMO.id);
+    });
+  });
+});
