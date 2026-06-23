@@ -22,6 +22,7 @@ locals {
     "cloudbuild.googleapis.com",
     "artifactregistry.googleapis.com",
     "iam.googleapis.com",
+    "storage.googleapis.com",
   ]
 }
 
@@ -130,6 +131,26 @@ resource "google_project_iam_member" "runner_aiplatform_user" {
   project = var.project_id
   role    = "roles/aiplatform.user"
   member  = "serviceAccount:${google_service_account.generator_runner.email}"
+}
+
+# ── GCS bucket for generated setup scripts ────────────────────────────────────
+resource "google_storage_bucket" "generator_scripts" {
+  name                        = "${var.project_id}-generator-scripts"
+  location                    = var.region
+  uniform_bucket_level_access = true
+  force_destroy               = false
+
+  versioning {
+    enabled = true
+  }
+
+  depends_on = [google_project_service.enabled]
+}
+
+resource "google_storage_bucket_iam_member" "runtime_scripts_object_admin" {
+  bucket = google_storage_bucket.generator_scripts.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.generator_runtime.email}"
 }
 
 # ── Cloud Run Job: headless provisioner ───────────────────────────────────────
