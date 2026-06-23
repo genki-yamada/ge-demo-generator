@@ -72,6 +72,7 @@ const { services } = buildServices({
   secretManagerClient,
   storageClient: storage,
   config,
+  registry,
 });
 
 // ─── App ───────────────────────────────────────────────────────────────────────

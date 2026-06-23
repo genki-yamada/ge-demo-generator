@@ -81,10 +81,12 @@ describe('buildServices — composition root', () => {
       'regenerateGoal',
       'updateInstruction',
       'appConfig',
+      'cleanupRunner',
     ]) {
       expect(services, `missing key: ${key}`).toHaveProperty(key);
     }
-    // The retired single-instance secretStore must NOT be present.
+    // The retired single-instance secretStore must NOT be present as a separate key.
+    // (scriptStore is the GCS-backed store; secretStore was the old per-instance SM store.)
     expect(services).not.toHaveProperty('secretStore');
   });
 
@@ -182,5 +184,39 @@ describe('buildServices — composition root', () => {
     delete clientsNoVersion.config.appVersion;
     const { services: svc } = buildServices(clientsNoVersion);
     expect(svc.appConfig.appVersion).toBe('v10.100-public');
+  });
+});
+
+describe('buildServices — cleanupRunner wiring', () => {
+  it('cleanupRunner is undefined when no registry is passed', () => {
+    const clients = makeFakeClients();
+    const { services } = buildServices(clients);
+    expect(services.cleanupRunner).toBeUndefined();
+  });
+
+  it('cleanupRunner is undefined when storageClient is absent (scriptStore cannot be built)', () => {
+    const clients = makeFakeClients();
+    delete clients.storageClient;
+    const fakeRegistry = {
+      startCleanup: vi.fn(),
+      finishCleanup: vi.fn(),
+      get: vi.fn(),
+      list: vi.fn(),
+    };
+    const { services } = buildServices({ ...clients, registry: fakeRegistry });
+    expect(services.cleanupRunner).toBeUndefined();
+  });
+
+  it('cleanupRunner is present with runCleanup when registry and storageClient are both provided', () => {
+    const clients = makeFakeClients();
+    const fakeRegistry = {
+      startCleanup: vi.fn(),
+      finishCleanup: vi.fn(),
+      get: vi.fn(),
+      list: vi.fn(),
+    };
+    const { services } = buildServices({ ...clients, registry: fakeRegistry });
+    expect(services.cleanupRunner).toBeDefined();
+    expect(typeof services.cleanupRunner.runCleanup).toBe('function');
   });
 });
