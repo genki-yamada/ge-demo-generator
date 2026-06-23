@@ -42,4 +42,15 @@ export class DemoRegistry {
     await this.store.put(updated);
     return updated;
   }
+
+  async startCleanup(id, now) {
+    const demo = await this.store.get(id);
+    if (!demo) throw new Error(`demo not found: ${id}`);
+    if (demo.state === 'building') throw new Error(`cannot cleanup while building: ${id}`);
+    return this.transition(id, 'deleting', now);
+  }
+
+  async finishCleanup(id, ok, now) {
+    return this.transition(id, ok ? 'deleted' : 'delete_failed', now);
+  }
 }
