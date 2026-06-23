@@ -7,6 +7,8 @@ const OBJECT_NAME = `scripts/${DEMO_ID}.sh`;
 const GCS_URI = `gs://${BUCKET}/${OBJECT_NAME}`;
 const CLEANUP_OBJECT_NAME = `scripts/${DEMO_ID}-cleanup.sh`;
 const CLEANUP_GCS_URI = `gs://${BUCKET}/${CLEANUP_OBJECT_NAME}`;
+const HEADLESS_OBJECT_NAME = `scripts/${DEMO_ID}-headless.sh`;
+const HEADLESS_GCS_URI = `gs://${BUCKET}/${HEADLESS_OBJECT_NAME}`;
 
 function makeFakeStorage() {
   const fakeFile = {
@@ -120,6 +122,41 @@ describe('makeScriptStore', () => {
 
     it('calls delete() with { ignoreNotFound: true }', async () => {
       await store.removeCleanup(DEMO_ID);
+      expect(fakeFile.delete).toHaveBeenCalledWith({ ignoreNotFound: true });
+    });
+  });
+
+  describe('saveHeadless(demoId, scriptText)', () => {
+    it('calls storage.bucket with the correct bucket name', async () => {
+      await store.saveHeadless(DEMO_ID, '#!/bin/bash\necho headless');
+      expect(storage.bucket).toHaveBeenCalledWith(BUCKET);
+    });
+
+    it('calls file() with the headless object name (demoId-headless.sh)', async () => {
+      await store.saveHeadless(DEMO_ID, '#!/bin/bash\necho headless');
+      expect(fakeBucket.file).toHaveBeenCalledWith(HEADLESS_OBJECT_NAME);
+    });
+
+    it('calls save() with the script text and correct contentType', async () => {
+      const script = '#!/bin/bash\necho headless';
+      await store.saveHeadless(DEMO_ID, script);
+      expect(fakeFile.save).toHaveBeenCalledWith(script, { contentType: 'text/x-shellscript' });
+    });
+
+    it('returns the gs:// URI for the headless object', async () => {
+      const uri = await store.saveHeadless(DEMO_ID, '#!/bin/bash\necho headless');
+      expect(uri).toBe(HEADLESS_GCS_URI);
+    });
+  });
+
+  describe('removeHeadless(demoId)', () => {
+    it('calls file() with the headless object name (demoId-headless.sh)', async () => {
+      await store.removeHeadless(DEMO_ID);
+      expect(fakeBucket.file).toHaveBeenCalledWith(HEADLESS_OBJECT_NAME);
+    });
+
+    it('calls delete() with { ignoreNotFound: true }', async () => {
+      await store.removeHeadless(DEMO_ID);
       expect(fakeFile.delete).toHaveBeenCalledWith({ ignoreNotFound: true });
     });
   });

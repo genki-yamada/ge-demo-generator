@@ -203,12 +203,24 @@ export function demosRouter(registry, services = {}) {
       // 3. Deinteractivize the setup script for headless execution
       const headlessScript = deinteractivize(result.setupScript);
 
+      // 3b. Upload headless script to GCS and use the URI as scriptRef.
+      //     This avoids passing ~600KB text as a Cloud Run env var (env size limit).
+      //     Falls back to raw script text if scriptStore is absent or upload fails.
+      let scriptRef = headlessScript;
+      if (scriptStore) {
+        try {
+          scriptRef = await scriptStore.saveHeadless(result.demoId, headlessScript);
+        } catch (e) {
+          console.error('[saveHeadless] GCS upload failed, falling back to inline script:', e?.message ?? e);
+        }
+      }
+
       // 4. Fire-and-forget: kick runProvision without awaiting
       //    Errors are caught and logged only — response is already sent.
       Promise.resolve().then(() =>
         jobRunner.runProvision({
           demo: { id: result.demoId, domain: result.domainName, suffix: result.suffix },
-          scriptRef: headlessScript,
+          scriptRef,
           secrets: options.credentials ?? {},
           registry,
           now: now ?? (() => new Date().toISOString()),
