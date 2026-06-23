@@ -4,7 +4,11 @@ FROM google/cloud-sdk:slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 \
       python3-venv \
+      python3-pip \
       curl \
+      jq \
+      make \
+      git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv (fast Python package manager used by generated setup scripts).
