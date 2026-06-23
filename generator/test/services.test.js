@@ -68,6 +68,9 @@ describe('buildServices — composition root', () => {
       'optimizeGoal',
       'analyzeMcp',
       'now',
+      'regenerateGoal',
+      'updateInstruction',
+      'appConfig',
     ]) {
       expect(services, `missing key: ${key}`).toHaveProperty(key);
     }
@@ -136,5 +139,38 @@ describe('buildServices — composition root', () => {
   it('now() returns an ISO timestamp string', () => {
     expect(typeof services.now).toBe('function');
     expect(services.now()).toMatch(NOW_RE);
+  });
+
+  it('regenerateGoal is a two-arg function that calls vertexClient', async () => {
+    clients.vertexClient.generateContent.mockResolvedValueOnce('Generated goal text');
+    const companyInfo = { companyName: 'Acme', industry: 'Retail', companySummary: 'A retailer.' };
+    const selectedWorkflows = [{ name: 'Inventory', reason: 'Good candidate.' }];
+    const result = await services.regenerateGoal(companyInfo, selectedWorkflows);
+    expect(clients.vertexClient.generateContent).toHaveBeenCalledOnce();
+    expect(result.success).toBe(true);
+    expect(result.goal).toBe('Generated goal text');
+  });
+
+  it('updateInstruction is a three-arg function that performs the string replacement', () => {
+    expect(typeof services.updateInstruction).toBe('function');
+    expect(services.updateInstruction.length).toBe(3);
+    // A no-op call (no marker in script) returns the script unchanged
+    const script = '#!/bin/bash\necho hi';
+    const result = services.updateInstruction(script, 'business', 'technical');
+    expect(result).toBe(script);
+  });
+
+  it('appConfig contains appVersion and model from config', () => {
+    expect(services.appConfig).toMatchObject({
+      appVersion: 'v10.100-public',
+      model: 'gemini-3.5-flash',
+    });
+  });
+
+  it('appConfig.appVersion falls back to v10.100-public when config.appVersion is undefined', () => {
+    const clientsNoVersion = makeFakeClients();
+    delete clientsNoVersion.config.appVersion;
+    const { services: svc } = buildServices(clientsNoVersion);
+    expect(svc.appConfig.appVersion).toBe('v10.100-public');
   });
 });

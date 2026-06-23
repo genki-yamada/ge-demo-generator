@@ -1,6 +1,10 @@
 import express from 'express';
-import { demosRouter } from './routes/demos.js';
+import { fileURLToPath } from 'url';
+import { join, dirname } from 'path';
+import { demosRouter, generateRouter } from './routes/demos.js';
 import { planningRouter } from './routes/planning.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Build the Express application.
@@ -11,11 +15,17 @@ import { planningRouter } from './routes/planning.js';
  * @param {object} [opts.services={}]    - Optional injected services for Plan C routes.
  *   When omitted or empty, Plan A GET routes and /health continue to work unchanged.
  *   Shape: { generateDemo, deinteractivize, jobRunner, secretStore,
- *            research, optimizeGoal, analyzeMcp, now }
+ *            research, optimizeGoal, analyzeMcp, now,
+ *            regenerateGoal, updateInstruction, appConfig }
  */
 export function buildApp({ registry, authMiddleware, services = {} }) {
   const app = express();
   app.use(express.json());
+
+  // 静的UI（generator/web/）は IAP がエッジで保護するため authMiddleware の外で配信する。
+  // generator/web/ はまだ存在しない（U-2 が作成）。存在しなくても起動は問題ない。
+  const webDir = join(__dirname, '..', 'web');
+  app.use(express.static(webDir));
 
   // 認証不要のヘルスチェック。
   // 注意: 厳密パス /healthz は GCP の GFE がヘルスチェック用に予約しており、
@@ -25,11 +35,25 @@ export function buildApp({ registry, authMiddleware, services = {} }) {
   // /api 配下は認証必須
   app.use('/api', authMiddleware);
 
+  // GET /api/config — UI が appVersion・model・userEmail を取得する
+  app.get('/api/config', (req, res) => {
+    const { appVersion, model } = services.appConfig ?? {};
+    res.json({
+      appVersion: appVersion ?? null,
+      model: model ?? null,
+      userEmail: req.user?.email ?? null,
+    });
+  });
+
   // demos routes: Plan A (GET /) + Plan C (POST /, GET /:id/status)
   app.use('/api/demos', demosRouter(registry, services));
 
+  // generate route: POST /api/generate — sync, returns full generateDemo result, no job kick
+  app.use('/api/generate', generateRouter(registry, services));
+
   // planning routes (Plan C): only mounted when services are provided
-  if (services.research || services.optimizeGoal || services.analyzeMcp) {
+  if (services.research || services.optimizeGoal || services.analyzeMcp ||
+      services.regenerateGoal || services.updateInstruction) {
     app.use('/api', planningRouter(services));
   }
 

@@ -221,3 +221,241 @@ describe('POST /api/mcp/analyze', () => {
     expect(res.status).toBe(401);
   });
 });
+
+// ─── POST /api/regenerate-goal ────────────────────────────────────────────────
+
+describe('POST /api/regenerate-goal', () => {
+  let app;
+  let services;
+
+  beforeEach(() => {
+    services = makeStubServices({
+      regenerateGoal: vi.fn().mockResolvedValue({ success: true, goal: 'New scenario text' }),
+    });
+    app = buildApp({
+      registry: new DemoRegistry(new MemoryStore()),
+      authMiddleware: passThroughAuth,
+      services,
+    });
+  });
+
+  it('returns goal for valid companyInfo and selectedWorkflows', async () => {
+    const companyInfo = { companyName: 'Acme', industry: 'Retail', companySummary: 'A retailer.' };
+    const selectedWorkflows = [{ name: 'Inventory', reason: 'Automatable.' }];
+    const res = await request(app)
+      .post('/api/regenerate-goal')
+      .send({ companyInfo, selectedWorkflows });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.goal).toBe('New scenario text');
+  });
+
+  it('calls regenerateGoal service with companyInfo and selectedWorkflows', async () => {
+    const companyInfo = { companyName: 'Acme', industry: 'Retail', companySummary: 'A retailer.' };
+    const selectedWorkflows = [{ name: 'Inventory', reason: 'Automatable.' }];
+    await request(app)
+      .post('/api/regenerate-goal')
+      .send({ companyInfo, selectedWorkflows });
+
+    expect(services.regenerateGoal).toHaveBeenCalledOnce();
+    expect(services.regenerateGoal).toHaveBeenCalledWith(companyInfo, selectedWorkflows);
+  });
+
+  it('returns 400 when companyInfo is missing', async () => {
+    const res = await request(app)
+      .post('/api/regenerate-goal')
+      .send({ selectedWorkflows: [{ name: 'W', reason: 'R' }] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/companyInfo/i);
+  });
+
+  it('returns 400 when selectedWorkflows is missing', async () => {
+    const res = await request(app)
+      .post('/api/regenerate-goal')
+      .send({ companyInfo: { companyName: 'Acme' } });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/selectedWorkflows/i);
+  });
+
+  it('returns 400 when body is empty', async () => {
+    const res = await request(app)
+      .post('/api/regenerate-goal')
+      .send({});
+
+    expect(res.status).toBe(400);
+  });
+
+  it('passes through service failure as 200', async () => {
+    services.regenerateGoal.mockResolvedValue({ success: false, error: 'AI failed' });
+    const res = await request(app)
+      .post('/api/regenerate-goal')
+      .send({
+        companyInfo: { companyName: 'Acme', industry: 'Retail', companySummary: 'A retailer.' },
+        selectedWorkflows: [{ name: 'W', reason: 'R' }],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('returns 401 when auth middleware rejects', async () => {
+    const denyAuth = (req, res) => res.status(401).json({ error: 'denied' });
+    const restrictedApp = buildApp({
+      registry: new DemoRegistry(new MemoryStore()),
+      authMiddleware: denyAuth,
+      services,
+    });
+    const res = await request(restrictedApp)
+      .post('/api/regenerate-goal')
+      .send({
+        companyInfo: { companyName: 'Acme', industry: 'Retail', companySummary: '' },
+        selectedWorkflows: [{ name: 'W', reason: 'R' }],
+      });
+
+    expect(res.status).toBe(401);
+  });
+});
+
+// ─── POST /api/update-instruction ────────────────────────────────────────────
+
+describe('POST /api/update-instruction', () => {
+  let app;
+  let services;
+  const UPDATED_SCRIPT = '#!/bin/bash\n# updated';
+
+  beforeEach(() => {
+    services = makeStubServices({
+      updateInstruction: vi.fn().mockReturnValue(UPDATED_SCRIPT),
+    });
+    app = buildApp({
+      registry: new DemoRegistry(new MemoryStore()),
+      authMiddleware: passThroughAuth,
+      services,
+    });
+  });
+
+  it('returns { setupScript } for valid inputs', async () => {
+    const res = await request(app)
+      .post('/api/update-instruction')
+      .send({
+        setupScript: '#!/bin/bash\noriginal',
+        businessInstruction: 'Business text.',
+        technicalInstruction: 'Technical text.',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('setupScript', UPDATED_SCRIPT);
+  });
+
+  it('calls updateInstruction with setupScript, businessInstruction, technicalInstruction', async () => {
+    await request(app)
+      .post('/api/update-instruction')
+      .send({
+        setupScript: 'original',
+        businessInstruction: 'Biz.',
+        technicalInstruction: 'Tech.',
+      });
+
+    expect(services.updateInstruction).toHaveBeenCalledOnce();
+    expect(services.updateInstruction).toHaveBeenCalledWith('original', 'Biz.', 'Tech.');
+  });
+
+  it('returns 400 when setupScript is missing', async () => {
+    const res = await request(app)
+      .post('/api/update-instruction')
+      .send({ businessInstruction: 'Biz.', technicalInstruction: 'Tech.' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/setupScript/i);
+  });
+
+  it('returns 400 when businessInstruction is missing', async () => {
+    const res = await request(app)
+      .post('/api/update-instruction')
+      .send({ setupScript: 'original', technicalInstruction: 'Tech.' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/businessInstruction/i);
+  });
+
+  it('returns 400 when technicalInstruction is missing', async () => {
+    const res = await request(app)
+      .post('/api/update-instruction')
+      .send({ setupScript: 'original', businessInstruction: 'Biz.' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/technicalInstruction/i);
+  });
+
+  it('returns 401 when auth middleware rejects', async () => {
+    const denyAuth = (req, res) => res.status(401).json({ error: 'denied' });
+    const restrictedApp = buildApp({
+      registry: new DemoRegistry(new MemoryStore()),
+      authMiddleware: denyAuth,
+      services,
+    });
+    const res = await request(restrictedApp)
+      .post('/api/update-instruction')
+      .send({ setupScript: 'x', businessInstruction: 'y', technicalInstruction: 'z' });
+
+    expect(res.status).toBe(401);
+  });
+});
+
+// ─── GET /api/config ──────────────────────────────────────────────────────────
+
+describe('GET /api/config', () => {
+  let app;
+  let services;
+
+  beforeEach(() => {
+    services = makeStubServices({
+      appConfig: { appVersion: 'v10.100-public', model: 'gemini-3.5-flash' },
+    });
+    app = buildApp({
+      registry: new DemoRegistry(new MemoryStore()),
+      authMiddleware: passThroughAuth,
+      services,
+    });
+  });
+
+  it('returns { appVersion, model, userEmail } when authenticated', async () => {
+    const res = await request(app).get('/api/config');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      appVersion: 'v10.100-public',
+      model: 'gemini-3.5-flash',
+      userEmail: 'ce@example.com',
+    });
+  });
+
+  it('returns 401 when auth middleware rejects', async () => {
+    const denyAuth = (req, res) => res.status(401).json({ error: 'denied' });
+    const restrictedApp = buildApp({
+      registry: new DemoRegistry(new MemoryStore()),
+      authMiddleware: denyAuth,
+      services,
+    });
+    const res = await request(restrictedApp).get('/api/config');
+    expect(res.status).toBe(401);
+  });
+
+  it('returns empty/fallback appConfig when services.appConfig is not provided', async () => {
+    const servicesWithoutConfig = makeStubServices();
+    // appConfig not in makeStubServices default — omit it
+    delete servicesWithoutConfig.appConfig;
+    const appWithoutConfig = buildApp({
+      registry: new DemoRegistry(new MemoryStore()),
+      authMiddleware: passThroughAuth,
+      services: servicesWithoutConfig,
+    });
+    const res = await request(appWithoutConfig).get('/api/config');
+    // Should still return 200 with graceful empty/null values
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('userEmail', 'ce@example.com');
+  });
+});

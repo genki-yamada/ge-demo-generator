@@ -15,6 +15,56 @@ import { Router } from 'express';
  *   The route supplies only `{ userEmail, registry, now }` and merges them at call time.
  *   Do NOT assign the raw `generateDemo` export here — it needs ~12 deps and will crash.
  */
+
+/**
+ * generateRouter — POST /api/generate (sync generate-only endpoint).
+ *
+ * Returns the FULL generateDemo result (setupScript, dataPreview, systemInstruction,
+ * demoId, suffix, etc.) synchronously without kicking a Cloud Run Job.
+ * Intended for the UI "manual run" UX — the caller receives the setup script and
+ * can run it themselves (matching the original GAS UX).
+ *
+ * Does NOT call deinteractivize or jobRunner.runProvision.
+ *
+ * @param {object} registry  - DemoRegistry instance
+ * @param {object} [services={}] - Same shape as demosRouter services.
+ */
+export function generateRouter(registry, services = {}) {
+  const router = Router();
+
+  router.post('/', async (req, res, next) => {
+    try {
+      const { userGoal, options = {} } = req.body ?? {};
+
+      if (!userGoal) {
+        return res.status(400).json({ error: 'userGoal is required' });
+      }
+
+      const { generateDemo, now } = services;
+
+      // Guard: if generate service is not configured, return an honest 503 rather
+      // than a confusing TypeError→500.
+      if (typeof generateDemo !== 'function') {
+        return res.status(503).json({ error: 'build service not configured' });
+      }
+
+      // Orchestrate demo generation (registers building state internally) and
+      // return the FULL result — no job kick, no deinteractivize.
+      const result = await generateDemo(userGoal, options, {
+        userEmail: req.user?.email,
+        registry,
+        now: now ?? (() => new Date().toISOString()),
+      });
+
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  return router;
+}
+
 export function demosRouter(registry, services = {}) {
   const router = Router();
 
