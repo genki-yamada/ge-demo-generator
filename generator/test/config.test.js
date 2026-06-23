@@ -13,6 +13,7 @@ describe('loadConfig', () => {
     expect(cfg.retryDelayMs).toBe(1000);
     expect(cfg.databaseId).toBe('generator');
     expect(cfg.githubToken).toBeNull();
+    expect(cfg.scriptsBucket).toBe('');
   });
 
   it('respects env overrides', () => {
@@ -26,6 +27,7 @@ describe('loadConfig', () => {
       AGENT_RETRY_DELAY_MS: '2000',
       FIRESTORE_DATABASE_ID: 'custom-db',
       GITHUB_TOKEN: 'ghp_secret',
+      GENERATOR_SCRIPTS_BUCKET: 'my-scripts-bucket',
     });
     expect(cfg.projectId).toBe('my-project');
     expect(cfg.region).toBe('us-central1');
@@ -36,6 +38,7 @@ describe('loadConfig', () => {
     expect(cfg.retryDelayMs).toBe(2000);
     expect(cfg.databaseId).toBe('custom-db');
     expect(cfg.githubToken).toBe('ghp_secret');
+    expect(cfg.scriptsBucket).toBe('my-scripts-bucket');
   });
 
   it('maxRetries and retryDelayMs are numbers (not strings)', () => {

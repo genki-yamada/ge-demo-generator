@@ -40,7 +40,7 @@ export function generateRouter(registry, services = {}) {
         return res.status(400).json({ error: 'userGoal is required' });
       }
 
-      const { generateDemo, now } = services;
+      const { generateDemo, scriptStore, now } = services;
 
       // Guard: if generate service is not configured, return an honest 503 rather
       // than a confusing TypeError→500.
@@ -55,6 +55,14 @@ export function generateRouter(registry, services = {}) {
         registry,
         now: now ?? (() => new Date().toISOString()),
       });
+
+      if (scriptStore && result?.demoId && result?.setupScript) {
+        try {
+          const uri = await scriptStore.save(result.demoId, result.setupScript);
+          await registry.setScriptUri(result.demoId, uri, (now ?? (() => new Date().toISOString()))());
+          result.scriptGcsUri = uri;
+        } catch (e) { console.error('script save failed', e); }
+      }
 
       res.json(result);
     } catch (err) {
@@ -122,7 +130,7 @@ export function demosRouter(registry, services = {}) {
         return res.status(400).json({ error: 'userGoal is required' });
       }
 
-      const { generateDemo, deinteractivize, jobRunner, makeSecretStore, now } = services;
+      const { generateDemo, deinteractivize, jobRunner, makeSecretStore, scriptStore, now } = services;
 
       // Guard: if build services are not configured, return an honest 503 rather
       // than a confusing TypeError→500 (production wiring in server.js still TODO).
@@ -136,6 +144,17 @@ export function demosRouter(registry, services = {}) {
         registry,
         now: now ?? (() => new Date().toISOString()),
       });
+
+      // 1b. Persist setup script to GCS and record the URI in the registry.
+      //     Failures are non-fatal: we log and continue so the provisioner
+      //     response is not blocked by an optional persistence step.
+      if (scriptStore && result?.demoId && result?.setupScript) {
+        try {
+          const uri = await scriptStore.save(result.demoId, result.setupScript);
+          await registry.setScriptUri(result.demoId, uri, (now ?? (() => new Date().toISOString()))());
+          result.scriptGcsUri = uri;
+        } catch (e) { console.error('script save failed', e); }
+      }
 
       // 2. Store credentials in Secret Manager if provided.
       //    The secret store is PER-REQUEST: secret names embed result.suffix

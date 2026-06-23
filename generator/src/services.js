@@ -42,6 +42,7 @@ import { generateDemo as generateDemoImpl } from './planning/generate-demo.js';
 import { makeSecretStore as makeSecretStoreImpl } from './provision/secrets.js';
 import { makeJobRunner } from './provision/job-runner.js';
 import { deinteractivize } from './provision/deinteractivize.js';
+import { makeScriptStore } from './provision/script-store.js';
 
 /**
  * @param {object} clients
@@ -52,7 +53,7 @@ import { deinteractivize } from './provision/deinteractivize.js';
  * @param {object} clients.config                - loadConfig(env) + { jobName, appVersion? }
  * @returns {{ services: object }}
  */
-export function buildServices({ vertexClient, bqClient, jobsClient, secretManagerClient, config }) {
+export function buildServices({ vertexClient, bqClient, jobsClient, secretManagerClient, storageClient, config }) {
   // GAS-shaped wrapper: (prompt) => Promise<text>. generateSetupScript calls this.
   const callVertexAI = async (prompt) => vertexClient.generateContent(prompt);
 
@@ -97,6 +98,10 @@ export function buildServices({ vertexClient, bqClient, jobsClient, secretManage
     jobName: config.jobName,
   });
 
+  const scriptStore = storageClient
+    ? makeScriptStore({ bucket: config.scriptsBucket, storage: storageClient })
+    : undefined;
+
   const now = () => new Date().toISOString();
 
   // generate-demo.js: PARTIAL. Pre-bind all planning sub-deps; the route supplies
@@ -132,6 +137,7 @@ export function buildServices({ vertexClient, bqClient, jobsClient, secretManage
     deinteractivize,
     jobRunner,
     makeSecretStore,
+    scriptStore,
     research,
     optimizeGoal,
     analyzeMcp,

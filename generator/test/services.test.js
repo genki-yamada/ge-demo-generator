@@ -31,6 +31,14 @@ function makeFakeClients(overrides = {}) {
   const accessSecretVersion = vi.fn();
   const secretManagerClient = { createSecret, addSecretVersion, accessSecretVersion };
 
+  const fakeFile = {
+    save: vi.fn().mockResolvedValue(undefined),
+    download: vi.fn().mockResolvedValue([Buffer.from('script')]),
+    delete: vi.fn().mockResolvedValue(undefined),
+  };
+  const fakeBucket = { file: vi.fn().mockReturnValue(fakeFile) };
+  const storageClient = { bucket: vi.fn().mockReturnValue(fakeBucket) };
+
   const config = {
     projectId: 'proj-123',
     region: 'asia-northeast1',
@@ -43,9 +51,10 @@ function makeFakeClients(overrides = {}) {
     githubToken: 'ghp_fake',
     jobName: 'provisioner',
     appVersion: 'v10.100-public',
+    scriptsBucket: 'test-scripts-bucket',
   };
 
-  return { vertexClient, bqClient, jobsClient, secretManagerClient, config, ...overrides };
+  return { vertexClient, bqClient, jobsClient, secretManagerClient, storageClient, config, ...overrides };
 }
 
 describe('buildServices — composition root', () => {
@@ -64,6 +73,7 @@ describe('buildServices — composition root', () => {
       'deinteractivize',
       'jobRunner',
       'makeSecretStore',
+      'scriptStore',
       'research',
       'optimizeGoal',
       'analyzeMcp',

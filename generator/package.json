@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/server.js",
     "test": "vitest run",
@@ -14,6 +16,7 @@
     "@google-cloud/firestore": "^7.10.0",
     "@google-cloud/run": "^1.4.0",
     "@google-cloud/secret-manager": "^5.6.0",
+    "@google-cloud/storage": "^7.21.0",
     "express": "^4.21.2",
     "google-auth-library": "^9.15.0"
   },

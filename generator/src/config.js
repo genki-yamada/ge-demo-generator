@@ -18,5 +18,6 @@ export function loadConfig(env = process.env) {
     retryDelayMs: Number(env.AGENT_RETRY_DELAY_MS || 1000),   // Code.gs CONFIG.RETRY_DELAY_MS
     databaseId: env.FIRESTORE_DATABASE_ID || 'generator',
     githubToken: env.GITHUB_TOKEN || null,
+    scriptsBucket: env.GENERATOR_SCRIPTS_BUCKET || '',
   };
 }
