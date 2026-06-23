@@ -1,6 +1,7 @@
 import { BigQuery } from '@google-cloud/bigquery';
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
 import { JobsClient } from '@google-cloud/run';
+import { Storage } from '@google-cloud/storage';
 import { GoogleAuth } from 'google-auth-library';
 
 import { buildApp } from './app.js';
@@ -59,6 +60,7 @@ const vertexClient = makeVertexClient({
 const bqClient = makeBqClient({ bigquery: new BigQuery({ projectId: config.projectId }) });
 const secretManagerClient = new SecretManagerServiceClient();
 const jobsClient = new JobsClient();
+const storage = new Storage();
 
 // generateImage (Vertex image model) is DEFERRED — not wired here. planAndGenerateData
 // no-ops the image-gen branch when its generateImage dep is undefined (see services.js).
@@ -68,7 +70,9 @@ const { services } = buildServices({
   bqClient,
   jobsClient,
   secretManagerClient,
+  storageClient: storage,
   config,
+  registry,
 });
 
 // ─── App ───────────────────────────────────────────────────────────────────────

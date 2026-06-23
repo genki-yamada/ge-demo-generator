@@ -35,12 +35,14 @@ function makeStubServices(overrides = {}) {
   const optimizeGoal = vi.fn().mockResolvedValue({ success: true, optimizedGoal: 'refined goal' });
   const analyzeMcp = vi.fn().mockResolvedValue({ success: true, data: { is_supported: true } });
   const now = vi.fn().mockReturnValue(NOW);
+  const scriptStore = { save: vi.fn().mockResolvedValue('gs://test-bucket/scripts/demo-x-abcd1234.sh') };
 
   return {
     generateDemo,
     deinteractivize,
     jobRunner,
     makeSecretStore,
+    scriptStore,
     research,
     optimizeGoal,
     analyzeMcp,
@@ -197,6 +199,47 @@ describe('POST /api/demos — build start', () => {
 
     expect(res.status).toBe(503);
     expect(res.body.error).toMatch(/build service not configured/i);
+  });
+
+  it('calls scriptStore.save with demoId and setupScript after generateDemo', async () => {
+    await request(app)
+      .post('/api/demos')
+      .send({ userGoal: 'agent' });
+
+    expect(services.scriptStore.save).toHaveBeenCalledOnce();
+    const [demoId, scriptText] = services.scriptStore.save.mock.calls[0];
+    expect(demoId).toBe('demo-x-abcd1234');
+    expect(scriptText).toBe('#!/bin/bash\necho hello');
+  });
+
+  it('calls registry.setScriptUri with demoId and the GCS URI after save', async () => {
+    // Pre-register the demo so setScriptUri can find it (generateDemo stub does not
+    // write to the registry itself).
+    await registry.register({
+      domain: 'x',
+      suffix: 'abcd1234',
+      ownerCe: 'ce@example.com',
+      goal: 'agent',
+      now: NOW,
+    });
+
+    await request(app)
+      .post('/api/demos')
+      .send({ userGoal: 'agent' });
+
+    const demo = await registry.get('demo-x-abcd1234');
+    expect(demo?.scriptGcsUri).toBe('gs://test-bucket/scripts/demo-x-abcd1234.sh');
+  });
+
+  it('tolerates scriptStore.save failure — still returns 202', async () => {
+    services.scriptStore.save.mockRejectedValueOnce(new Error('GCS unavailable'));
+    const res = await request(app)
+      .post('/api/demos')
+      .send({ userGoal: 'agent' });
+
+    expect(res.status).toBe(202);
+    expect(res.body.demoId).toBe('demo-x-abcd1234');
+    expect(res.body.state).toBe('building');
   });
 });
 

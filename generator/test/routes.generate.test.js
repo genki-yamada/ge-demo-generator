@@ -34,11 +34,13 @@ function makeStubServices(overrides = {}) {
   const runProvision = vi.fn().mockResolvedValue({ ok: true });
   const jobRunner = { runProvision };
   const now = vi.fn().mockReturnValue(NOW);
+  const scriptStore = { save: vi.fn().mockResolvedValue('gs://test-bucket/scripts/demo-retail-abcd1234.sh') };
 
   return {
     generateDemo,
     deinteractivize,
     jobRunner,
+    scriptStore,
     now,
     ...overrides,
   };
@@ -150,5 +152,45 @@ describe('POST /api/generate — sync generate-only', () => {
 
     const [, opts] = services.generateDemo.mock.calls[0];
     expect(opts).toEqual({});
+  });
+
+  it('calls scriptStore.save with demoId and setupScript', async () => {
+    await request(app)
+      .post('/api/generate')
+      .send({ userGoal: 'retail agent' });
+
+    expect(services.scriptStore.save).toHaveBeenCalledOnce();
+    const [demoId, scriptText] = services.scriptStore.save.mock.calls[0];
+    expect(demoId).toBe('demo-retail-abcd1234');
+    expect(scriptText).toBe('#!/bin/bash\necho hello');
+  });
+
+  it('calls registry.setScriptUri after save', async () => {
+    // Pre-register the demo so setScriptUri can find it.
+    await registry.register({
+      domain: 'retail',
+      suffix: 'abcd1234',
+      ownerCe: 'ce@example.com',
+      goal: 'retail agent',
+      now: NOW,
+    });
+
+    await request(app)
+      .post('/api/generate')
+      .send({ userGoal: 'retail agent' });
+
+    const demo = await registry.get('demo-retail-abcd1234');
+    expect(demo?.scriptGcsUri).toBe('gs://test-bucket/scripts/demo-retail-abcd1234.sh');
+  });
+
+  it('tolerates scriptStore.save failure — still returns 200', async () => {
+    services.scriptStore.save.mockRejectedValueOnce(new Error('GCS unavailable'));
+    const res = await request(app)
+      .post('/api/generate')
+      .send({ userGoal: 'retail agent' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.demoId).toBe('demo-retail-abcd1234');
+    expect(res.body.success).toBe(true);
   });
 });

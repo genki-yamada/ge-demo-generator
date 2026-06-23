@@ -62,4 +62,82 @@ describe('DemoRegistry', () => {
     expect(updated.state).toBe('building');
     expect(updated.updatedAt).toBe(later);
   });
+
+  describe('startCleanup', () => {
+    it('transitions active → deleting', async () => {
+      await registry.register({ domain: 'c', suffix: '1', ownerCe: 'c', now });
+      await registry.transition('demo-c-1', 'active', later);
+      const result = await registry.startCleanup('demo-c-1', later);
+      expect(result.state).toBe('deleting');
+    });
+
+    it('transitions build_failed → deleting', async () => {
+      await registry.register({ domain: 'c', suffix: '2', ownerCe: 'c', now });
+      await registry.transition('demo-c-2', 'build_failed', later);
+      const result = await registry.startCleanup('demo-c-2', later);
+      expect(result.state).toBe('deleting');
+    });
+
+    it('transitions delete_failed → deleting (retry)', async () => {
+      await registry.register({ domain: 'c', suffix: '3', ownerCe: 'c', now });
+      await registry.transition('demo-c-3', 'active', later);
+      await registry.transition('demo-c-3', 'deleting', later);
+      await registry.transition('demo-c-3', 'delete_failed', later);
+      const result = await registry.startCleanup('demo-c-3', later);
+      expect(result.state).toBe('deleting');
+    });
+
+    it('rejects with building guard when state=building', async () => {
+      await registry.register({ domain: 'c', suffix: '4', ownerCe: 'c', now });
+      // state is 'building' after register
+      await expect(registry.startCleanup('demo-c-4', later)).rejects.toThrow(
+        /cannot cleanup while building/,
+      );
+    });
+
+    it('rejects via state machine when already deleting', async () => {
+      await registry.register({ domain: 'c', suffix: '5', ownerCe: 'c', now });
+      await registry.transition('demo-c-5', 'active', later);
+      await registry.transition('demo-c-5', 'deleting', later);
+      await expect(registry.startCleanup('demo-c-5', later)).rejects.toThrow(/invalid transition/);
+    });
+
+    it('rejects via state machine when already deleted (terminal)', async () => {
+      await registry.register({ domain: 'c', suffix: '6', ownerCe: 'c', now });
+      await registry.transition('demo-c-6', 'active', later);
+      await registry.transition('demo-c-6', 'deleting', later);
+      await registry.transition('demo-c-6', 'deleted', later);
+      await expect(registry.startCleanup('demo-c-6', later)).rejects.toThrow(/invalid transition/);
+    });
+
+    it('throws for unknown id', async () => {
+      await expect(registry.startCleanup('demo-missing-x', later)).rejects.toThrow(/not found/);
+    });
+  });
+
+  describe('finishCleanup', () => {
+    it('transitions deleting → deleted when ok=true', async () => {
+      await registry.register({ domain: 'f', suffix: '1', ownerCe: 'c', now });
+      await registry.transition('demo-f-1', 'active', later);
+      await registry.transition('demo-f-1', 'deleting', later);
+      const result = await registry.finishCleanup('demo-f-1', true, later);
+      expect(result.state).toBe('deleted');
+    });
+
+    it('transitions deleting → delete_failed when ok=false', async () => {
+      await registry.register({ domain: 'f', suffix: '2', ownerCe: 'c', now });
+      await registry.transition('demo-f-2', 'active', later);
+      await registry.transition('demo-f-2', 'deleting', later);
+      const result = await registry.finishCleanup('demo-f-2', false, later);
+      expect(result.state).toBe('delete_failed');
+    });
+
+    it('rejects via state machine when not in deleting state', async () => {
+      await registry.register({ domain: 'f', suffix: '3', ownerCe: 'c', now });
+      await registry.transition('demo-f-3', 'active', later);
+      await expect(registry.finishCleanup('demo-f-3', true, later)).rejects.toThrow(
+        /invalid transition/,
+      );
+    });
+  });
 });

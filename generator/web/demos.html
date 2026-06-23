@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GE Demo Generator – Demo List</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f8fafc; color: #1e293b; padding: 2rem; }
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; }
+    a { color: #3b82f6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    thead { background: #1e293b; color: #fff; }
+    th, td { padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; }
+    tbody tr:nth-child(even) { background: #f1f5f9; }
+    tbody tr:hover { background: #e2e8f0; }
+
+    /* State badges */
+    .badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-building      { background: #dbeafe; color: #1d4ed8; }
+    .badge-active        { background: #dcfce7; color: #166534; }
+    .badge-failed        { background: #fee2e2; color: #991b1b; }
+    .badge-deleting      { background: #fef9c3; color: #92400e; }
+    .badge-deleted       { background: #f1f5f9; color: #475569; }
+    .badge-delete-failed { background: #ffe4e6; color: #9f1239; }
+    .badge-unknown       { background: #f1f5f9; color: #475569; }
+
+    /* Buttons */
+    .btn-delete { padding: 0.35rem 0.8rem; font-size: 0.8rem; border: none; border-radius: 6px;
+                  background: #ef4444; color: #fff; cursor: pointer; }
+    .btn-delete:hover { background: #dc2626; }
+    .btn-reload { padding: 0.45rem 1rem; font-size: 0.875rem; border: none; border-radius: 6px;
+                  background: #3b82f6; color: #fff; cursor: pointer; margin-bottom: 1rem; }
+    .btn-reload:hover { background: #2563eb; }
+
+    /* Confirm modal */
+    #confirmModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+                    align-items: center; justify-content: center; z-index: 1000; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 2rem; max-width: 480px;
+                 width: 90%; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+    .modal-box h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.75rem; color: #dc2626; }
+    #confirmLabel { font-size: 0.875rem; margin-bottom: 0.75rem; color: #374151; display: block; }
+    #confirmInput { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db;
+                    border-radius: 6px; font-size: 0.875rem; margin-bottom: 1rem; }
+    #confirmInput:focus { outline: 2px solid #3b82f6; border-color: transparent; }
+    .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+    #confirmBtn { padding: 0.45rem 1rem; background: #ef4444; color: #fff; border: none;
+                  border-radius: 6px; font-size: 0.875rem; cursor: pointer; }
+    #confirmBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+    #confirmBtn:not(:disabled):hover { background: #dc2626; }
+    #cancelBtn { padding: 0.45rem 1rem; background: #e5e7eb; color: #374151; border: none;
+                 border-radius: 6px; font-size: 0.875rem; cursor: pointer; }
+    #cancelBtn:hover { background: #d1d5db; }
+
+    /* Toast */
+    #toastArea { display: none; position: fixed; bottom: 1.5rem; right: 1.5rem; max-width: 380px;
+                 padding: 0.75rem 1.25rem; border-radius: 8px; font-size: 0.875rem;
+                 box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 2000; }
+    .toast-info  { background: #3b82f6; color: #fff; }
+    .toast-error { background: #ef4444; color: #fff; }
+
+    /* Nav */
+    .nav { margin-bottom: 1.5rem; font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+  <div class="nav"><a href="/">&larr; Generator</a></div>
+  <h1>Demo List</h1>
+
+  <button class="btn-reload" id="reloadBtn">Reload</button>
+
+  <div class="table-wrap">
+    <table id="demosTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Owner CE</th>
+          <th>Goal</th>
+          <th>State</th>
+          <th>Created At</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="demosTableBody">
+        <tr><td colspan="6" style="text-align:center">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Confirm modal (id="confirmModal") -->
+  <div id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+    <div class="modal-box">
+      <h2 id="confirmModalTitle">Confirm Cleanup</h2>
+      <label id="confirmLabel" for="confirmInput">Type the demo id to confirm deletion:</label>
+      <input id="confirmInput" type="text" autocomplete="off" placeholder="demo-id" />
+      <div class="modal-actions">
+        <button id="cancelBtn">Cancel</button>
+        <button id="confirmBtn" disabled>Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification area -->
+  <div id="toastArea" role="alert"></div>
+
+  <script type="module" src="demos-app.js"></script>
+
+  <script>
+    // Wire reload button (non-module script so it runs after the module self-installs).
+    // The module exports installDemosApp and self-installs on load, but we can't
+    // import here easily. Instead, just reload the page on click for simplicity.
+    document.getElementById('reloadBtn').addEventListener('click', () => location.reload());
+  </script>
+</body>
+</html>

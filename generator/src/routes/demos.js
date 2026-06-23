@@ -40,7 +40,7 @@ export function generateRouter(registry, services = {}) {
         return res.status(400).json({ error: 'userGoal is required' });
       }
 
-      const { generateDemo, now } = services;
+      const { generateDemo, scriptStore, now } = services;
 
       // Guard: if generate service is not configured, return an honest 503 rather
       // than a confusing TypeError→500.
@@ -55,6 +55,14 @@ export function generateRouter(registry, services = {}) {
         registry,
         now: now ?? (() => new Date().toISOString()),
       });
+
+      if (scriptStore && result?.demoId && result?.setupScript) {
+        try {
+          const uri = await scriptStore.save(result.demoId, result.setupScript);
+          await registry.setScriptUri(result.demoId, uri, (now ?? (() => new Date().toISOString()))());
+          result.scriptGcsUri = uri;
+        } catch (e) { console.error('script save failed', e); }
+      }
 
       res.json(result);
     } catch (err) {
@@ -98,6 +106,37 @@ export function demosRouter(registry, services = {}) {
     }
   });
 
+  // ── Plan D: POST /api/demos/:id/cleanup ──────────────────────────────────
+
+  router.post('/:id/cleanup', async (req, res, next) => {
+    try {
+      const { confirmName } = req.body ?? {};
+      const { cleanupRunner, now } = services;
+      // Fix 4: guard misconfigured deployment BEFORE the DB read to avoid a wasted roundtrip.
+      if (typeof cleanupRunner?.runCleanup !== 'function') return res.status(503).json({ error: 'cleanup service not configured' });
+      const demo = await registry.get(req.params.id);
+      if (!demo) return res.status(404).json({ error: 'not found' });
+      if (confirmName !== demo.id) return res.status(400).json({ error: 'confirmName must match the demo id' });
+      if (demo.state === 'building') return res.status(409).json({ error: 'cannot cleanup while building' });
+      if (demo.state === 'deleting') return res.status(409).json({ error: 'cleanup already in progress' });
+      let updated;
+      try {
+        updated = await registry.startCleanup(req.params.id, (now ?? (() => new Date().toISOString()))());
+      } catch (e) {
+        // Fix 3: only map state-conflict errors to 409; genuine infra errors become 500 via next(err).
+        if (/cannot cleanup while building|invalid transition/i.test(e.message)) {
+          return res.status(409).json({ error: `cannot start cleanup: ${e.message}` });
+        }
+        return next(e);
+      }
+      // Non-blocking fire-and-forget: runCleanup transitions deleting → deleted|delete_failed.
+      Promise.resolve()
+        .then(() => cleanupRunner.runCleanup({ demo: updated }))
+        .catch((err) => console.error('cleanup runner failed:', err));
+      return res.status(202).json({ demoId: updated.id, state: 'deleting' });
+    } catch (err) { next(err); }
+  });
+
   // ── Plan A: GET /api/demos/:id ────────────────────────────────────────────
 
   router.get('/:id', async (req, res, next) => {
@@ -122,7 +161,7 @@ export function demosRouter(registry, services = {}) {
         return res.status(400).json({ error: 'userGoal is required' });
       }
 
-      const { generateDemo, deinteractivize, jobRunner, makeSecretStore, now } = services;
+      const { generateDemo, deinteractivize, jobRunner, makeSecretStore, scriptStore, now } = services;
 
       // Guard: if build services are not configured, return an honest 503 rather
       // than a confusing TypeError→500 (production wiring in server.js still TODO).
@@ -136,6 +175,17 @@ export function demosRouter(registry, services = {}) {
         registry,
         now: now ?? (() => new Date().toISOString()),
       });
+
+      // 1b. Persist setup script to GCS and record the URI in the registry.
+      //     Failures are non-fatal: we log and continue so the provisioner
+      //     response is not blocked by an optional persistence step.
+      if (scriptStore && result?.demoId && result?.setupScript) {
+        try {
+          const uri = await scriptStore.save(result.demoId, result.setupScript);
+          await registry.setScriptUri(result.demoId, uri, (now ?? (() => new Date().toISOString()))());
+          result.scriptGcsUri = uri;
+        } catch (e) { console.error('script save failed', e); }
+      }
 
       // 2. Store credentials in Secret Manager if provided.
       //    The secret store is PER-REQUEST: secret names embed result.suffix
