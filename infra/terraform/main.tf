@@ -23,6 +23,7 @@ locals {
     "artifactregistry.googleapis.com",
     "iam.googleapis.com",
     "storage.googleapis.com",
+    "aiplatform.googleapis.com",
   ]
 }
 
@@ -181,6 +182,15 @@ resource "google_storage_bucket_iam_member" "runtime_scripts_object_admin" {
   member = "serviceAccount:${google_service_account.generator_runtime.email}"
 }
 
+# The provisioner Job (runner SA) downloads the headless script from GCS in its
+# entrypoint (gsutil cp $SCRIPT_REF). It needs read access to the scripts bucket.
+# (Discovered during E2E: without this the Job exits 1 on storage.objects.list.)
+resource "google_storage_bucket_iam_member" "runner_scripts_object_viewer" {
+  bucket = google_storage_bucket.generator_scripts.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.generator_runner.email}"
+}
+
 # ── Runtime SA: additional project-level IAM roles ────────────────────────────
 # The generator app (runtime SA) needs these to orchestrate provisioning jobs.
 
@@ -234,8 +244,18 @@ resource "google_cloud_run_v2_job" "provisioner" {
   template {
     template {
       service_account = google_service_account.generator_runner.email
+      # The generated setup scripts load BigQuery tables in parallel and run
+      # Python tooling; 512Mi OOMs. 4Gi/2cpu observed sufficient in E2E.
+      max_retries = 0
+      timeout     = "1800s"
       containers {
         image = var.provisioner_image
+        resources {
+          limits = {
+            cpu    = "2"
+            memory = "4Gi"
+          }
+        }
       }
     }
   }
