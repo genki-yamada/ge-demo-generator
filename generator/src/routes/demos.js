@@ -6,6 +6,11 @@ import { Router } from 'express';
  * reach it (the generated script deploys with ingress=internal). Best-effort —
  * never throws, no-ops when geRegistrar is unconfigured or the provision failed.
  *
+ * NOTE: this only opens network ingress; it does NOT grant the GE Discovery Engine
+ * SA run.invoker. Invocation stays IAM-gated (no allUsers) — the invoker binding is
+ * granted explicitly by the "register to GE" action (POST /:id/register-ge), so a
+ * built-but-unregistered demo is reachable on the network yet not invokable.
+ *
  * @param {object} services        - route services (may have geRegistrar + config)
  * @param {object} provisionResult - result of jobRunner.runProvision ({ ok, ... })
  * @param {string} demoId          - the agent Cloud Run service name (== demo id)

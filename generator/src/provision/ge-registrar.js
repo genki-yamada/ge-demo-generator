@@ -225,10 +225,12 @@ export function makeGeRegistrar({ getToken, fetchImpl, config }) {
       throw new Error(`registerAgent failed (${res.status}): ${text}`);
     }
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    // Guard against a 2xx body lacking `name` — return nulls rather than throw a raw TypeError.
+    const resourceName = data?.name ?? null;
     return {
-      agentResourceName: data.name,
-      agentId: data.name.split('/').pop(),
+      agentResourceName: resourceName,
+      agentId: resourceName ? resourceName.split('/').pop() : null,
       alreadyRegistered: false,
     };
   }
