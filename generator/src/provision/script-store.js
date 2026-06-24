@@ -16,6 +16,7 @@ export function makeScriptStore({ bucket, storage }) {
   const objectName = (demoId) => `scripts/${demoId}.sh`;
   const cleanupObjectName = (demoId) => `scripts/${demoId}-cleanup.sh`;
   const headlessObjectName = (demoId) => `scripts/${demoId}-headless.sh`;
+  const envObjectName = (demoId) => `envs/${demoId}.env`;
   return {
     async save(demoId, scriptText) {
       await storage.bucket(bucket).file(objectName(demoId)).save(scriptText, { contentType: 'text/x-shellscript' });
@@ -41,6 +42,12 @@ export function makeScriptStore({ bucket, storage }) {
     },
     async removeHeadless(demoId) {
       await storage.bucket(bucket).file(headlessObjectName(demoId)).delete({ ignoreNotFound: true });
+    },
+    envRef(demoId) {
+      return `gs://${bucket}/envs/${demoId}.env`;
+    },
+    async removeEnv(demoId) {
+      await storage.bucket(bucket).file(envObjectName(demoId)).delete({ ignoreNotFound: true });
     },
   };
 }

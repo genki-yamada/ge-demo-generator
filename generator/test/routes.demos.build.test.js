@@ -38,6 +38,7 @@ function makeStubServices(overrides = {}) {
   const scriptStore = {
     save: vi.fn().mockResolvedValue('gs://test-bucket/scripts/demo-x-abcd1234.sh'),
     saveHeadless: vi.fn().mockResolvedValue('gs://test-bucket/scripts/demo-x-abcd1234-headless.sh'),
+    envRef: vi.fn((demoId) => `gs://test-bucket/envs/${demoId}.env`),
   };
 
   return {
@@ -276,6 +277,22 @@ describe('POST /api/demos — build start', () => {
     // scriptRef must be the GCS URI, not the ~600KB script text
     expect(arg.scriptRef).toBe('gs://test-bucket/scripts/demo-x-abcd1234-headless.sh');
     expect(arg.scriptRef).toMatch(/^gs:\/\//);
+  });
+
+  it('passes envRef from scriptStore.envRef(demoId) to runProvision', async () => {
+    await request(app)
+      .post('/api/demos')
+      .send({ userGoal: 'agent' });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(services.jobRunner.runProvision).toHaveBeenCalledOnce();
+    const arg = services.jobRunner.runProvision.mock.calls[0][0];
+    // envRef must equal what scriptStore.envRef returned for the demoId
+    expect(arg.envRef).toBe(services.scriptStore.envRef('demo-x-abcd1234'));
+    expect(arg.envRef).toBe('gs://test-bucket/envs/demo-x-abcd1234.env');
   });
 
   it('tolerates scriptStore.saveHeadless failure — still kicks runProvision with fallback', async () => {

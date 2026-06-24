@@ -59,7 +59,8 @@ export function makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, reg
         const secrets = {};
 
         // 5. Dispatch the Cloud Run Job with --cleanup arg and SCRIPT_REF (GCS URI)
-        ({ ok, executionId } = await jobRunner.runCleanup({ demo, scriptRef, secrets }));
+        const envRef = scriptStore.envRef(demo.id);
+        ({ ok, executionId } = await jobRunner.runCleanup({ demo, scriptRef, secrets, envRef }));
       } catch (err) {
         // Pre-job failure (e.g. scriptStore.fetch threw because scriptGcsUri was never set).
         // ok stays false; fall through to finishCleanup(false) so demo is never stuck in `deleting`.
@@ -80,9 +81,16 @@ export function makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, reg
       // we let it propagate — the finally above has already run removeCleanup.
       await registry.finishCleanup(demo.id, ok, now());
 
-      // 8. On success only: remove the original setup script from GCS (keep storage clean; ADR-0004)
+      // 8. On success only: remove the original setup script and persisted env from GCS (ADR-0004)
       if (ok) {
         await scriptStore.remove(demo.id);
+        // Best-effort: remove the persisted env file (agent engine name). A failure here
+        // must NOT mask the successful cleanup result or throw out of runCleanup.
+        try {
+          await scriptStore.removeEnv(demo.id);
+        } catch (e) {
+          console.error('removeEnv failed:', e?.message ?? e);
+        }
       }
 
       // 9. Return summary. Per-resource structured results are deferred (need Cloud Logging).
