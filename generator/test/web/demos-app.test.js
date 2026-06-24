@@ -16,6 +16,7 @@ import {
   buildCleanupRequest,
   renderRowData,
   stateBadgeClass,
+  formatJst,
   installDemosApp,
 } from '../../web/demos-app.js';
 
@@ -79,6 +80,33 @@ describe('renderRowData', () => {
     expect(row.cells[1]).toBe('');
     expect(row.cells[2]).toBe('');
     expect(row.cells[4]).toBe('');
+  });
+});
+
+describe('formatJst', () => {
+  it('converts a UTC ISO timestamp to Asia/Tokyo (UTC+9)', () => {
+    // 2026-01-01T00:00:00Z is 09:00 on the same day in JST.
+    const out = formatJst('2026-01-01T00:00:00.000Z');
+    expect(out).toContain('2026/01/01');
+    expect(out).toContain('09:00');
+    expect(out).toContain('JST');
+  });
+
+  it('rolls over to the next day when UTC time is late', () => {
+    // 2026-01-01T20:00:00Z is 05:00 on 2026-01-02 in JST.
+    const out = formatJst('2026-01-01T20:00:00.000Z');
+    expect(out).toContain('2026/01/02');
+    expect(out).toContain('05:00');
+  });
+
+  it('returns empty string for empty/missing input', () => {
+    expect(formatJst('')).toBe('');
+    expect(formatJst(undefined)).toBe('');
+    expect(formatJst(null)).toBe('');
+  });
+
+  it('returns the raw value for an unparseable timestamp', () => {
+    expect(formatJst('not-a-date')).toBe('not-a-date');
   });
 });
 
