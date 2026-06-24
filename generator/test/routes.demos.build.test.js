@@ -35,7 +35,10 @@ function makeStubServices(overrides = {}) {
   const optimizeGoal = vi.fn().mockResolvedValue({ success: true, optimizedGoal: 'refined goal' });
   const analyzeMcp = vi.fn().mockResolvedValue({ success: true, data: { is_supported: true } });
   const now = vi.fn().mockReturnValue(NOW);
-  const scriptStore = { save: vi.fn().mockResolvedValue('gs://test-bucket/scripts/demo-x-abcd1234.sh') };
+  const scriptStore = {
+    save: vi.fn().mockResolvedValue('gs://test-bucket/scripts/demo-x-abcd1234.sh'),
+    saveHeadless: vi.fn().mockResolvedValue('gs://test-bucket/scripts/demo-x-abcd1234-headless.sh'),
+  };
 
   return {
     generateDemo,
@@ -240,6 +243,55 @@ describe('POST /api/demos — build start', () => {
     expect(res.status).toBe(202);
     expect(res.body.demoId).toBe('demo-x-abcd1234');
     expect(res.body.state).toBe('building');
+  });
+
+  it('calls scriptStore.saveHeadless with demoId and the deinteractivized script', async () => {
+    await request(app)
+      .post('/api/demos')
+      .send({ userGoal: 'agent' });
+
+    // Flush microtasks so saveHeadless (which precedes runProvision) completes
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(services.scriptStore.saveHeadless).toHaveBeenCalledOnce();
+    const [demoId, headlessText] = services.scriptStore.saveHeadless.mock.calls[0];
+    expect(demoId).toBe('demo-x-abcd1234');
+    // deinteractivize stub appends '\n# headless'
+    expect(headlessText).toBe('#!/bin/bash\necho hello\n# headless');
+  });
+
+  it('passes the GCS URI (not script text) as scriptRef to runProvision', async () => {
+    await request(app)
+      .post('/api/demos')
+      .send({ userGoal: 'agent' });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(services.jobRunner.runProvision).toHaveBeenCalledOnce();
+    const arg = services.jobRunner.runProvision.mock.calls[0][0];
+    // scriptRef must be the GCS URI, not the ~600KB script text
+    expect(arg.scriptRef).toBe('gs://test-bucket/scripts/demo-x-abcd1234-headless.sh');
+    expect(arg.scriptRef).toMatch(/^gs:\/\//);
+  });
+
+  it('tolerates scriptStore.saveHeadless failure — still kicks runProvision with fallback', async () => {
+    services.scriptStore.saveHeadless.mockRejectedValueOnce(new Error('GCS write fail'));
+    const res = await request(app)
+      .post('/api/demos')
+      .send({ userGoal: 'agent' });
+
+    expect(res.status).toBe(202);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // runProvision still called; scriptRef falls back to the raw headless text
+    expect(services.jobRunner.runProvision).toHaveBeenCalledOnce();
   });
 });
 

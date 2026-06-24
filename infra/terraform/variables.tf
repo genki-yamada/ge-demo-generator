@@ -32,3 +32,9 @@ variable "provisioner_image" {
   description = "ヘッドレスプロビジョナー Job のコンテナイメージ（gcloud/bq/uv 入り実行環境）。初回は placeholder"
   default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
+
+variable "iap_audience" {
+  type        = string
+  description = "IAP の JWT audience（/projects/<NUMBER>/apps/<PROJECT_ID> 形式）。IAP 有効化後に判明する値。空のまま deploy すると IAP audience 検証がスキップされる。"
+  default     = ""
+}
