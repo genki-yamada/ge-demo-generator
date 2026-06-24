@@ -9,6 +9,8 @@ const CLEANUP_OBJECT_NAME = `scripts/${DEMO_ID}-cleanup.sh`;
 const CLEANUP_GCS_URI = `gs://${BUCKET}/${CLEANUP_OBJECT_NAME}`;
 const HEADLESS_OBJECT_NAME = `scripts/${DEMO_ID}-headless.sh`;
 const HEADLESS_GCS_URI = `gs://${BUCKET}/${HEADLESS_OBJECT_NAME}`;
+const ENV_OBJECT_NAME = `envs/${DEMO_ID}.env`;
+const ENV_GCS_URI = `gs://${BUCKET}/${ENV_OBJECT_NAME}`;
 
 function makeFakeStorage() {
   const fakeFile = {
@@ -157,6 +159,31 @@ describe('makeScriptStore', () => {
 
     it('calls delete() with { ignoreNotFound: true }', async () => {
       await store.removeHeadless(DEMO_ID);
+      expect(fakeFile.delete).toHaveBeenCalledWith({ ignoreNotFound: true });
+    });
+  });
+
+  describe('envRef(demoId)', () => {
+    it('returns the gs:// URI for the env file', () => {
+      const uri = store.envRef(DEMO_ID);
+      expect(uri).toBe(ENV_GCS_URI);
+    });
+
+    it('makes no calls on the storage mock (pure path helper)', () => {
+      store.envRef(DEMO_ID);
+      expect(storage.bucket).not.toHaveBeenCalled();
+      expect(fakeBucket.file).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('removeEnv(demoId)', () => {
+    it('calls file() with the env object name (envs/<demoId>.env)', async () => {
+      await store.removeEnv(DEMO_ID);
+      expect(fakeBucket.file).toHaveBeenCalledWith(ENV_OBJECT_NAME);
+    });
+
+    it('calls delete() with { ignoreNotFound: true }', async () => {
+      await store.removeEnv(DEMO_ID);
       expect(fakeFile.delete).toHaveBeenCalledWith({ ignoreNotFound: true });
     });
   });
