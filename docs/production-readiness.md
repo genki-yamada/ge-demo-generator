@@ -1,7 +1,7 @@
 # 本番運用に向けた残作業一覧（Production Readiness）
 
 最終更新: 2026-06-24 / 対象: `ge-work-osaka` にデプロイ済みの GE Demo Generator
-（generator サービス `backend:v3` / provisioner Job `provisioner:v3`）
+（generator サービス `backend:v4` / provisioner Job `provisioner:v3`、rev generator-00009-frv）
 
 ## 現状サマリ
 
@@ -13,8 +13,11 @@
 - Agent Engine の headless 自動削除（entrypoint による `.env` persist/restore）を
   実インフラ上のプローブで検証済み。
 - generator サービスは `Ready=True` / 100% トラフィック / 最新コード。env 配線正常。
+- **IAP 認証フローを実機で疎通確認**（2026-06-24）: `ge-yamada@sts-inc.co.jp` で IAP ログイン →
+  UI 表示 → `/api/config` が 200 + 正しい `userEmail`。§1 の #1・#2 は解決済み（下記）。
 
-**「エンドユーザーがそのまま本番利用できる状態」ではない** — 以下が未整備。
+**残るブロッカーは GE インスタンス（#2 の「GE 登録」, P0）** — それ以外は P1/P2。
+以下、解決済みも含め記録。
 
 凡例: 🔴 P0（利用を妨げるブロッカー） / 🟡 P1（本番前に必須） / 🟢 P2（推奨・運用品質）
 出典: [検証済]=本ドキュメント作成時に実機確認 / [既知]=メモリ/runbook 記録 / [繰越]=実装時 deferred / [推奨]=一般的本番要件
@@ -23,20 +26,29 @@
 
 ## 1. アクセス・認証（IAP）
 
-- 🔴 **IAP_AUDIENCE が未設定（空）** [検証済]
-  - 現状: deployed service の `IAP_AUDIENCE=''`。`/api` は `iapAuth`（`src/auth/iap.js`）が
-    IAP の JWT アサーションを `audience` で検証するため、空だと `aud` 不一致で必ず例外 →
-    **全 API が 401**。静的 UI は配信されても API 呼び出しが全滅する。
-  - 対応: IAP の audience 値を取得し terraform `iap_audience`（`infra/terraform/variables.tf:36`）
-    に設定して再デプロイ。Cloud Run 統合 IAP の場合の audience 形式を runbook に追記する。
-  - 受け入れ条件: 正規 IAP 経由の `/api/*` が 200 を返し `req.user.email` が解決される。
+- ✅ **IAP_AUDIENCE 未設定 → 解決済み（2026-06-24）** [検証済]
+  - 旧状態: `IAP_AUDIENCE=''` のため `iapAuth`（`src/auth/iap.js`）が `aud` 不一致で **全 API 401**。
+  - 対応済み: Cloud Run 統合 IAP の audience 形式
+    `/projects/<NUMBER>/locations/<REGION>/services/<SERVICE>` を設定。terraform は
+    `data.google_project.current.number` から自動導出（PR #11）。実行中サービスには
+    `IAP_AUDIENCE=/projects/757234190351/locations/asia-northeast1/services/generator` を投入。
+  - 検証: `/api/config` が 200 + `userEmail` 解決。
+  - 注意: `--update-env-vars` を **Git Bash** で実行すると先頭 `/projects/...` が MSYS パス変換で
+    破損する。**PowerShell 経由**で設定すること（メモリ `deploy-procedure-ge-work-osaka` 参照）。
 
-- 🔴 **IAP の組織ドメイン拒否** [既知]
-  - 現状: `ge-work-osaka` は別組織 `gcp-osaka.sts-inc.co.jp` 配下で、内部限定 IAP が
-    `ge-yamada@sts-inc.co.jp` を外部扱いで拒否（未認証 curl も 403）。
-  - 対応: (a) 本番プロジェクトを利用者と同一組織に置く、または (b) IAP アクセスポリシー /
-    対象ユーザーの組織設定を調整、または (c) 外部 ID 対応のアクセスモデルに変更。
-  - 参照: メモリ `ge-work-osaka-org-domain`。
+- ✅ **「IAP 組織ドメイン拒否」は誤診 → 解決済み（2026-06-24）** [検証済]
+  - 旧説: `ge-work-osaka` が別組織 `gcp-osaka.sts-inc.co.jp` 配下のため内部限定 IAP が
+    `ge-yamada@sts-inc.co.jp`（別ドメイン）を拒否する、と考えていた。**これは誤りだった。**
+  - 真因: (1) サービスで **IAP が有効化されていなかった**（`run.googleapis.com/iap-enabled` 無し →
+    未認証は Cloud Run 直の素な 403「Your client does not have permission to get URL /」で、
+    IAP の同意/拒否画面ですらない）、(2) **`iap.httpsResourceAccessor` 未付与**。
+  - 対応済み: `gcloud beta run services update generator --iap` で有効化 +
+    `gcloud projects add-iam-policy-binding ge-work-osaka --member=user:<email>
+    --role=roles/iap.httpsResourceAccessor`。`domain-restricted-sharing` は `allValues: ALLOW`、
+    カスタム OAuth クライアントは不要だった。
+  - 検証: 別組織の `ge-yamada@sts-inc.co.jp` で IAP ログイン → UI 表示 → API 疎通。
+  - 切り分けの教訓: 素な 403「Your client does not have permission」= IAP 未経由（未有効）／
+    スタイル付き「You don't have access」= IAP 経由だが未認可。参照: メモリ `ge-work-osaka-org-domain`。
 
 - 🟡 **DEV_USER_EMAIL バイパスの恒久無効化** [検証済]
   - 現状: 本番 service に `DEV_USER_EMAIL` は未設定（=バイパス無効）で良好。
@@ -54,6 +66,11 @@
   - 対応: 本番プロジェクトで GE インスタンスを用意し、登録手順を文書化または自動化。
 
 ## 3. Infrastructure as Code / プロジェクト
+
+- ✅ **backend イメージに `web/`（UI）が含まれていなかった → 解決済み（PR #12）** [検証済]
+  - 旧状態: Dockerfile が `COPY src ./src` のみで静的 UI（`generator/web/`）を同梱せず、IAP 通過後の
+    `GET /` が Express `Cannot GET /` を返した（UI 移植より前の Dockerfile が未更新だった）。
+  - 対応済み: `COPY web ./web` を追加（PR #12）→ `backend:v4` 再ビルド・デプロイで UI 表示を確認。
 
 - 🟡 **terraform state とのドリフト** [検証済]
   - 現状: E2E 中に runner/runtime SA の IAM や (default) Firestore DB を手動で付与・作成し、
@@ -137,11 +154,16 @@
 
 ## 最短の本番化クリティカルパス
 
-1. 🔴 §1 IAP_AUDIENCE 設定 → API を疎通可能にする
-2. 🔴 §1 IAP 組織ドメイン問題の解消（本番プロジェクト＝利用者と同一組織が最も確実）
-3. 🔴 §2 GE インスタンス用意 + 登録手順確定
-4. 🟡 §3 本番プロジェクトを terraform で構築（(default) Firestore 含む）/ state 一元化
-5. 🟡 §4 シークレット配線 + §7 CI + §8 認可・レート制限
+1. ✅ §1 IAP_AUDIENCE 設定（PR #11） → `/api` 疎通確認済み
+2. ✅ §1 IAP アクセス（IAP 有効化 + accessor 付与） → 別組織ユーザーで疎通確認済み（「組織の壁」は誤診）
+3. ✅ §3 backend イメージに UI 同梱（PR #12） → UI 表示確認済み
+4. 🔴 §2 GE インスタンス用意 + 登録手順確定 ← **残る唯一の P0**
+5. 🟡 §3 本番プロジェクトを terraform で構築（(default) Firestore 含む）/ state 一元化
+6. 🟡 §4 シークレット配線 + §7 CI + §8 認可・レート制限
 
-上記 1〜3 が満たされれば「ユーザーが UI からデモを生成し GE で動かす」一連が本番で成立する。
-4〜5 は継続運用の品質・安全のために本番投入前後で整備する。
+UI からの認証・API 疎通は本番で成立済み。**残るブロッカーは GE インスタンス（#4）のみ**で、これが
+揃えば「ユーザーが UI からデモを生成し GE で動かす」一連が完成する。5〜6 は継続運用の品質・安全のため
+本番投入前後で整備する。
+
+> 注: 上記の検証は検証用プロジェクト `ge-work-osaka` 上での実機確認。本番では §3 の本番プロジェクト
+> 分離後に同手順（IAP 有効化 + accessor 付与 + IAP_AUDIENCE）を再適用する。
