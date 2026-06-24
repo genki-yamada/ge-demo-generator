@@ -17,6 +17,30 @@
  */
 
 // ---------------------------------------------------------------------------
+// State display label mapping (Japanese — display only, not data values)
+// ---------------------------------------------------------------------------
+
+/** @type {Record<string, string>} */
+const STATE_LABELS = {
+  building:     '構築中',
+  active:       '稼働中',
+  build_failed: '構築失敗',
+  deleting:     '削除中',
+  deleted:      '削除済み',
+  delete_failed: '削除失敗',
+};
+
+/**
+ * Return the Japanese display label for a raw state enum value.
+ * Falls back to the raw value if not found.
+ * @param {string} state
+ * @returns {string}
+ */
+function stateLabel(state) {
+  return STATE_LABELS[state] ?? state;
+}
+
+// ---------------------------------------------------------------------------
 // Pure helper functions (exported for unit tests — no DOM dependency)
 // ---------------------------------------------------------------------------
 
@@ -138,7 +162,7 @@ export function installDemosApp({
       const tr = doc.createElement('tr');
       const td = doc.createElement('td');
       td.colSpan = 6;
-      td.textContent = 'No demos found.';
+      td.textContent = 'デモが見つかりません。';
       td.style.textAlign = 'center';
       tr.appendChild(td);
       tbody.appendChild(tr);
@@ -160,7 +184,7 @@ export function installDemosApp({
       const stateTd = doc.createElement('td');
       const badge = doc.createElement('span');
       badge.className = 'badge ' + stateBadgeClass(demo.state);
-      badge.textContent = demo.state;
+      badge.textContent = stateLabel(demo.state);
       badge.id = `state-${demo.id}`;
       stateTd.appendChild(badge);
       tr.appendChild(stateTd);
@@ -177,13 +201,13 @@ export function installDemosApp({
       if (canDelete) {
         const btn = doc.createElement('button');
         btn.className = 'btn-delete';
-        btn.textContent = demo.state === 'delete_failed' ? 'Retry Cleanup' : 'Cleanup';
+        btn.textContent = demo.state === 'delete_failed' ? '再クリーンアップ' : 'クリーンアップ';
         btn.dataset.demoId = demo.id;
         btn.addEventListener('click', () => openConfirmModal(demo.id));
         actionTd.appendChild(btn);
       } else if (demo.state === 'deleting') {
         const span = doc.createElement('span');
-        span.textContent = 'Deleting…';
+        span.textContent = '削除中...';
         actionTd.appendChild(span);
       }
 
@@ -196,7 +220,7 @@ export function installDemosApp({
     const badge = el(`state-${demoId}`);
     if (badge) {
       badge.className = 'badge ' + stateBadgeClass(state);
-      badge.textContent = state;
+      badge.textContent = stateLabel(state);
     }
 
     // Update the action cell: find the row in tbody
@@ -214,18 +238,18 @@ export function installDemosApp({
     if (state === 'delete_failed') {
       const btn = doc.createElement('button');
       btn.className = 'btn-delete';
-      btn.textContent = 'Retry Cleanup';
+      btn.textContent = '再クリーンアップ';
       btn.dataset.demoId = demoId;
       btn.addEventListener('click', () => openConfirmModal(demoId));
       actionTd.appendChild(btn);
     } else if (state === 'deleting') {
       const span = doc.createElement('span');
-      span.textContent = 'Deleting…';
+      span.textContent = '削除中...';
       actionTd.appendChild(span);
     } else if (state !== 'building' && state !== 'deleted') {
       const btn = doc.createElement('button');
       btn.className = 'btn-delete';
-      btn.textContent = 'Cleanup';
+      btn.textContent = 'クリーンアップ';
       btn.dataset.demoId = demoId;
       btn.addEventListener('click', () => openConfirmModal(demoId));
       actionTd.appendChild(btn);
@@ -238,7 +262,7 @@ export function installDemosApp({
     const input = el('confirmInput');
     const btn   = el('confirmBtn');
     const label = el('confirmLabel');
-    if (label) label.textContent = `Type the demo id to confirm deletion: ${demoId}`;
+    if (label) label.textContent = `削除を確認するためにデモ ID を入力してください: ${demoId}`;
     if (input) { input.value = ''; }
     if (btn)   { btn.disabled = true; }
     if (modal) { modal.style.display = 'flex'; }
@@ -290,12 +314,12 @@ export function installDemosApp({
       try {
         r = await fetchImpl(`/api/demos/${demoId}`);
       } catch (fetchErr) {
-        showToast('Poll error: ' + fetchErr.message, true);
+        showToast('ポーリングエラー: ' + fetchErr.message, true);
         return;
       }
 
       if (!r.ok) {
-        showToast('Poll error: HTTP ' + r.status, true);
+        showToast('ポーリングエラー: HTTP ' + r.status, true);
         return;
       }
 
@@ -304,12 +328,12 @@ export function installDemosApp({
         const body = await r.json();
         demo = body.demo;
       } catch (parseErr) {
-        showToast('Poll error: ' + parseErr.message, true);
+        showToast('ポーリングエラー: ' + parseErr.message, true);
         return;
       }
 
       if (!demo) {
-        showToast('Poll error: missing demo in response', true);
+        showToast('ポーリングエラー: レスポンスにデモ情報がありません', true);
         return;
       }
 
@@ -343,7 +367,7 @@ export function installDemosApp({
    */
   async function startCleanup(demoId, typedName) {
     if (!validateConfirm(typedName, demoId)) {
-      showToast('Confirmation name does not match. Cleanup aborted.', true);
+      showToast('確認 ID が一致しません。クリーンアップを中止しました。', true);
       return;
     }
 
@@ -354,7 +378,7 @@ export function installDemosApp({
         buildCleanupRequest(typedName),
       );
     } catch (fetchErr) {
-      showToast('Cleanup error: ' + fetchErr.message, true);
+      showToast('クリーンアップエラー: ' + fetchErr.message, true);
       return;
     }
 
@@ -364,7 +388,7 @@ export function installDemosApp({
         const body = await r.json();
         if (body && body.error) errMsg = body.error;
       } catch (_) { /* ignore json parse error */ }
-      showToast('Cleanup failed: ' + errMsg, true);
+      showToast('クリーンアップに失敗しました: ' + errMsg, true);
       return;
     }
 
@@ -404,7 +428,7 @@ export function installDemosApp({
 
     // Optionally load demos on install (can be suppressed in tests)
     if (autoLoad) {
-      loadDemos().catch(err => showToast('Failed to load demos: ' + err.message, true));
+      loadDemos().catch(err => showToast('デモの読み込みに失敗しました: ' + err.message, true));
     }
   }
 
