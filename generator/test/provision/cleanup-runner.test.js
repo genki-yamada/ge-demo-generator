@@ -10,12 +10,16 @@ const EXEC_ID = 'projects/p/locations/r/jobs/j/executions/exec-cleanup-1';
 const NOW_STRING = '2026-06-22T00:00:00.000Z';
 const NOW_FN = () => NOW_STRING;
 
+const ENV_REF = `gs://test-bucket/envs/${DEMO_ID}.env`;
+
 function makeStubs({ runCleanupOk = true } = {}) {
   const scriptStore = {
     fetch: vi.fn().mockResolvedValue(SCRIPT_TEXT),
     remove: vi.fn().mockResolvedValue(undefined),
     saveCleanup: vi.fn().mockResolvedValue(CLEANUP_SCRIPT_REF),
     removeCleanup: vi.fn().mockResolvedValue(undefined),
+    envRef: vi.fn((demoId) => `gs://test-bucket/envs/${demoId}.env`),
+    removeEnv: vi.fn().mockResolvedValue(undefined),
   };
 
   const deinteractivize = vi.fn().mockReturnValue(HEADLESS_SCRIPT);
@@ -80,6 +84,17 @@ describe('makeCleanupRunner / runCleanup', () => {
       expect(callArg).not.toHaveProperty('script');
     });
 
+    it('passes envRef from scriptStore.envRef(demo.id) to jobRunner.runCleanup', async () => {
+      const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs();
+      const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
+
+      await runner.runCleanup({ demo: DEMO });
+
+      expect(jobRunner.runCleanup).toHaveBeenCalledOnce();
+      const callArg = jobRunner.runCleanup.mock.calls[0][0];
+      expect(callArg.envRef).toBe(ENV_REF);
+    });
+
     it('calls registry.finishCleanup with demo.id, ok, and now() result', async () => {
       const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs({ runCleanupOk: true });
       const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
@@ -112,6 +127,28 @@ describe('makeCleanupRunner / runCleanup', () => {
 
       expect(scriptStore.remove).toHaveBeenCalledOnce();
       expect(scriptStore.remove).toHaveBeenCalledWith(DEMO_ID);
+    });
+
+    it('calls scriptStore.removeEnv(demo.id) on success', async () => {
+      const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs({ runCleanupOk: true });
+      const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
+
+      await runner.runCleanup({ demo: DEMO });
+
+      expect(scriptStore.removeEnv).toHaveBeenCalledOnce();
+      expect(scriptStore.removeEnv).toHaveBeenCalledWith(DEMO_ID);
+    });
+
+    it('does not throw if scriptStore.removeEnv fails (best-effort)', async () => {
+      const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs({ runCleanupOk: true });
+      scriptStore.removeEnv.mockRejectedValueOnce(new Error('GCS delete failed'));
+      const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
+
+      // Must not throw despite removeEnv rejection
+      const result = await runner.runCleanup({ demo: DEMO });
+
+      // Result is still the success outcome
+      expect(result).toEqual({ demoId: DEMO_ID, executionId: EXEC_ID, allOk: true });
     });
 
     it('returns { demoId, executionId, allOk: true }', async () => {
@@ -152,6 +189,15 @@ describe('makeCleanupRunner / runCleanup', () => {
       await runner.runCleanup({ demo: DEMO });
 
       expect(scriptStore.remove).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call scriptStore.removeEnv when ok=false', async () => {
+      const { scriptStore, deinteractivize, jobRunner, registry } = makeStubs({ runCleanupOk: false });
+      const runner = makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now: NOW_FN });
+
+      await runner.runCleanup({ demo: DEMO });
+
+      expect(scriptStore.removeEnv).not.toHaveBeenCalled();
     });
 
     it('returns { demoId, executionId, allOk: false }', async () => {

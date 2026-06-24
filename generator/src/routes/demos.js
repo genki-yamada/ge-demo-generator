@@ -217,6 +217,7 @@ export function demosRouter(registry, services = {}) {
 
       // 4. Fire-and-forget: kick runProvision without awaiting
       //    Errors are caught and logged only — response is already sent.
+      const envRef = scriptStore ? scriptStore.envRef(result.demoId) : undefined;
       Promise.resolve().then(() =>
         jobRunner.runProvision({
           demo: { id: result.demoId, domain: result.domainName, suffix: result.suffix },
@@ -224,6 +225,7 @@ export function demosRouter(registry, services = {}) {
           secrets: options.credentials ?? {},
           registry,
           now: now ?? (() => new Date().toISOString()),
+          envRef,
         })
       ).catch((err) => {
         console.error('[runProvision] async kick failed:', err?.message ?? err);
