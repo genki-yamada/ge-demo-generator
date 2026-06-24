@@ -450,4 +450,19 @@ describe('makeGeRegistrar / registerToGe', () => {
     expect(result.alreadyRegistered).toBe(true);
     expect(result.agentId).toBeNull();
   });
+
+  it('works when registerToGe is destructured from the returned object (no this-binding needed)', async () => {
+    const fetchImpl = makeOrchestratorFetch({ ingressAlready: false, saAlready: false, agentStatus: 200 });
+
+    // Destructure — simulates a caller doing `const { registerToGe } = makeGeRegistrar(...)`
+    const { registerToGe } = makeGeRegistrar({ getToken, fetchImpl, config: CONFIG });
+
+    // Must resolve without TypeError (no `this` reference inside registerToGe)
+    const result = await registerToGe({ demoId: DEMO_ID });
+
+    expect(result.demoId).toBe(DEMO_ID);
+    expect(typeof result.agentId).toBe('string');
+    expect(result.alreadyRegistered).toBe(false);
+    expect(result.ingressChanged).toBe(true);
+  });
 });
