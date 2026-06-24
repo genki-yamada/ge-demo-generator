@@ -137,6 +137,45 @@ export function demosRouter(registry, services = {}) {
     } catch (err) { next(err); }
   });
 
+  // ── POST /api/demos/:id/provision — headless auto-execution ──────────────
+  // Build (provision on Cloud) a demo that was already generated via /api/generate.
+  // The setup script is already saved to GCS (scriptStore.save) and the demo is in
+  // `building` state; here we deinteractivize that saved script, upload a headless
+  // copy, and fire-and-forget runProvision (which transitions building → active|
+  // build_failed). This builds exactly what the user previewed — no regeneration.
+  router.post('/:id/provision', async (req, res, next) => {
+    try {
+      const { deinteractivize, jobRunner, scriptStore, now } = services;
+      if (typeof jobRunner?.runProvision !== 'function' || typeof deinteractivize !== 'function' || !scriptStore) {
+        return res.status(503).json({ error: 'provision service not configured' });
+      }
+      const demo = await registry.get(req.params.id);
+      if (!demo) return res.status(404).json({ error: 'not found' });
+      // Only a freshly generated demo (building) can be provisioned. active/deleting/
+      // deleted/build_failed are not valid sources for a building→active transition.
+      if (demo.state !== 'building') {
+        return res.status(409).json({ error: `cannot provision in state: ${demo.state}` });
+      }
+      // Prepare the headless script from the already-saved setup script.
+      let scriptRef;
+      try {
+        const raw = await scriptStore.fetch(demo.id);
+        const headless = deinteractivize(raw);
+        scriptRef = await scriptStore.saveHeadless(demo.id, headless);
+      } catch (e) {
+        console.error('[provision] could not prepare script:', e?.message ?? e);
+        return res.status(409).json({ error: 'setup script not available for this demo' });
+      }
+      const envRef = scriptStore.envRef(demo.id);
+      const nowFn = now ?? (() => new Date().toISOString());
+      // Fire-and-forget: response returns immediately; runProvision does the long work.
+      Promise.resolve().then(() =>
+        jobRunner.runProvision({ demo, scriptRef, secrets: {}, envRef, registry, now: nowFn })
+      ).catch((err) => console.error('[provision] async kick failed:', err?.message ?? err));
+      return res.status(202).json({ demoId: demo.id, state: 'building' });
+    } catch (err) { next(err); }
+  });
+
   // ── Plan A: GET /api/demos/:id ────────────────────────────────────────────
 
   router.get('/:id', async (req, res, next) => {

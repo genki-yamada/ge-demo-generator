@@ -222,6 +222,27 @@ export function installRpcFacade({ win = window, fetchImpl = window.fetch.bind(w
 
     return cfg;
   };
+
+  // ---- cloud auto-provision ---------------------------------------------------
+
+  /**
+   * Kick the headless build of an already-generated demo on Cloud Run.
+   * POST /api/demos/:id/provision → { demoId, state:'building' }.
+   * Resolves with the response body on 2xx; throws Error(message) otherwise.
+   *
+   * @param {string} demoId
+   * @returns {Promise<{demoId:string, state:string}>}
+   */
+  win.provisionDemoOnCloud = async function provisionDemoOnCloud(demoId) {
+    const r = await fetchImpl('/api/demos/' + encodeURIComponent(demoId) + '/provision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+    return data;
+  };
 }
 
 // Auto-install in a browser context (not during module tests where window is absent)
