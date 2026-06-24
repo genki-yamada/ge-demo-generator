@@ -231,7 +231,7 @@ describe('installDemosApp – loadDemos', () => {
     const tbody = doc._elements.demosTableBody;
     expect(tbody._children).toHaveLength(1);
     const tdText = tbody._children[0]._children[0].textContent;
-    expect(tdText).toBe('No demos found.');
+    expect(tdText).toBe('デモが見つかりません。');
   });
 
   it('throws (rejects) on non-ok response (!r.ok)', async () => {
@@ -389,7 +389,7 @@ describe('installDemosApp – pollStatus', () => {
 
     // No further polling after error
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(doc._elements.toastArea.textContent).toContain('Poll error');
+    expect(doc._elements.toastArea.textContent).toContain('ポーリングエラー');
   });
 });
 
