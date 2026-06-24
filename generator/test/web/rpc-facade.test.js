@@ -426,3 +426,31 @@ describe('provisionDemoOnCloud', () => {
     await expect(win.provisionDemoOnCloud('demo-x-abcd1234')).rejects.toThrow('cannot provision in state: active');
   });
 });
+
+describe('registerDemoToGe', () => {
+  it('POSTs to /api/demos/:id/register-ge and returns the body on success', async () => {
+    const payload = { demoId: 'demo-x-abcd1234', agentId: 'agent-99', alreadyRegistered: false };
+    const { win, fetchImpl } = setup(payload);
+    const out = await win.registerDemoToGe('demo-x-abcd1234');
+    expect(out).toEqual(payload);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/api/demos/demo-x-abcd1234/register-ge',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('URL-encodes the demoId', async () => {
+    const { win, fetchImpl } = setup({ demoId: 'x', agentId: 'a', alreadyRegistered: false });
+    await win.registerDemoToGe('demo a/b');
+    expect(fetchImpl.mock.calls[0][0]).toBe('/api/demos/demo%20a%2Fb/register-ge');
+  });
+
+  it('throws with the server error message on non-2xx', async () => {
+    const win = { document: { getElementById: vi.fn(() => null) } };
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve({ ok: false, status: 409, json: () => Promise.resolve({ error: 'agent already registered' }) }),
+    );
+    installRpcFacade({ win, fetchImpl });
+    await expect(win.registerDemoToGe('demo-x-abcd1234')).rejects.toThrow('agent already registered');
+  });
+});
