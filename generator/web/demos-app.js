@@ -40,6 +40,25 @@ function stateLabel(state) {
   return STATE_LABELS[state] ?? state;
 }
 
+/**
+ * Format an ISO timestamp into Japan Standard Time (Asia/Tokyo) for display.
+ * Returns '' for empty input and the raw value for unparseable input.
+ * Display only — the registry/API value stays ISO/UTC.
+ * @param {string} iso
+ * @returns {string}
+ */
+export function formatJst(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(d);
+  return parts + ' JST';
+}
+
 // ---------------------------------------------------------------------------
 // Pure helper functions (exported for unit tests — no DOM dependency)
 // ---------------------------------------------------------------------------
@@ -191,7 +210,7 @@ export function installDemosApp({
 
       // createdAt
       const dateTd = doc.createElement('td');
-      dateTd.textContent = demo.createdAt ?? '';
+      dateTd.textContent = formatJst(demo.createdAt);
       tr.appendChild(dateTd);
 
       // actions
