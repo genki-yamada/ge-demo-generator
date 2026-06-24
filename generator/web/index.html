@@ -1280,7 +1280,7 @@
           </svg>
           このツールについて
         </button>
-        <a href="https://github.com/ryotat7/ge-demo-generator" target="_blank"
+        <a href="https://github.com/genki-yamada/ge-demo-generator" target="_blank"
           class="nav-item w-full text-left flex items-center">
           <svg class="w-3.5 h-3.5 mr-1.5 inline-block" fill="currentColor" viewBox="0 0 24 24">
             <path
@@ -1553,7 +1553,7 @@
                         詳細リソース
                       </h3>
                       <p class="text-[13px] text-gray-300 leading-relaxed">
-                        詳細な説明が必要ですか？<a href="https://github.com/ryotat7/ge-demo-generator.git" target="_blank" class="text-sky-400 hover:underline underline-offset-4">GitHub リポジトリ</a>でアーキテクチャガイドラインを詳しく確認できます。
+                        詳細な説明が必要ですか？<a href="https://github.com/genki-yamada/ge-demo-generator.git" target="_blank" class="text-sky-400 hover:underline underline-offset-4">GitHub リポジトリ</a>でアーキテクチャガイドラインを詳しく確認できます。
                       </p>
                       <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
                     </div>
@@ -2282,13 +2282,26 @@
                   <div>
                     <h4 class="text-sm font-bold text-sky-400 uppercase tracking-tight mb-1">💡 推奨環境</h4>
                     <p class="text-[13px] text-gray-300 leading-relaxed">
-                      右のボタンをクリックして Google Cloud Console から直接 Cloud Shell を開いてください。Cloud Shell にはセットアップスクリプトに必要なツールがプリインストールされているため、強くお勧めします。また、<a href="https://shell.cloud.google.com/cloudshell/editor?cloudshell_tutorial=tutorial.md&cloudshell_git_repo=https://github.com/ryotat7/ge-demo-generator.git" target="_blank" rel="noopener noreferrer" class="text-sky-400 underline hover:text-sky-300 transition-all">Cloud Shell チュートリアルを起動</a>してステップごとのガイドを利用することもできます。
+                      右のボタンをクリックして Google Cloud Console から直接 Cloud Shell を開いてください。Cloud Shell にはセットアップスクリプトに必要なツールがプリインストールされているため、強くお勧めします。また、<a href="https://shell.cloud.google.com/cloudshell/editor?cloudshell_tutorial=tutorial.md&cloudshell_git_repo=https://github.com/genki-yamada/ge-demo-generator.git" target="_blank" rel="noopener noreferrer" class="text-sky-400 underline hover:text-sky-300 transition-all">Cloud Shell チュートリアルを起動</a>してステップごとのガイドを利用することもできます。
                     </p>
                   </div>
                   <a href="https://console.cloud.google.com/welcome?cloudshell=true" target="_blank" rel="noopener noreferrer"
                     class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-[11px] transition-all shadow-lg flex items-center gap-2 uppercase tracking-wider border border-sky-400/20 hover:scale-105 shrink-0 ml-4">
                     Cloud Shell を開く
                   </a>
+                </div>
+
+                <!-- クラウドで自動実行（headless プロビジョニング） -->
+                <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-3xl p-6 mb-6 flex items-center justify-between gap-4">
+                  <div>
+                    <h4 class="text-sm font-bold text-emerald-400 uppercase tracking-tight mb-1">☁️ クラウドで自動実行</h4>
+                    <p class="text-[13px] text-gray-300 leading-relaxed">手動でコピーする代わりに、このスクリプトを Google Cloud 上で自動実行します（BigQuery / Firestore / Agent Engine / Cloud Run を構築）。進捗は <a href="/demos.html" target="_blank" rel="noopener noreferrer" class="text-emerald-400 underline hover:text-emerald-300 transition-all">デモ一覧</a> で確認できます。</p>
+                    <p id="autoProvisionStatus" class="text-[12px] text-emerald-300 mt-2 hidden"></p>
+                  </div>
+                  <button id="autoProvisionBtn" onclick="provisionOnCloud()"
+                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-[11px] transition-all shadow-lg flex items-center gap-2 uppercase tracking-wider border border-emerald-400/20 hover:scale-105 shrink-0 ml-4 disabled:opacity-50 disabled:cursor-not-allowed">
+                    クラウドで自動実行
+                  </button>
                 </div>
 
                 <!-- Internal User Tips Accordion -->
@@ -4966,6 +4979,32 @@
       window.URL.revokeObjectURL(url);
     }
     function downloadScript() { if (currentData) downloadFile(currentData.setupScript, 'setup.sh', 'text/x-shellscript'); }
+
+    // クラウドで自動実行: 生成済みデモ（currentData.demoId）の headless ビルドを起動する。
+    async function provisionOnCloud() {
+      const btn = document.getElementById('autoProvisionBtn');
+      const status = document.getElementById('autoProvisionStatus');
+      const demoId = currentData && currentData.demoId;
+      if (!demoId) { showToast('先にセットアップスクリプトを生成してください'); return; }
+      if (!window.provisionDemoOnCloud) { showToast('自動実行は利用できません'); return; }
+      btn.disabled = true;
+      const original = btn.innerText;
+      btn.innerText = '起動中...';
+      try {
+        const res = await window.provisionDemoOnCloud(demoId);
+        status.classList.remove('hidden');
+        status.innerHTML = '✅ クラウドでの構築を開始しました（<span class="font-mono">' + res.demoId +
+          '</span>）。進捗は <a href="/demos.html" target="_blank" rel="noopener noreferrer" class="underline hover:text-emerald-200">デモ一覧</a> で確認できます。';
+        showToast('☁️ クラウドでの自動実行を開始しました');
+        btn.innerText = '構築を開始しました';
+        // 成功時はボタンを無効のままにして二重起動を防ぐ（再実行は building 状態でないと 409）。
+      } catch (e) {
+        status.classList.remove('hidden');
+        status.innerText = '❌ 起動に失敗しました: ' + (e && e.message ? e.message : e);
+        btn.disabled = false;
+        btn.innerText = original;
+      }
+    }
     function downloadAllCSV() { if (currentData && currentData.rawTables) currentData.rawTables.forEach(t => downloadFile(t.csvData, `${t.tableName}.csv`, 'text/csv')); }
 
     window.downloadExternalImage = function(index) {

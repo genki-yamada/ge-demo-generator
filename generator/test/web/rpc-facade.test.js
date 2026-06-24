@@ -399,3 +399,30 @@ describe('installRpcFacade', () => {
     });
   });
 });
+
+describe('provisionDemoOnCloud', () => {
+  it('POSTs to /api/demos/:id/provision and returns the body on success', async () => {
+    const { win, fetchImpl } = setup({ demoId: 'demo-x-abcd1234', state: 'building' });
+    const out = await win.provisionDemoOnCloud('demo-x-abcd1234');
+    expect(out).toEqual({ demoId: 'demo-x-abcd1234', state: 'building' });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/api/demos/demo-x-abcd1234/provision',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('URL-encodes the demoId', async () => {
+    const { win, fetchImpl } = setup({ demoId: 'x', state: 'building' });
+    await win.provisionDemoOnCloud('demo a/b');
+    expect(fetchImpl.mock.calls[0][0]).toBe('/api/demos/demo%20a%2Fb/provision');
+  });
+
+  it('throws with the server error message on non-2xx', async () => {
+    const win = { document: { getElementById: vi.fn(() => null) } };
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve({ ok: false, status: 409, json: () => Promise.resolve({ error: 'cannot provision in state: active' }) }),
+    );
+    installRpcFacade({ win, fetchImpl });
+    await expect(win.provisionDemoOnCloud('demo-x-abcd1234')).rejects.toThrow('cannot provision in state: active');
+  });
+});
