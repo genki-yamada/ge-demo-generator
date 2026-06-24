@@ -16,6 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # so installing into the system environment is intentional and safe here.
 RUN pip3 install --no-cache-dir --break-system-packages uv
 
+# Run in $HOME so the generated script's relative `cd ${dirName}` lands its .env at
+# $HOME/${dirName}/.env — the exact path entrypoint.sh persists/restores (DEMO_DIR==demo.id).
+# Makes the CWD==$HOME contract explicit rather than relying on the base image default.
+WORKDIR /root
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

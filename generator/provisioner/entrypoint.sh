@@ -18,7 +18,7 @@ done
 if [ "$_cleanup" = "1" ]; then
   # CLEANUP mode: restore persisted env before running script (best-effort)
   if [ -n "${ENV_REF:-}" ] && [ -n "${DEMO_DIR:-}" ]; then
-    mkdir -p "$HOME/$DEMO_DIR"
+    mkdir -p "$HOME/$DEMO_DIR" 2>/dev/null || true
     gsutil cp "$ENV_REF" "$HOME/$DEMO_DIR/.env" 2>/dev/null \
       || echo "[entrypoint] notice: could not restore $ENV_REF — skipping (Agent Engine name may be unavailable)"
   fi
