@@ -3141,16 +3141,16 @@
     const GenerationLogger = {
       phrases: {
         en: [
-          { tag: 'info', msg: 'Initializing system configuration...' },
-          { tag: 'ai', msg: 'Analyzing industry data models...' },
-          { tag: 'ai', msg: 'Designing relational schema structures...' },
-          { tag: 'info', msg: 'Generating synthetic data and MCP resources...' },
-          { tag: 'ai', msg: 'Crafting system instructions for Gemini...' },
-          { tag: 'info', msg: 'Constructing Gcloud deployment scripts...' },
-          { tag: 'ai', msg: 'Optimizing agent reasoning chains...' },
-          { tag: 'success', msg: 'Resource bundling complete.' },
-          { tag: 'info', msg: 'Finalizing executable artifact...' },
-          { tag: 'wait', msg: 'Waiting for response... (typically 1:30 - 2:30 minutes)' }
+          { tag: 'info', msg: 'システム構成を初期化しています...' },
+          { tag: 'ai', msg: '業界データモデルを分析しています...' },
+          { tag: 'ai', msg: 'リレーショナルスキーマ構造を設計しています...' },
+          { tag: 'info', msg: '合成データと MCP リソースを生成しています...' },
+          { tag: 'ai', msg: 'Gemini 向けシステム指示を作成しています...' },
+          { tag: 'info', msg: 'Cloud デプロイスクリプトを構築しています...' },
+          { tag: 'ai', msg: 'エージェントの推論チェーンを最適化しています...' },
+          { tag: 'success', msg: 'リソースのバンドルが完了しました。' },
+          { tag: 'info', msg: '実行可能アーティファクトを最終化しています...' },
+          { tag: 'wait', msg: 'レスポンスを待機中... (通常 1:30 〜 2:30 分)' }
         ]
       },
       timer: null,
@@ -4237,14 +4237,14 @@
                   <span class="text-[12px] font-bold text-white font-mono break-all">${file.fileName}</span>
                 </div>
                 ${previewHeaderHtml}
-                <p class="text-[11px] text-gray-400 mb-3">${file.description || 'No description'}</p>
-                <div class="text-[10px] text-gray-500 mb-3">Type: ${fileTypeLabel}</div>
+                <p class="text-[11px] text-gray-400 mb-3">${file.description || '説明なし'}</p>
+                <div class="text-[10px] text-gray-500 mb-3">種別: ${fileTypeLabel}</div>
               </div>
               <button onclick="${isExcel ? 'downloadExternalExcel' : (isImage ? 'downloadExternalImage' : 'downloadExternalPDF')}(${index})" class="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-400 font-bold rounded-lg text-[11px] transition-all uppercase tracking-wider border border-amber-500/30 cursor-pointer">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                 </svg>
-                Download
+                ダウンロード
               </button>
             `;
             extFilesList.appendChild(div);
@@ -6646,8 +6646,8 @@
           box.innerHTML = '';
           if(data.required_env_vars && data.required_env_vars.length > 0) {
             data.required_env_vars.forEach(v => {
-              const reqStatus = v.is_required ? '<span class="text-red-400 font-bold">[REQUIRED]</span>' : '<span class="text-gray-500">[OPTIONAL]</span>';
-              box.innerHTML += '<div class="text-sm text-gray-300">🔑 ' + v.key + ' (' + v.description + ') ' + reqStatus + (v.is_secret ? ' <span class="text-amber-400">[SECRET]</span>' : '') + '</div>';
+              const reqStatus = v.is_required ? '<span class="text-red-400 font-bold">[必須]</span>' : '<span class="text-gray-500">[任意]</span>';
+              box.innerHTML += '<div class="text-sm text-gray-300">🔑 ' + v.key + ' (' + v.description + ') ' + reqStatus + (v.is_secret ? ' <span class="text-amber-400">[シークレット]</span>' : '') + '</div>';
             });
             document.getElementById('mcpEnvVarList').classList.remove('hidden');
           } else {
@@ -6658,7 +6658,7 @@
           // Show degraded tools warning if applicable
           if (data.degraded_tools && data.degraded_tools.length > 0) {
             let degradedHtml = '<div class="mt-3 p-3 bg-amber-950/30 border border-amber-500/20 rounded-2xl">' +
-              '<h4 class="text-amber-400 font-bold text-[10px] uppercase tracking-wider mb-2">⚠️ Limited Tools (native binary not available)</h4>';
+              '<h4 class="text-amber-400 font-bold text-[10px] uppercase tracking-wider mb-2">⚠️ 機能制限ツール（ネイティブバイナリが利用できません）</h4>';
             data.degraded_tools.forEach(t => {
               degradedHtml += '<div class="text-xs text-amber-300/80">• ' + t + '</div>';
             });
@@ -6669,10 +6669,10 @@
           // Show credential file requirement if applicable
           if (data.credential_file) {
             let credHtml = '<div class="mt-3 p-3 bg-blue-950/30 border border-blue-500/20 rounded-2xl">' +
-              '<h4 class="text-blue-400 font-bold text-[10px] uppercase tracking-wider mb-2">📄 Credential File Required</h4>' +
+              '<h4 class="text-blue-400 font-bold text-[10px] uppercase tracking-wider mb-2">📄 認証情報ファイルが必要です</h4>' +
               '<p class="text-xs text-gray-300">' + data.credential_file.file_description + '</p>' +
-              '<div class="mt-2 text-xs text-gray-400 font-mono">→ Env: ' + data.credential_file.env_var_name + '</div>' +
-              '<p class="text-blue-400/70 text-[10px] mt-2">⚠️ You will be prompted to paste the credential file during script execution in Cloud Shell.</p>' +
+              '<div class="mt-2 text-xs text-gray-400 font-mono">→ 環境変数: ' + data.credential_file.env_var_name + '</div>' +
+              '<p class="text-blue-400/70 text-[10px] mt-2">⚠️ Cloud Shell でのスクリプト実行時に、認証情報ファイルの内容の貼り付けが求められます。</p>' +
               '</div>';
             document.getElementById('mcpEnvVarsBox').innerHTML += credHtml;
           }
@@ -6680,7 +6680,7 @@
         .withFailureHandler((err) => {
           btn.disabled = false;
           loading.classList.add('hidden');
-          alert("System Failure: " + err.message);
+          alert("システムエラー: " + err.message);
         })
         .analyzeMcpRepository(url);
     }
@@ -6745,7 +6745,7 @@
 
       cachedImportedMcpList.forEach((mcp, i) => {
         const isRemote = mcp.type === 'remote';
-        const displayName = isRemote ? (mcp.name || 'Remote MCP') : mcp.github_url.split('/').pop().replace(/\.git$/, '');
+        const displayName = isRemote ? (mcp.name || 'リモート MCP') : mcp.github_url.split('/').pop().replace(/\.git$/, '');
         const subtitle = isRemote
           ? '☁️ MANAGED · ' + (mcp.endpoint_url || '').replace('https://', '').split('/')[0].toUpperCase()
           : (mcp.language || 'unknown').toUpperCase() + ' · ' + (mcp.transport_mode || 'stdio').toUpperCase();
