@@ -1063,7 +1063,7 @@
           <p class="text-[11px] text-gray-500">MCP サーバーを追加してデモを外部データで強化</p>
         </div>
       </div>
-      <button onclick="closeMcpModal()" aria-label="Close modal" class="text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 rounded-lg p-1 transition-colors">
+      <button onclick="closeMcpModal()" aria-label="モーダルを閉じる" class="text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 rounded-lg p-1 transition-colors">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
       </button>
     </div>
@@ -1516,7 +1516,7 @@
                         <div class="text-[10px] text-slate-400">Google Maps API</div>
                       </div>
                       <div class="px-3 py-1.5 rounded-lg bg-slate-800/50 border border-slate-600/15 text-center">
-                        <div class="text-[10px] text-slate-400">GCS / Visuals</div>
+                        <div class="text-[10px] text-slate-400">GCS / ビジュアル</div>
                       </div>
                     </div>
 
@@ -1803,7 +1803,7 @@
                   <!-- Magic Wand Button -->
                   <button id="magicWandBtn" onclick="optimizeGoalWithMagicWand()"
                     class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/30 text-[9px] font-bold transition-all cursor-pointer shadow-md shadow-indigo-500/10 group"
-                    title="Structure and optimize this scenario using Gemini Flash Lite">
+                    title="Gemini Flash Lite でこのシナリオを構造化・最適化">
                     <span class="group-hover:animate-pulse">🪄</span>
                     <span>プロンプトを最適化</span>
                   </button>
@@ -2393,7 +2393,7 @@
                       <div class="sticky top-0 z-30 h-0 w-full flex justify-end">
                         <button onclick="downloadSetupScript(); event.stopPropagation();"
                           class="mt-4 mr-4 w-9 h-9 flex items-center justify-center rounded-xl bg-gray-900/60 hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-400 transition-all border border-white/10 backdrop-blur-md shadow-xl group/download pointer-events-auto"
-                          title="Download setup script">
+                          title="セットアップスクリプトをダウンロード">
                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -2940,7 +2940,7 @@
       if (btn) {
         btn.disabled = true;
         btn._originalHTML = btn.innerHTML;
-        btn.innerHTML = '<div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Regenerating scenario...';
+        btn.innerHTML = '<div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> シナリオを再生成中...';
       }
     }
 
@@ -2948,7 +2948,7 @@
       const btn = document.querySelector('[onclick="applySelectedWorkflows()"]');
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = btn._originalHTML || '🚀 Apply Selected Workflows';
+        btn.innerHTML = btn._originalHTML || '🚀 選択したワークフローを適用';
       }
     }
 
@@ -4194,7 +4194,7 @@
             if (isImage && file.base64Data) {
               // Image thumbnail preview
               previewHeaderHtml = `
-                <div class="mb-3 rounded-xl overflow-hidden border border-white/10 bg-black/50 flex items-center justify-center cursor-pointer hover:border-amber-500/40 transition-all aspect-video relative group/img" onclick="openDocModal(${index})" title="Click to preview document">
+                <div class="mb-3 rounded-xl overflow-hidden border border-white/10 bg-black/50 flex items-center justify-center cursor-pointer hover:border-amber-500/40 transition-all aspect-video relative group/img" onclick="openDocModal(${index})" title="クリックしてプレビュー">
                   <img src="data:image/jpeg;base64,${file.base64Data}" class="w-full h-full object-cover hover:scale-[1.03] transition-transform duration-300" alt="${file.fileName}"/>
                   <div class="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path></svg>
@@ -4205,7 +4205,7 @@
             } else if (isExcel) {
               // Excel Mock Icon Preview Block
               previewHeaderHtml = `
-                <div class="mb-3 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.03] hover:bg-emerald-500/[0.06] flex flex-col items-center justify-center cursor-pointer hover:border-emerald-500/40 transition-all aspect-video relative group/img" onclick="openDocModal(${index})" title="Click to preview spreadsheet">
+                <div class="mb-3 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.03] hover:bg-emerald-500/[0.06] flex flex-col items-center justify-center cursor-pointer hover:border-emerald-500/40 transition-all aspect-video relative group/img" onclick="openDocModal(${index})" title="クリックしてスプレッドシートをプレビュー">
                   <div class="text-3xl mb-1 transition-transform duration-300 group-hover/img:scale-110">📊</div>
                   <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-mono">Excel 台帳テーブル</span>
                   <div class="absolute inset-0 bg-emerald-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5 rounded-xl">
@@ -4217,7 +4217,7 @@
             } else {
               // PDF Mock Icon Preview Block
               previewHeaderHtml = `
-                <div class="mb-3 rounded-xl border border-red-500/10 bg-red-500/[0.03] hover:bg-red-500/[0.06] flex flex-col items-center justify-center cursor-pointer hover:border-red-500/40 transition-all aspect-video relative group/img" onclick="openDocModal(${index})" title="Click to preview document">
+                <div class="mb-3 rounded-xl border border-red-500/10 bg-red-500/[0.03] hover:bg-red-500/[0.06] flex flex-col items-center justify-center cursor-pointer hover:border-red-500/40 transition-all aspect-video relative group/img" onclick="openDocModal(${index})" title="クリックしてプレビュー">
                   <div class="text-3xl mb-1 transition-transform duration-300 group-hover/img:scale-110">📄</div>
                   <span class="text-[10px] font-bold text-red-400 uppercase tracking-widest font-mono">PDF ドキュメントスキャン</span>
                   <div class="absolute inset-0 bg-red-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5 rounded-xl">
@@ -4284,8 +4284,8 @@
                </div>
                 <div class="relative bg-black/60 rounded-xl p-4 border border-white/5 hover:border-emerald-500/30 transition-all min-w-0 group/copy">
                   <p class="text-[13px] text-sky-200 select-text leading-relaxed font-mono">${prompt}</p>
-                  <button onclick="copyToClipboard(this.previousElementSibling.innerText)" class="absolute top-3 right-3 p-2 rounded-lg bg-emerald-500/10 backdrop-blur-md text-emerald-400/70 opacity-0 group-hover/copy:opacity-100 transition-all border border-emerald-500/20 shadow-lg hover:text-emerald-300 hover:bg-emerald-500/30 hover:border-emerald-500/50 active:bg-emerald-500 active:text-white active:border-emerald-400 active:scale-95 flex items-center gap-1.5 cursor-pointer duration-200" title="Copy prompt">
-                    <span class="text-[10px] font-bold tracking-wide">COPY</span>
+                  <button onclick="copyToClipboard(this.previousElementSibling.innerText)" class="absolute top-3 right-3 p-2 rounded-lg bg-emerald-500/10 backdrop-blur-md text-emerald-400/70 opacity-0 group-hover/copy:opacity-100 transition-all border border-emerald-500/20 shadow-lg hover:text-emerald-300 hover:bg-emerald-500/30 hover:border-emerald-500/50 active:bg-emerald-500 active:text-white active:border-emerald-400 active:scale-95 flex items-center gap-1.5 cursor-pointer duration-200" title="プロンプトをコピー">
+                    <span class="text-[10px] font-bold tracking-wide">コピー</span>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                   </button>
                </div>
@@ -4515,10 +4515,10 @@
           collectionName: (tables.length > 0 ? tables[0].tableName : 'operational') + '_status',
           documents: [{
             data: {
-              status: "Discrepancy Found",
-              priority: "High",
-              assigned_to: "Audit Team",
-              notes: "Operational status override."
+              status: "差異検出",
+              priority: "高",
+              assigned_to: "監査チーム",
+              notes: "運用ステータスを上書き。"
             }
           }]
         };
@@ -4527,7 +4527,7 @@
       if (activeFs && activeFs.collectionName) {
         let fsLabel = `<b>🔥 FIRESTORE: ${activeFs.collectionName.toUpperCase()}</b>\n`;
         fsLabel += `<i>────────────────</i>\n`;
-        fsLabel += `📄 Real-time Operational Status\n`;
+        fsLabel += `📄 リアルタイム運用ステータス\n`;
         
         if (activeFs.documents && activeFs.documents.length > 0) {
           const sampleDoc = activeFs.documents[0];
@@ -4875,13 +4875,13 @@
       controlsDiv.id = 'erDiagramControls';
       controlsDiv.className = 'absolute bottom-4 right-4 flex flex-col gap-2 z-10';
       controlsDiv.innerHTML = `
-        <button id="zoomIn" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 transition-all shadow-lg backdrop-blur-sm" title="Zoom In">
+        <button id="zoomIn" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 transition-all shadow-lg backdrop-blur-sm" title="拡大">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
         </button>
-        <button id="zoomOut" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 transition-all shadow-lg backdrop-blur-sm" title="Zoom Out">
+        <button id="zoomOut" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 transition-all shadow-lg backdrop-blur-sm" title="縮小">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
         </button>
-        <button id="zoomReset" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 transition-all shadow-lg backdrop-blur-sm" title="Reset View">
+        <button id="zoomReset" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/50 transition-all shadow-lg backdrop-blur-sm" title="表示をリセット">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
         </button>
       `;
@@ -5435,27 +5435,27 @@
         return;
       }
 
-      const demoName = currentData.dirName || 'Untitled Demo';
+      const demoName = currentData.dirName || '無題のデモ';
       const agentName = currentData.agentShortName || '';
       const summary = currentData.oneSentenceSummary || '';
       const lines = [];
 
-      lines.push(`# Demo Flow: ${demoName}`);
-      if (agentName) lines.push(`Agent: ${agentName}`);
+      lines.push(`# デモフロー: ${demoName}`);
+      if (agentName) lines.push(`エージェント: ${agentName}`);
       if (summary) lines.push(`${summary}`);
       lines.push('');
-      lines.push(`Generated: ${new Date().toLocaleString()}`);
+      lines.push(`生成日時: ${new Date().toLocaleString()}`);
       lines.push('---');
       lines.push('');
 
       currentData.demoGuide.forEach((step, i) => {
-        const title = step.title || `Scenario ${i + 1}`;
+        const title = step.title || `シナリオ ${i + 1}`;
         const prompt = typeof step === 'object' ? step.prompt : step;
         const isAWT = typeof step === 'object' && step.requiredFileId;
         const tags = typeof step === 'object' && step.tags ? step.tags : [];
 
-        lines.push(`## ${i + 1}. ${title}${isAWT ? ' [AWT - File Required]' : ''}`);
-        if (tags.length) lines.push(`Tags: ${tags.join(', ')}`);
+        lines.push(`## ${i + 1}. ${title}${isAWT ? ' [AWT - ファイルが必要]' : ''}`);
+        if (tags.length) lines.push(`タグ: ${tags.join(', ')}`);
         lines.push('');
         lines.push(prompt);
         lines.push('');
@@ -5487,10 +5487,10 @@
           if (diag && res && res.success) {
             diag.classList.remove('bg-gray-600', 'bg-red-500');
             diag.classList.add('bg-emerald-500');
-            diag.title = `Sync OK (Spreadsheet Connected)`;
+            diag.title = `同期 OK（スプレッドシート接続済）`;
           } else {
             diag.classList.add('bg-red-500');
-            diag.title = `Sync Error: ${res ? res.error : 'Unknown error'}`;
+            diag.title = `同期エラー: ${res ? res.error : '不明なエラー'}`;
           }
         }).checkSpreadsheet();
       }
@@ -5623,11 +5623,11 @@
 
     function fmtDate(ts) {
       var d = new Date(ts);
-      return isNaN(d.getTime()) ? 'Unknown Date' : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+      return isNaN(d.getTime()) ? '不明な日時' : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
     }
 
     function cleanTitle(goal) {
-      if (!goal) return 'Untitled demo';
+      if (!goal) return '無題のデモ';
       var lines = String(goal).split(String.fromCharCode(10));
       var first = '';
       for (var i = 0; i < lines.length; i++) {
@@ -5641,14 +5641,14 @@
         if (code === HASH || code === STAR || code === TICK) continue;
         out += first.charAt(j);
       }
-      return out.replace(/^\s+|\s+$/g, '') || 'Untitled demo';
+      return out.replace(/^\s+|\s+$/g, '') || '無題のデモ';
     }
 
     function flashCopied(btn) {
       if (!btn || btn.dataset.flashing === '1') return;
       btn.dataset.flashing = '1';
       var original = btn.innerHTML;
-      btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied';
+      btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> コピー済';
       btn.classList.add('!text-emerald-400', '!border-emerald-500/30', '!bg-emerald-500/10');
       setTimeout(function() {
         btn.innerHTML = original;
@@ -5763,7 +5763,7 @@
           <span id="docPreviewIcon" class="text-lg">📄</span>
           <h4 id="docPreviewTitle" class="text-xs font-bold text-gray-300 font-mono break-all pr-4">document.pdf</h4>
         </div>
-        <button onclick="closeDocModal()" aria-label="Close Preview" class="text-gray-400 hover:text-white focus:outline-none rounded-lg p-1 transition-colors hover:bg-white/5 border border-white/5 cursor-pointer">
+        <button onclick="closeDocModal()" aria-label="プレビューを閉じる" class="text-gray-400 hover:text-white focus:outline-none rounded-lg p-1 transition-colors hover:bg-white/5 border border-white/5 cursor-pointer">
           <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
@@ -5809,7 +5809,7 @@
   <div id="featureNotifyModal">
     <div class="glass max-w-2xl w-full rounded-3xl p-7 border border-white/10 shadow-2xl fade-in relative flex flex-col max-h-[90vh]">
       <!-- Close Button -->
-      <button onclick="closeFeatureNotify(false)" aria-label="Close" class="absolute top-5 right-5 text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 rounded-lg p-1 transition-colors z-10">
+      <button onclick="closeFeatureNotify(false)" aria-label="閉じる" class="absolute top-5 right-5 text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 rounded-lg p-1 transition-colors z-10">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
       </button>
       <!-- Header -->
@@ -6166,54 +6166,54 @@
     const MCP_CATALOG = {
       categories: [
         {
-          id: 'gov-legal', name: 'Government & Legal', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"></path></svg>',
+          id: 'gov-legal', name: '政府・法律', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"></path></svg>',
           servers: [
-            { id: 'us-gov-open-data', name: 'US Government Open Data', github_url: 'https://github.com/lzinga/us-gov-open-data-mcp', description: '40+ US government APIs: Treasury, FRED, Congress, FDA, CDC health stats, and more.', language: 'nodejs', tags: ['government','economics','health','finance'], requires_api_key: 'partial', demo_tip: 'Combine with BigQuery internal data to correlate macroeconomic indicators with business performance.' },
-            { id: 'us-legal', name: 'US Legal & Legislation', github_url: 'https://github.com/JamesANZ/us-legal-mcp', description: 'Congress bills, Federal Register documents, and court opinions via CourtListener.', language: 'python', tags: ['legal','regulation','compliance'], requires_api_key: false, demo_tip: 'Great for compliance-focused demos showing regulatory monitoring.' }
+            { id: 'us-gov-open-data', name: 'US Government Open Data', github_url: 'https://github.com/lzinga/us-gov-open-data-mcp', description: '米国政府の40以上の API: 財務省・FRED・議会・FDA・CDC 統計など。', language: 'nodejs', tags: ['government','economics','health','finance'], requires_api_key: 'partial', demo_tip: 'BigQuery の社内データと組み合わせてマクロ経済指標とビジネス成果を相関分析するデモに最適。' },
+            { id: 'us-legal', name: 'US Legal & Legislation', github_url: 'https://github.com/JamesANZ/us-legal-mcp', description: '米国議会法案・連邦官報・CourtListener を通じた判例。', language: 'python', tags: ['legal','regulation','compliance'], requires_api_key: false, demo_tip: '規制監視をテーマにしたコンプライアンス系デモに最適。' }
           ]
         },
         {
-          id: 'environment', name: 'Environment & Weather', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg>',
+          id: 'environment', name: '環境・気象', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg>',
           servers: [
-            { id: 'weather-mcp', name: 'Weather Data', github_url: 'https://github.com/weather-mcp/weather-mcp', description: 'Global weather data: forecasts, current conditions, historical data (1940-present), alerts, air quality, marine conditions, and wildfire tracking. No API keys required.', language: 'nodejs', tags: ['weather','environment','forecast','global'], requires_api_key: false, demo_tip: 'Perfect for logistics, retail, or energy demos where weather directly impacts operations, supply chain, or demand.' }
+            { id: 'weather-mcp', name: 'Weather Data', github_url: 'https://github.com/weather-mcp/weather-mcp', description: '世界の気象データ: 予報・現況・過去データ（1940年〜）・アラート・大気質・海洋情報・山火事追跡。API キー不要。', language: 'nodejs', tags: ['weather','environment','forecast','global'], requires_api_key: false, demo_tip: '天気が業務・サプライチェーン・需要に直結する物流・小売・エネルギー系デモに最適。' }
           ]
         },
         {
-          id: 'finance', name: 'Finance & Markets', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>',
+          id: 'finance', name: '金融・市場', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>',
           servers: [
-            { id: 'yahoo-finance', name: 'Yahoo Finance', github_url: 'https://github.com/Alex2Yang97/yahoo-finance-mcp', description: 'Stock info, historical prices, financial statements, options data, and analyst recommendations.', language: 'python', tags: ['stocks','markets','financial-data'], requires_api_key: false, demo_tip: 'Perfect for investment analysis or portfolio monitoring demos.' }
+            { id: 'yahoo-finance', name: 'Yahoo Finance', github_url: 'https://github.com/Alex2Yang97/yahoo-finance-mcp', description: '株式情報・過去の株価・財務諸表・オプションデータ・アナリスト推奨。', language: 'python', tags: ['stocks','markets','financial-data'], requires_api_key: false, demo_tip: '投資分析やポートフォリオ監視デモに最適。' }
           ]
         },
         {
-          id: 'social', name: 'Social & Communication', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path></svg>',
+          id: 'social', name: 'ソーシャル・コミュニケーション', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path></svg>',
           servers: [
 
-            { id: 'line-bot', name: 'LINE Bot', github_url: 'https://github.com/line/line-bot-mcp-server', description: 'LINE Messaging API integration: send messages, manage rich menus, retrieve profiles.', language: 'nodejs', tags: ['messaging','japan','chatbot'], requires_api_key: true, demo_tip: 'Essential for Japan-market demos with customer-facing messaging.' },
-            { id: 'slack-mcp', name: 'Slack', type: 'remote', endpoint_url: 'https://mcp.slack.com/mcp', auth_type: 'oauth2_slack', github_url: null, docs_url: 'https://docs.slack.dev/ai/slack-mcp-server/', description: 'Search channels & messages, send messages, manage canvases, and access user profiles via Slack MCP Server.', language: 'managed', tags: ['communication','collaboration','messaging','slack'], requires_api_key: true, demo_tip: 'Enable team communication analysis and automated Slack messaging in demos.' }
+            { id: 'line-bot', name: 'LINE Bot', github_url: 'https://github.com/line/line-bot-mcp-server', description: 'LINE Messaging API 連携: メッセージ送信・リッチメニュー管理・プロフィール取得。', language: 'nodejs', tags: ['messaging','japan','chatbot'], requires_api_key: true, demo_tip: '顧客向けメッセージングを含む日本市場向けデモに必須。' },
+            { id: 'slack-mcp', name: 'Slack', type: 'remote', endpoint_url: 'https://mcp.slack.com/mcp', auth_type: 'oauth2_slack', github_url: null, docs_url: 'https://docs.slack.dev/ai/slack-mcp-server/', description: 'Slack MCP Server 経由でチャンネル・メッセージ検索、メッセージ送信、キャンバス管理、ユーザープロフィール取得。', language: 'managed', tags: ['communication','collaboration','messaging','slack'], requires_api_key: true, demo_tip: 'デモでのチームコミュニケーション分析や Slack 自動送信を実現。' }
           ]
         },
         {
-          id: 'japan', name: 'Japan-Specific', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+          id: 'japan', name: '日本特化', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
           servers: [
-            { id: 'mlit-dpf', name: 'MLIT Data Platform', github_url: 'https://github.com/MLIT-DATA-PLATFORM/mlit-dpf-mcp', description: 'Japanese Ministry of Land, Infrastructure, Transport and Tourism data platform for geospatial data.', language: 'python', tags: ['infrastructure','geospatial','japan-gov'], requires_api_key: true, demo_tip: 'Combine with internal real estate or logistics data for location intelligence.' },
-            { id: 'tax-law', name: 'Japanese Tax Law', github_url: 'https://github.com/kentaroajisaka/tax-law-mcp', description: 'Japanese tax laws, administrative circulars (tsutatsu), and judicial precedents.', language: 'python', tags: ['tax','legal','japan-gov'], requires_api_key: false, demo_tip: 'Ideal for accounting/consulting demos needing authoritative tax references.' },
-            { id: 'labor-law', name: 'Japanese Labor Law', github_url: 'https://github.com/kentaroajisaka/labor-law-mcp', description: 'Japanese labor & social insurance law via e-Gov API, MHLW circulars, and JAISH safety directives. 45+ preset laws with abbreviation support.', language: 'nodejs', tags: ['labor','legal','compliance','japan-gov'], requires_api_key: false, demo_tip: 'Perfect for HR/compliance demos verifying labor regulations against actual statute text.' },
-            { id: 'kokkai-giji', name: 'National Diet Proceedings', github_url: 'https://github.com/seiichi3141/kokkai_giji_mcp', description: 'Search Japanese National Diet proceedings: meeting records, individual speeches, speaker analysis via NDL API.', language: 'nodejs', tags: ['government','politics','parliament','japan-gov'], requires_api_key: false, demo_tip: 'Great for public affairs or policy analysis demos tracking legislative discussions.' }
+            { id: 'mlit-dpf', name: 'MLIT Data Platform', github_url: 'https://github.com/MLIT-DATA-PLATFORM/mlit-dpf-mcp', description: '国土交通省の地理空間データプラットフォーム。', language: 'python', tags: ['infrastructure','geospatial','japan-gov'], requires_api_key: true, demo_tip: '社内の不動産・物流データと組み合わせた位置情報インテリジェンスデモに最適。' },
+            { id: 'tax-law', name: 'Japanese Tax Law', github_url: 'https://github.com/kentaroajisaka/tax-law-mcp', description: '日本の税法・通達・判例。', language: 'python', tags: ['tax','legal','japan-gov'], requires_api_key: false, demo_tip: '権威ある税務情報が必要な会計・コンサル系デモに最適。' },
+            { id: 'labor-law', name: 'Japanese Labor Law', github_url: 'https://github.com/kentaroajisaka/labor-law-mcp', description: 'e-Gov API・厚生労働省通達・JISHA 安全指令による労働・社会保険法。45以上のプリセット法令と略称対応。', language: 'nodejs', tags: ['labor','legal','compliance','japan-gov'], requires_api_key: false, demo_tip: '実際の法令条文と照合する HR・コンプライアンス系デモに最適。' },
+            { id: 'kokkai-giji', name: 'National Diet Proceedings', github_url: 'https://github.com/seiichi3141/kokkai_giji_mcp', description: '国会議事録検索: 会議録・個人発言・NDL API による発言者分析。', language: 'nodejs', tags: ['government','politics','parliament','japan-gov'], requires_api_key: false, demo_tip: '立法議論を追跡する政策分析・公共政策系デモに最適。' }
           ]
         },
 
         {
-          id: 'google-official', name: 'Google Official', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>',
+          id: 'google-official', name: 'Google 公式', icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>',
           servers: [
-            { id: 'google-workspace-mcp', name: 'Google Workspace MCP', type: 'workspace', dev_preview: true, github_url: null, docs_url: 'https://developers.google.com/workspace/guides/configure-mcp-servers', description: 'Official Google Workspace MCP servers: Gmail, Google Drive, Calendar, Chat, and People. Access emails, files, events, and contacts.', language: 'managed', tags: ['google','workspace','gmail','drive','calendar','chat'], requires_api_key: 'oauth', demo_tip: 'Powerful for enterprise demos needing email, calendar, and document integration.' }
+            { id: 'google-workspace-mcp', name: 'Google Workspace MCP', type: 'workspace', dev_preview: true, github_url: null, docs_url: 'https://developers.google.com/workspace/guides/configure-mcp-servers', description: '公式 Google Workspace MCP サーバー: Gmail、Google Drive、Calendar、Chat、People。メール・ファイル・予定・連絡先へのアクセス。', language: 'managed', tags: ['google','workspace','gmail','drive','calendar','chat'], requires_api_key: 'oauth', demo_tip: 'メール・カレンダー・ドキュメント連携が必要なエンタープライズデモに強力。' }
           ]
         }
       ],
       recipes: [
-        { name: 'Public Data & Climate Analyst', description: 'Correlate global weather hazards and US macroeconomic indicators with market trends and financial performance.', servers: ['us-gov-open-data','yahoo-finance','weather-mcp'], industries: ['retail','financial-services','agriculture'] },
-        { name: 'Regulatory & Legislative Monitor', description: 'Monitor US legislation, Federal Register documents, and court opinions alongside government statistics.', servers: ['us-legal','us-gov-open-data'], industries: ['financial-services','legal','compliance'] },
-        { name: 'Japan Business Intelligence', description: 'Comprehensive analysis of Japanese markets combining geospatial infrastructure, tax law, and labor compliance.', servers: ['mlit-dpf','tax-law','labor-law'], industries: ['real-estate','logistics','consulting'] },
-        { name: 'Japan Climate & Logistics', description: 'Optimize logistics, real estate development, and supply chain resiliency in Japan against weather risks.', servers: ['mlit-dpf','weather-mcp'], industries: ['logistics','real-estate','insurance'] }
+        { name: 'パブリックデータ・気候アナリスト', description: '世界の気象リスクと米国マクロ経済指標を市場動向・財務実績と相関分析。', servers: ['us-gov-open-data','yahoo-finance','weather-mcp'], industries: ['retail','financial-services','agriculture'] },
+        { name: '規制・立法モニター', description: '米国法律・連邦官報・判例を政府統計と合わせてモニタリング。', servers: ['us-legal','us-gov-open-data'], industries: ['financial-services','legal','compliance'] },
+        { name: 'ジャパン ビジネスインテリジェンス', description: '地理空間インフラ・税法・労働コンプライアンスを組み合わせた日本市場の総合分析。', servers: ['mlit-dpf','tax-law','labor-law'], industries: ['real-estate','logistics','consulting'] },
+        { name: 'ジャパン 気候・物流', description: '気象リスクに対する日本国内の物流・不動産開発・サプライチェーン強靭化を最適化。', servers: ['mlit-dpf','weather-mcp'], industries: ['logistics','real-estate','insurance'] }
       ]
     };
 
@@ -6301,8 +6301,8 @@
                 '<div class="flex items-center gap-1.5">' +
                   '<h4 class="text-sm font-bold text-white truncate">' + server.name + '</h4>' +
                   ((server.type === 'remote' || server.type === 'workspace')
-                    ? '<a href="' + (server.docs_url || '#') + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="View documentation" class="flex-shrink-0 text-gray-600 hover:text-gray-300 transition-colors"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>'
-                    : '<a href="' + server.github_url + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="View on GitHub" class="flex-shrink-0 text-gray-600 hover:text-gray-300 transition-colors">' +
+                    ? '<a href="' + (server.docs_url || '#') + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="ドキュメントを見る" class="flex-shrink-0 text-gray-600 hover:text-gray-300 transition-colors"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>'
+                    : '<a href="' + server.github_url + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="GitHub で見る" class="flex-shrink-0 text-gray-600 hover:text-gray-300 transition-colors">' +
                       '<svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>' +
                     '</a>') +
                 '</div>' +
@@ -6395,8 +6395,8 @@
           transport_mode: 'streamable_http',
           is_supported: true,
           required_env_vars: [
-            { key: 'SLACK_CLIENT_ID', description: 'Slack App Client ID', is_secret: false, is_required: true },
-            { key: 'SLACK_CLIENT_SECRET', description: 'Slack App Client Secret', is_secret: true, is_required: true }
+            { key: 'SLACK_CLIENT_ID', description: 'Slack アプリ クライアント ID', is_secret: false, is_required: true },
+            { key: 'SLACK_CLIENT_SECRET', description: 'Slack アプリ クライアントシークレット', is_secret: true, is_required: true }
           ],
           github_url: server.docs_url,
           docs_url: server.docs_url,
@@ -6434,7 +6434,7 @@
             const failCard = document.getElementById('catalog-card-' + serverId);
             if (failCard) failCard.classList.remove('is-adding');
             if (failBtn) {
-              failBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Failed';
+              failBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>失敗';
               failBtn.classList.remove('opacity-70', 'pointer-events-none');
               failBtn.classList.add('text-red-400', 'border-red-500/20');
             }
@@ -6456,7 +6456,7 @@
           const errCard = document.getElementById('catalog-card-' + serverId);
           if (errCard) errCard.classList.remove('is-adding');
           if (errBtn) {
-            errBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Error';
+            errBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>エラー';
             errBtn.classList.remove('opacity-70', 'pointer-events-none');
           }
           setTimeout(() => { renderCatalogGrid(document.getElementById('mcpCatalogSearch').value.toLowerCase().trim()); renderRecipes(); }, 2000);
@@ -6479,7 +6479,7 @@
       if (!badge) return;
       const totalCount = cachedImportedMcpList.length + (window.workspaceMcpIncluded ? 1 : 0);
       if (totalCount > 0) {
-        badge.textContent = totalCount + ' added';
+        badge.textContent = totalCount + ' 件追加済';
         badge.classList.remove('hidden');
       } else {
         badge.classList.add('hidden');
@@ -6608,13 +6608,13 @@
           resultSection.classList.remove('hidden');
           
           if (!res.success) {
-            document.getElementById('mcpStatusMessage').innerHTML = '<p class="text-red-400 text-sm">Analysis Error: ' + res.message + '</p>';
+            document.getElementById('mcpStatusMessage').innerHTML = '<p class="text-red-400 text-sm">解析エラー: ' + res.message + '</p>';
             return;
           }
           
           const data = res.data;
           if (!data.is_supported) {
-            document.getElementById('mcpStatusMessage').innerHTML = '<div class="p-4 bg-red-950/30 border border-red-500/20 rounded-2xl text-sm text-red-400">🚨 <strong>Unsupported Repository:</strong> ' + data.unsupported_reason + '</div>';
+            document.getElementById('mcpStatusMessage').innerHTML = '<div class="p-4 bg-red-950/30 border border-red-500/20 rounded-2xl text-sm text-red-400">🚨 <strong>非対応リポジトリ:</strong> ' + data.unsupported_reason + '</div>';
             document.getElementById('mcpEnvVarList').classList.add('hidden');
             return;
           }
@@ -6627,14 +6627,14 @@
           
           let addButtonHtml;
           if (isDuplicate) {
-            addButtonHtml = '<div class="p-2 bg-amber-950/30 border border-amber-500/20 rounded-xl text-xs text-amber-400 mt-2">⚠️ This MCP server is already added to your demo plan.</div>' +
+            addButtonHtml = '<div class="p-2 bg-amber-950/30 border border-amber-500/20 rounded-xl text-xs text-amber-400 mt-2">⚠️ この MCP サーバーはすでにデモプランに追加済みです。</div>' +
               '<button disabled class="w-full bg-gray-700 text-gray-400 mt-4 py-3 font-bold text-sm rounded-2xl cursor-not-allowed flex items-center justify-center gap-2 select-none">' +
               '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>追加済み</button>';
           } else {
             addButtonHtml = '<button onclick="applyImportAndClose()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white mt-4 py-3 font-bold text-sm rounded-2xl transition-all flex items-center justify-center gap-2 select-none">デモ生成に追加</button>';
           }
           
-          document.getElementById('mcpStatusMessage').innerHTML = '<div class="p-4 bg-emerald-950/30 border border-emerald-500/20 rounded-2xl text-sm text-emerald-400">✅ <strong>Analysis Completed!</strong> Language: ' + data.language.toUpperCase() + ' (' + data.transport_mode.toUpperCase() + ')</div>' + addButtonHtml;
+          document.getElementById('mcpStatusMessage').innerHTML = '<div class="p-4 bg-emerald-950/30 border border-emerald-500/20 rounded-2xl text-sm text-emerald-400">✅ <strong>解析完了！</strong> 言語: ' + data.language.toUpperCase() + ' (' + data.transport_mode.toUpperCase() + ')</div>' + addButtonHtml;
             
           // Update Analyze button state to allow re-analysis
           btn.disabled = false;
