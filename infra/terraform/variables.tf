@@ -35,6 +35,6 @@ variable "provisioner_image" {
 
 variable "iap_audience" {
   type        = string
-  description = "IAP の JWT audience（/projects/<NUMBER>/apps/<PROJECT_ID> 形式）。IAP 有効化後に判明する値。空のまま deploy すると IAP audience 検証がスキップされる。"
+  description = "IAP の JWT audience の明示オーバーライド。空の場合は main.tf の local で Cloud Run 形式 /projects/<NUMBER>/locations/<REGION>/services/generator を自動導出する。注意: この値が誤り/不一致だと iapAuth が JWT 検証に失敗し /api が全て 401 になる（空＝検証スキップではない）。"
   default     = ""
 }

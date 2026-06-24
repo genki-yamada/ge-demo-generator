@@ -14,6 +14,12 @@ provider "google" {
 }
 
 locals {
+  # IAP JWT audience for the generator service. Cloud Run integrated IAP uses the
+  # format /projects/<NUMBER>/locations/<REGION>/services/<SERVICE_NAME>. Derived from
+  # the project number so it is never stale; var.iap_audience overrides when non-empty.
+  # (An empty value reaching the container makes iapAuth reject every /api call with 401.)
+  iap_audience = var.iap_audience != "" ? var.iap_audience : "/projects/${data.google_project.current.number}/locations/${var.region}/services/generator"
+
   services = [
     "run.googleapis.com",
     "firestore.googleapis.com",
@@ -105,7 +111,7 @@ resource "google_cloud_run_v2_service" "generator" {
       }
       env {
         name  = "IAP_AUDIENCE"
-        value = var.iap_audience
+        value = local.iap_audience
       }
     }
   }
