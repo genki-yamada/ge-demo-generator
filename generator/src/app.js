@@ -23,7 +23,7 @@ export function buildApp({ registry, authMiddleware, services = {} }) {
   app.use(express.json());
 
   // 静的UI（generator/web/）は IAP がエッジで保護するため authMiddleware の外で配信する。
-  // generator/web/ はまだ存在しない（U-2 が作成）。存在しなくても起動は問題ない。
+  // web/ は Docker イメージに COPY 済み（Dockerfile）。存在しなくても起動は問題ない。
   const webDir = join(__dirname, '..', 'web');
   app.use(express.static(webDir));
 
