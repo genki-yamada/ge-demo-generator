@@ -176,6 +176,30 @@ export function demosRouter(registry, services = {}) {
     } catch (err) { next(err); }
   });
 
+  // ── GE-3: POST /api/demos/:id/register-ge ────────────────────────────────
+  // Register an active demo's Cloud Run agent to Gemini Enterprise.
+  // Sets ingress=all, grants GE Discovery Engine SA run.invoker, registers to GE app.
+
+  router.post('/:id/register-ge', async (req, res, next) => {
+    try {
+      const { geRegistrar } = services;
+      if (typeof geRegistrar?.registerToGe !== 'function') {
+        return res.status(503).json({ error: 'GE registration not configured' });
+      }
+      const demo = await registry.get(req.params.id);
+      if (!demo) return res.status(404).json({ error: 'not found' });
+      if (demo.state !== 'active') {
+        return res.status(409).json({ error: `cannot register in state: ${demo.state}` });
+      }
+      const result = await geRegistrar.registerToGe({ demoId: demo.id, region: services.config?.agentRegion });
+      return res.status(200).json({
+        demoId: demo.id,
+        agentId: result.agentId ?? null,
+        alreadyRegistered: !!result.alreadyRegistered,
+      });
+    } catch (err) { next(err); }
+  });
+
   // ── Plan A: GET /api/demos/:id ────────────────────────────────────────────
 
   router.get('/:id', async (req, res, next) => {
