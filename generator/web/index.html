@@ -1,10 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
+﻿<!DOCTYPE html>
+<html lang="ja">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ADK Agent Demo Generator</title>
+  <title>ADK エージェント デモジェネレーター</title>
   <script src="https://cdn.tailwindcss.com"></script> <!-- Tailwind CDN used for portability in GAS environment -->
   <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1059,8 +1059,8 @@
           <svg class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
         </div>
         <div>
-          <h2 class="text-lg font-bold text-white">External Data Sources</h2>
-          <p class="text-[11px] text-gray-500">Add MCP servers to enhance your demo with external data</p>
+          <h2 class="text-lg font-bold text-white">外部データソース</h2>
+          <p class="text-[11px] text-gray-500">MCP サーバーを追加してデモを外部データで強化</p>
         </div>
       </div>
       <button onclick="closeMcpModal()" aria-label="Close modal" class="text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 rounded-lg p-1 transition-colors">
@@ -1072,15 +1072,15 @@
     <div class="flex border-b border-white/10 px-6 gap-0">
       <button class="mcp-tab active" data-tab="catalog" onclick="switchMcpTab('catalog')">
         <svg class="w-3.5 h-3.5 inline-block mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-        Browse Catalog
+        カタログを見る
       </button>
       <button class="mcp-tab" data-tab="recipes" onclick="switchMcpTab('recipes')">
         <svg class="w-3.5 h-3.5 inline-block mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
-        Recommended Combos
+        おすすめコンボ
       </button>
       <button class="mcp-tab" data-tab="url" onclick="switchMcpTab('url')">
         <svg class="w-3.5 h-3.5 inline-block mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-        Import from URL
+        URL からインポート
       </button>
     </div>
 
@@ -1093,7 +1093,7 @@
         <!-- Search Bar -->
         <div class="relative">
           <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-          <input type="text" id="mcpCatalogSearch" placeholder="Search servers by name, category, or capability..." class="mcp-search-input" oninput="filterMcpCatalog()">
+          <input type="text" id="mcpCatalogSearch" placeholder="名前・カテゴリ・機能でサーバーを検索..." class="mcp-search-input" oninput="filterMcpCatalog()">
         </div>
 
         <!-- Catalog Grid (populated by JS) -->
@@ -1104,7 +1104,7 @@
       <!-- ============ TAB 2: RECOMMENDED COMBOS ============ -->
       <div id="mcpTabRecipes" class="hidden flex flex-col gap-5">
         <div class="flex flex-col gap-1.5">
-          <p class="text-xs text-gray-400 leading-relaxed">Select a pre-configured bundle of MCP servers tailored for common business scenarios to quickly bootstrap your demo.</p>
+          <p class="text-xs text-gray-400 leading-relaxed">一般的なビジネスシナリオ向けに事前設定された MCP サーバーのバンドルを選択し、デモを素早く起動できます。</p>
         </div>
         <div id="mcpRecipeCards" class="grid grid-cols-1 gap-3"></div>
       </div>
@@ -1116,28 +1116,28 @@
         <div class="bg-black/40 border border-white/10 rounded-2xl p-5 text-sm text-gray-300 space-y-4 font-inter">
           <details class="group bg-black/20 border border-white/5 rounded-xl p-3 cursor-pointer transition-all hover:border-white/10">
             <summary class="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-wider focus:outline-none">
-              <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> How It Works</span>
+              <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> 仕組み</span>
               <span class="text-gray-500 transition-transform group-open:rotate-180">▼</span>
             </summary>
             <div class="flex flex-col gap-1 text-xs text-gray-300 bg-black/30 p-4 rounded-xl border border-white/5 mt-3">
               <div class="flex items-center gap-3">
                 <div class="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center font-bold flex-shrink-0 text-[10px]">1</div>
-                <div><strong>Analyze:</strong> Enter GitHub URL. Gemini scans for language & env vars.</div>
+                <div><strong>解析:</strong> GitHub URL を入力。Gemini が言語と環境変数をスキャン。</div>
               </div>
               <div class="ml-2.5 h-2.5 border-l-2 border-dashed border-sky-500/30"></div>
               <div class="flex items-center gap-3">
                 <div class="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center font-bold flex-shrink-0 text-[10px]">2</div>
-                <div><strong>Integrate:</strong> Click "Add to Demo". Script includes MCP sidecar setup.</div>
+                <div><strong>統合:</strong> 「デモに追加」をクリック。スクリプトに MCP サイドカー設定を含む。</div>
               </div>
               <div class="ml-2.5 h-2.5 border-l-2 border-dashed border-sky-500/30"></div>
               <div class="flex items-center gap-3">
                 <div class="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold flex-shrink-0 text-[10px]">3</div>
-                <div><strong>Input:</strong> Run script in Cloud Shell. Prompted for API keys.</div>
+                <div><strong>入力:</strong> Cloud Shell でスクリプトを実行。API キーの入力を求められます。</div>
               </div>
               <div class="ml-2.5 h-2.5 border-l-2 border-dashed border-amber-500/30"></div>
               <div class="flex items-center gap-3">
                 <div class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold flex-shrink-0 text-[10px]">4</div>
-                <div><strong>Deploy:</strong> Keys saved in Secret Manager, MCP cloned into agent container, and run as a sidecar.</div>
+                <div><strong>デプロイ:</strong> キーは Secret Manager に保存、MCP はエージェントコンテナにクローンされサイドカーとして実行。</div>
               </div>
             </div>
           </details>
@@ -1145,30 +1145,30 @@
           <!-- Warnings & Constraints Accordion -->
           <details class="group bg-black/20 border border-white/5 rounded-xl p-3 cursor-pointer transition-all hover:border-white/10">
             <summary class="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-wider focus:outline-none">
-              <span class="flex items-center gap-1.5"><svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg> Warnings & Constraints</span>
+              <span class="flex items-center gap-1.5"><svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg> 注意事項と制約</span>
               <span class="text-gray-500 transition-transform group-open:rotate-180">▼</span>
             </summary>
             <ul class="list-disc pl-5 space-y-1 text-xs text-gray-400 mt-3">
-              <li>Supports Python and Node.js/TypeScript repositories only.</li>
-              <li>Environment variables prompted securely in terminal.</li>
-              <li>No support for OAuth or interactive auth frameworks.</li>
-              <li>Heavy native binaries (e.g., Chromium, FFmpeg) are skipped.</li>
+              <li>Python および Node.js/TypeScript リポジトリのみ対応。</li>
+              <li>環境変数はターミナルで安全に入力。</li>
+              <li>OAuth やインタラクティブ認証フレームワークは非対応。</li>
+              <li>大型ネイティブバイナリ（Chromium、FFmpeg 等）はスキップ。</li>
             </ul>
           </details>
 
           <!-- Technical Architecture Accordion -->
           <details class="group bg-black/20 border border-white/5 rounded-xl p-3 cursor-pointer transition-all hover:border-white/10">
             <summary class="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-wider focus:outline-none">
-              <span class="flex items-center gap-1.5"><svg class="w-3 h-3 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg> Technical Architecture</span>
+              <span class="flex items-center gap-1.5"><svg class="w-3 h-3 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg> 技術アーキテクチャ</span>
               <span class="text-gray-500 transition-transform group-open:rotate-180">▼</span>
             </summary>
             <div class="mt-3 text-xs text-gray-400 space-y-2">
-              <p class="leading-relaxed">Leverages our <strong>Universal MCP Bridge</strong> architecture:</p>
+              <p class="leading-relaxed"><strong>Universal MCP Bridge</strong> アーキテクチャを活用:</p>
               <ul class="list-disc pl-5 space-y-1">
-                <li><strong>Runtime Abstraction:</strong> Eliminates buildpack dependencies via a generic proxy.</li>
-                <li><strong>Transport Negotiation:</strong> Bridges HTTP/SSE to stdio/SSE automatically.</li>
-                <li><strong>Automated Deployment:</strong> Cloned into agent container and run as a sidecar.</li>
-                <li><strong>Auto-Binding:</strong> Binds to agent internally via supergateway.</li>
+                <li><strong>ランタイム抽象化:</strong> 汎用プロキシでビルドパック依存を解消。</li>
+                <li><strong>トランスポート調整:</strong> HTTP/SSE を stdio/SSE に自動ブリッジ。</li>
+                <li><strong>自動デプロイ:</strong> エージェントコンテナにクローンしサイドカーとして実行。</li>
+                <li><strong>自動バインディング:</strong> supergateway 経由でエージェントに内部接続。</li>
               </ul>
               <div class="mt-3 bg-black/60 p-2.5 rounded-xl border border-white/5 font-mono text-[9px] text-center text-sky-400/60">
                 Agent ──(HTTP/SSE)──▶ [Universal Bridge] ──(stdio/SSE)──▶ Custom MCP
@@ -1179,14 +1179,14 @@
 
         <!-- URL Input -->
         <div class="flex flex-col gap-2">
-          <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">GitHub Repository URL</label>
+          <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">GitHub リポジトリ URL</label>
           <div class="flex gap-3">
             <input type="text" id="mcpRepoUrl" placeholder="https://github.com/owner/repo-name" 
                    onkeydown="if(event.key==='Enter'){event.preventDefault();triggerMcpAnalysis();}"
                    class="flex-1 bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent">
             <button id="btnMcpImport" onclick="triggerMcpAnalysis()"
                     class="bg-sky-500 hover:bg-sky-600 text-white px-6 font-bold text-sm rounded-2xl transition-all flex items-center gap-2">
-              Analyze
+              解析
             </button>
           </div>
         </div>
@@ -1194,13 +1194,13 @@
         <!-- Loading & Results (preserved) -->
         <div id="mcpLoading" class="hidden text-center py-4 flex flex-col items-center gap-3">
            <div class="w-6 h-6 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>
-           <p class="text-sm text-sky-400">Gemini is analyzing the repository...</p>
+           <p class="text-sm text-sky-400">Gemini がリポジトリを解析中...</p>
         </div>
 
         <div id="mcpResult" class="hidden border-t border-white/10 pt-4 mt-2 flex flex-col gap-4">
            <div id="mcpStatusMessage"></div>
            <div id="mcpEnvVarList" class="hidden flex flex-col gap-2">
-              <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Required Environmental Variables (Key Names Only):</label>
+              <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">必要な環境変数（キー名のみ）:</label>
               <div id="mcpEnvVarsBox" class="bg-black/30 border border-white/5 rounded-2xl p-4 font-mono text-xs text-gray-300 flex flex-col gap-1"></div>
            </div>
         </div>
@@ -1237,7 +1237,7 @@
       class="w-64 ml-6 my-6 hidden lg:flex flex-col glass rounded-3xl overflow-hidden shadow-2xl sidebar-transition z-20">
       <div class="p-6 h-full flex flex-col overflow-y-auto no-scrollbar">
         <div class="flex items-center justify-between mb-6 px-3">
-          <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Workflow</h3>
+          <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">ワークフロー</h3>
           <button onclick="toggleLeftSidebar()" class="text-gray-500 hover:text-white transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
@@ -1248,37 +1248,37 @@
 
         <!-- Workflow -->
         <a href="#section-step1" class="nav-item active" data-section="section-step1">
-          Step 1: Define Goal
+          ステップ1: 目的の定義
         </a>
         <a href="#section-step2" class="nav-item" data-section="section-step2">
-          Step 2: Review
+          ステップ2: レビュー
         </a>
         <a href="#section-step3" class="nav-item" data-section="section-step3">
-          Step 3: Deploy
+          ステップ3: デプロイ
         </a>
         <a href="#section-step4" class="nav-item" data-section="section-step4">
-          Step 4: Run Demo
+          ステップ4: デモ実行
         </a>
 
         <!-- Explore -->
         <div class="px-3 mt-8 mb-4">
-          <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Explore</h3>
+          <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">探索</h3>
         </div>
         <button onclick="openWhatsNew()" class="nav-item w-full text-left flex items-center">
 
           <svg class="w-3.5 h-3.5 mr-1.5 inline-block text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-          What's New
+          新着情報
         </button>
 
         <!-- Resources -->
         <div class="px-3 mt-8 mb-4">
-          <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Resources</h3>
+          <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">リソース</h3>
         </div>
         <button onclick="openOnboarding()" class="nav-item w-full text-left flex items-center">
           <svg class="w-3.5 h-3.5 mr-1.5 inline-block text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          About this toolkit
+          このツールについて
         </button>
         <a href="https://github.com/ryotat7/ge-demo-generator" target="_blank"
           class="nav-item w-full text-left flex items-center">
@@ -1315,28 +1315,28 @@
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
               </span>
-              New
+              新着
             </span>
-            
+
             <!-- Fade Slides Container -->
             <div class="relative flex-1 h-[28px] text-xs text-gray-200 self-center flex items-center">
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-100 flex items-center">
-                <span>⚡ <strong>Default Model Updated:</strong> The default agent model has been upgraded to <strong>Gemini 3.5 Flash</strong>, delivering blazing fast speed and advanced reasoning capabilities out of the box!</span>
+                <span>⚡ <strong>デフォルトモデル更新:</strong> デフォルトエージェントモデルが <strong>Gemini 3.5 Flash</strong> にアップグレードされ、圧倒的な速度と高度な推論能力をすぐに利用できます！</span>
               </div>
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
-                <span>🧪 <strong>Agent Sandbox (Code Execution):</strong> Next '26 — Secure Python sandbox for advanced analysis, NLP & data science. <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/scale/sandbox/code-execution-overview" target="_blank" class="text-sky-400 underline cursor-pointer hover:text-sky-300 focus:outline-none">Learn more</a></span>
+                <span>🧪 <strong>エージェントサンドボックス（コード実行）:</strong> '26年次 — 高度な分析、NLP、データサイエンス向けの安全な Python サンドボックス。<a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/scale/sandbox/code-execution-overview" target="_blank" class="text-sky-400 underline cursor-pointer hover:text-sky-300 focus:outline-none">詳細を見る</a></span>
               </div>
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
-                <span><svg class="w-3.5 h-3.5 inline-block -mt-0.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> <strong>External Data Sources:</strong> Browse our curated catalog of MCP servers — government data, finance, legal & more! <button onclick="openMcpModal()" class="text-sky-400 underline cursor-pointer hover:text-sky-300 focus:outline-none">Browse catalog</button></span>
+                <span><svg class="w-3.5 h-3.5 inline-block -mt-0.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> <strong>外部データソース:</strong> 政府データ、金融、法律などの MCP サーバーのキュレートカタログを参照！ <button onclick="openMcpModal()" class="text-sky-400 underline cursor-pointer hover:text-sky-300 focus:outline-none">カタログを見る</button></span>
               </div>
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
-                <span>🔌 <strong>Google Workspace MCP:</strong> Gmail, Drive, Calendar & more now in the MCP catalog! <button onclick="openMcpModal()" class="text-sky-400 underline cursor-pointer hover:text-sky-300 focus:outline-none">Browse catalog</button></span>
+                <span>🔌 <strong>Google Workspace MCP:</strong> Gmail、Drive、Calendar などが MCP カタログに登場！ <button onclick="openMcpModal()" class="text-sky-400 underline cursor-pointer hover:text-sky-300 focus:outline-none">カタログを見る</button></span>
               </div>
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
-                <span>🤖 <strong>A2A + A2UI:</strong> Standard A2A messaging, Human-in-the-loop, and interactive UI components (cards, forms, approvals).</span>
+                <span>🤖 <strong>A2A + A2UI:</strong> 標準 A2A メッセージング、ヒューマン・イン・ザ・ループ、およびインタラクティブ UI コンポーネント（カード、フォーム、承認）に対応。</span>
               </div>
               <div class="banner-slide absolute inset-0 transition-all duration-500 ease-in-out opacity-0 pointer-events-none flex items-center">
-                <span>⚡ <strong>Agentic Workflow:</strong> Instantly generate custom zero-code demos with unstructured documents (images/PDFs), AI-proposed SKU mapping chips, and Human-in-the-loop approval!</span>
+                <span>⚡ <strong>エージェントワークフロー:</strong> 非構造化ドキュメント（画像/PDF）、AI 提案の SKU マッピングチップ、ヒューマン・イン・ザ・ループ承認を含むカスタムゼロコードデモを即座に生成！</span>
               </div>
             </div>
 
@@ -1370,12 +1370,11 @@
 
           <p
             class="text-gray-400 text-base text-center lg:text-left mx-auto lg:mx-0 leading-relaxed font-light">
-            Instantly generate <b>custom demo environments</b> for any business domain. This tool <b>dynamically
-              synthesizes datasets</b> and configures agents tailored to your client's unique challenges.
+            <b>カスタムデモ環境</b>を任意のビジネスドメインに即座に生成。このツールはデータセットを<b>動的に
+              合成</b>し、クライアントの固有の課題に合わせたエージェントを設定します。
             <button onclick="toggleArchitecture()"
               class="inline-flex items-center gap-1 text-sky-400/70 hover:text-sky-400 transition-colors ml-1 font-medium group">
-              <span class="border-b border-sky-400/30 group-hover:border-sky-400 leading-none pb-0.5">How it
-                works</span>
+              <span class="border-b border-sky-400/30 group-hover:border-sky-400 leading-none pb-0.5">仕組み</span>
               <svg class="w-3 h-3 transition-transform duration-300 group-data-[open=true]:rotate-180" fill="none"
                 stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -1395,11 +1394,11 @@
                   </span>
                   <div class="flex items-baseline gap-1.5 flex-wrap">
                     <span class="stat-highlight" id="statTotalDemosBanner">—</span>
-                    <span class="stat-label">demos created by</span>
+                    <span class="stat-label">件のデモを</span>
                     <span class="stat-highlight" id="statTotalUsersBanner">—</span>
-                    <span class="stat-label">users across</span>
+                    <span class="stat-label">人のユーザーが</span>
                     <span class="stat-highlight" id="statTotalLocationsBanner">—</span>
-                    <span class="stat-label">offices</span>
+                    <span class="stat-label">拠点で作成</span>
                   </div>
                 </div>
                 <!-- Divider -->
@@ -1425,16 +1424,16 @@
                         d="M13 10V3L4 14h7v7l9-11h-7z">
                       </path>
                     </svg>
-                    How GE Demo Generator Works
+                    GE Demo Generator の仕組み
                   </h3>
                   <p class="text-[13px] text-gray-300 leading-relaxed mb-4">
-                    This web application does not deploy resources directly into your project. Instead, it dynamically synthesizes a personalized <b>Setup Shell Script</b> based on your custom inputs. Once you execute this script in your Google Cloud Shell, it automatically provisions all necessary resources (BigQuery, Firestore, Cloud Run) securely within your own Google Cloud environment, allowing you to instantly start demonstrations.
+                    このウェブアプリは、リソースをプロジェクトに直接デプロイしません。代わりに、入力内容に基づいてパーソナライズされた<b>セットアップシェルスクリプト</b>を動的に合成します。Google Cloud Shell でこのスクリプトを実行すると、必要なリソース（BigQuery、Firestore、Cloud Run）がお客様の Google Cloud 環境内に自動的にプロビジョニングされ、即座にデモを開始できます。
                   </p>
                   <p class="text-[13px] text-gray-300 leading-relaxed mb-4">
-                    The synthesized agent uses a <b>dual-model architecture</b>: a <span class="text-sky-400 font-semibold">Flash-Lite coordinator</span> (<code class="text-[11px] bg-white/5 px-1 rounded">root_agent</code>) handles routine interactions at low latency, while a <span class="text-emerald-400 font-semibold">Pro sub-agent</span> (<code class="text-[11px] bg-white/5 px-1 rounded">deep_analysis_agent</code>) is automatically delegated to for complex multi-step reasoning tasks. Models are configurable via <code class="text-[11px] bg-white/5 px-1 rounded">--model-analysis-agent</code> and <code class="text-[11px] bg-white/5 px-1 rounded">--model-root-agent</code> CLI flags.
+                    合成されたエージェントは<b>デュアルモデルアーキテクチャ</b>を採用: <span class="text-sky-400 font-semibold">Flash-Lite コーディネーター</span>（<code class="text-[11px] bg-white/5 px-1 rounded">root_agent</code>）が低レイテンシで通常のインタラクションを担当し、<span class="text-emerald-400 font-semibold">Pro サブエージェント</span>（<code class="text-[11px] bg-white/5 px-1 rounded">deep_analysis_agent</code>）が複雑なマルチステップ推論タスクに自動的に委譲されます。モデルは <code class="text-[11px] bg-white/5 px-1 rounded">--model-analysis-agent</code> と <code class="text-[11px] bg-white/5 px-1 rounded">--model-root-agent</code> CLI フラグで設定可能です。
                   </p>
                   <p class="text-[13px] text-gray-300 leading-relaxed mb-4">
-                    Additionally, the accelerator generates domain-specific <b>Sample Prompts, PDFs, and Excel files</b> alongside the datasets. This allows you to enjoy a rich, living End-to-End pre-sales demonstration seamlessly.
+                    さらに、このアクセラレーターはデータセットとともにドメイン固有の<b>サンプルプロンプト、PDF、Excelファイル</b>を生成します。これにより、リッチでリアルなエンドツーエンドのプリセールスデモをシームレスに体験できます。
                   </p>
 
 
@@ -1443,9 +1442,9 @@
                 <!-- Section 2: Agent Runtime Architecture -->
                 <div>
 
-                  <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Agent Runtime Architecture</h3>
+                  <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">エージェント実行アーキテクチャ</h3>
                   <p class="text-[13px] text-gray-300 leading-relaxed mb-6">
-                    The diagram below illustrates the dual-model delegation architecture. The <span class="text-sky-400 font-semibold">Flash-Lite Root Agent</span> coordinates most interactions directly, delegating complex multi-step analysis to the <span class="text-emerald-400 font-semibold">Pro Deep Analysis Agent</span>. Both agents share the same MCP toolsets and image generation capabilities.
+                    以下の図はデュアルモデル委譲アーキテクチャを示しています。<span class="text-sky-400 font-semibold">Flash-Lite ルートエージェント</span>がほとんどのインタラクションを直接調整し、複雑なマルチステップ分析を<span class="text-emerald-400 font-semibold">Pro 深層分析エージェント</span>に委譲します。両エージェントは同じ MCP ツールセットと画像生成機能を共有します。
                   </p>
                   
                   <!-- Static CSS Architecture Diagram -->
@@ -1455,20 +1454,20 @@
                     <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
                       <!-- Root Agent -->
                       <div class="flex-shrink-0 px-4 py-2.5 rounded-xl bg-sky-600/90 border border-sky-400/30 shadow-lg shadow-sky-500/10 text-center min-w-[180px]">
-                        <div class="text-[13px] font-bold text-white leading-tight">Root Agent</div>
+                        <div class="text-[13px] font-bold text-white leading-tight">ルートエージェント</div>
                         <div class="text-[10px] text-sky-200/80 mt-0.5">Flash-Lite · Coordinator</div>
                       </div>
                       <!-- Delegation Arrow -->
                       <div class="flex items-center gap-1">
                         <div class="hidden sm:block w-8 border-t-2 border-dashed border-emerald-400/60"></div>
                         <div class="sm:hidden h-5 border-l-2 border-dashed border-emerald-400/60"></div>
-                        <span class="text-[9px] text-emerald-400/80 font-medium tracking-wide">delegate</span>
+                        <span class="text-[9px] text-emerald-400/80 font-medium tracking-wide">委譲</span>
                         <div class="hidden sm:block w-4 border-t-2 border-dashed border-emerald-400/60"></div>
                         <svg class="hidden sm:block w-2.5 h-2.5 text-emerald-400/70 -ml-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"/></svg>
                       </div>
                       <!-- Deep Analysis Agent -->
                       <div class="flex-shrink-0 px-4 py-2.5 rounded-xl bg-emerald-600/90 border border-emerald-400/30 shadow-lg shadow-emerald-500/10 text-center min-w-[180px]">
-                        <div class="text-[13px] font-bold text-white leading-tight">Deep Analysis Agent</div>
+                        <div class="text-[13px] font-bold text-white leading-tight">深層分析エージェント</div>
                         <div class="text-[10px] text-emerald-200/80 mt-0.5">Pro · Complex Reasoning</div>
                       </div>
                     </div>
@@ -1490,7 +1489,7 @@
                         <div class="text-[11px] font-semibold text-indigo-300">Maps MCP</div>
                       </div>
                       <div class="px-3 py-2 rounded-lg bg-pink-900/40 border border-pink-500/20 text-center">
-                        <div class="text-[11px] font-semibold text-pink-300">Image Gen</div>
+                        <div class="text-[11px] font-semibold text-pink-300">画像生成</div>
                       </div>
                       <div class="px-3 py-2 rounded-lg bg-purple-900/30 border border-purple-500/15 border-dashed text-center">
                         <div class="text-[11px] font-medium text-purple-300/70">Slack / Custom</div>
@@ -1525,15 +1524,15 @@
                     <div class="flex items-center justify-center gap-4 pt-1">
                       <div class="flex items-center gap-1.5">
                         <div class="w-4 border-t-2 border-solid border-slate-500/50"></div>
-                        <span class="text-[9px] text-slate-500">tool call</span>
+                        <span class="text-[9px] text-slate-500">ツール呼び出し</span>
                       </div>
                       <div class="flex items-center gap-1.5">
                         <div class="w-4 border-t-2 border-dashed border-emerald-400/50"></div>
-                        <span class="text-[9px] text-slate-500">delegation</span>
+                        <span class="text-[9px] text-slate-500">委譲</span>
                       </div>
                       <div class="flex items-center gap-1.5">
                         <div class="w-3 h-3 rounded border border-dashed border-slate-500/30 bg-slate-800/30"></div>
-                        <span class="text-[9px] text-slate-500">optional</span>
+                        <span class="text-[9px] text-slate-500">オプション</span>
                       </div>
                     </div>
 
@@ -1551,10 +1550,10 @@
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                         </svg>
-                        Deep Dive Resources
+                        詳細リソース
                       </h3>
                       <p class="text-[13px] text-gray-300 leading-relaxed">
-                        Need a full comprehensive explanation? Deep-dive into our architecture guidelines in the <a href="https://github.com/ryotat7/ge-demo-generator.git" target="_blank" class="text-sky-400 hover:underline underline-offset-4">GitHub Repository</a>.
+                        詳細な説明が必要ですか？<a href="https://github.com/ryotat7/ge-demo-generator.git" target="_blank" class="text-sky-400 hover:underline underline-offset-4">GitHub リポジトリ</a>でアーキテクチャガイドラインを詳しく確認できます。
                       </p>
                       <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
                     </div>
@@ -1571,8 +1570,8 @@
             <span
               class="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500 text-white font-bold shadow-lg shadow-sky-500/40">1</span>
             <div>
-              <h2 class="text-xl font-bold text-white uppercase tracking-tight">Step 1: Define Business Challenge</h2>
-              <p class="text-[11px] text-gray-500">Select a template or describe your customer's problem</p>
+              <h2 class="text-xl font-bold text-white uppercase tracking-tight">ステップ1: 業務課題の定義</h2>
+              <p class="text-[11px] text-gray-500">テンプレートを選択するか、顧客の課題を説明してください</p>
             </div>
           </div>
           <!-- Customer Domain Research (Optional) -->
@@ -1581,10 +1580,10 @@
               <div class="w-7 h-7 bg-violet-500/20 rounded-lg flex items-center justify-center text-violet-400">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
               </div>
-              <label class="text-[10px] font-bold text-violet-400 uppercase tracking-widest">Customer Domain</label>
-              <span class="text-[8px] font-normal lowercase text-gray-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">Optional</span>
+              <label class="text-[10px] font-bold text-violet-400 uppercase tracking-widest">顧客ドメイン</label>
+              <span class="text-[8px] font-normal lowercase text-gray-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">任意</span>
             </div>
-            <p class="text-[11px] text-gray-400 mb-4 leading-relaxed">Enter your customer's domain to automatically research their company, identify business challenges, and find agent-automatable workflows.</p>
+            <p class="text-[11px] text-gray-400 mb-4 leading-relaxed">顧客のドメインを入力すると、会社情報を自動調査し、業務課題を特定して、エージェントで自動化可能なワークフローを発見します。</p>
             <div class="flex gap-3">
               <input id="customerDomain" type="text"
                 class="flex-1 bg-gray-900/60 border border-violet-500/30 rounded-xl px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:ring-2 focus:ring-violet-500/50 focus:border-transparent transition-all"
@@ -1594,14 +1593,14 @@
                 class="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-2 uppercase tracking-wider shadow-lg shadow-violet-500/20 hover:shadow-violet-500/30 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
                 <svg id="researchIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 <svg id="researchSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                <span id="researchBtnText">Research</span>
+                <span id="researchBtnText">調査</span>
               </button>
             </div>
 
             <!-- Research Loading State -->
             <div id="researchLoading" class="hidden mt-4 flex items-center gap-3 text-xs text-violet-300">
               <div class="w-5 h-5 border-2 border-violet-500/30 border-t-violet-400 rounded-full animate-spin"></div>
-              <span class="animate-pulse">Researching company information via Google Search...</span>
+              <span class="animate-pulse">Google 検索で企業情報を調査中...</span>
             </div>
 
             <!-- Research Error -->
@@ -1627,7 +1626,7 @@
               <div class="p-5 border-b border-white/5">
                 <h5 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                   <svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                  Business Challenges
+                  業務課題
                 </h5>
                 <ul id="researchChallenges" class="space-y-2"></ul>
               </div>
@@ -1636,9 +1635,9 @@
               <div class="p-5 border-b border-white/5">
                 <h5 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                   <svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-                  Agent-Automatable Workflows
+                  エージェントで自動化可能なワークフロー
                 </h5>
-                <p class="text-[10px] text-gray-500 mb-3">Click to select workflows for your scenario. Selected workflows will be included in the generated business challenge.</p>
+                <p class="text-[10px] text-gray-500 mb-3">シナリオに含めるワークフローをクリックして選択。選択されたワークフローは生成される業務課題に含まれます。</p>
                 <div id="researchWorkflows" class="space-y-2"></div>
               </div>
 
@@ -1646,7 +1645,7 @@
               <div class="p-5 flex flex-col sm:flex-row gap-3">
                 <button onclick="applySelectedWorkflows()"
                   class="flex-1 px-4 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 uppercase tracking-wider shadow-lg shadow-violet-500/20 active:scale-[0.97]">
-                  🚀 Apply Selected Workflows
+                  🚀 選択したワークフローを適用
                 </button>
                 <button onclick="clearResearch()"
                   class="px-4 py-3 bg-white/5 hover:bg-red-500/10 text-gray-500 hover:text-red-400 text-xs rounded-xl transition-all flex items-center justify-center gap-1 border border-white/10 active:scale-[0.97]">
@@ -1674,10 +1673,10 @@
                       d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
                 </div>
-                <h3 class="text-lg font-bold text-white mb-2">Pick from Gallery</h3>
-                <p class="text-[13px] text-gray-400 leading-relaxed flex-1">Choose from pre-built scenarios across 12 industries. Recommended for first-time users.</p>
+                <h3 class="text-lg font-bold text-white mb-2">ギャラリーから選ぶ</h3>
+                <p class="text-[13px] text-gray-400 leading-relaxed flex-1">12 業界の事前構築済みシナリオから選択。初めて使用する方におすすめです。</p>
                 <div class="mt-5 w-fit inline-flex items-center gap-2 bg-sky-500/20 text-sky-400 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider group-hover:bg-sky-500 group-hover:text-white transition-all">
-                  <span>Start with Template</span>
+                  <span>テンプレートから開始</span>
                   <svg class="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
@@ -1702,10 +1701,10 @@
                       d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                 </div>
-                <h3 class="text-lg font-bold text-white mb-2">Start from Scratch</h3>
-                <p class="text-[13px] text-gray-400 leading-relaxed flex-1">Describe your customer's unique challenge. Pasting meeting notes generates highly realistic data.</p>
+                <h3 class="text-lg font-bold text-white mb-2">一から作成</h3>
+                <p class="text-[13px] text-gray-400 leading-relaxed flex-1">顧客固有の課題を説明してください。会議メモを貼り付けると、よりリアルなデータが生成されます。</p>
                 <div class="mt-5 w-fit inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                  <span>Manual Input</span>
+                  <span>手動入力</span>
                   <svg class="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
@@ -1722,7 +1721,7 @@
                 viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
               </svg>
-              <span class="group-hover:underline underline-offset-4 decoration-gray-600">Back to selection</span>
+              <span class="group-hover:underline underline-offset-4 decoration-gray-600">選択に戻る</span>
             </button>
             <div class="mb-8 p-6 bg-white/5 rounded-2xl border border-white/10 shadow-inner">
               <div class="flex items-center gap-4 mb-4">
@@ -1732,7 +1731,7 @@
                       d="M13 10V3L4 14h7v7l9-11h-7z">
                     </path>
                   </svg>
-                  Template Hub
+                  テンプレートハブ
                 </label>
                 <div class="flex items-center gap-1 bg-black/20 rounded-lg p-1 border border-white/5 shadow-sm">
                   <svg class="w-2.5 h-2.5 text-gray-500 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1750,7 +1749,7 @@
 
               <!-- Industry Filter -->
               <div class="mb-5">
-                <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-3">1. Select Industry</p>
+                <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-3">1. 業界を選択</p>
                 <div id="industryFilters" class="flex flex-wrap gap-2">
                   <!-- Industry filters will be injected here -->
                 </div>
@@ -1758,7 +1757,7 @@
 
               <!-- Job Function Filter -->
               <div class="mb-6">
-                <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-3">2. Filter by Job Function
+                <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-3">2. 職種でフィルター
                 </p>
                 <div id="jobFunctionFilters" class="flex flex-wrap gap-2">
                   <!-- Job function filters will be injected here -->
@@ -1766,7 +1765,7 @@
               </div>
 
               <div class="border-t border-white/5 pt-6 mt-6">
-                <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-4">3. Select a Template</p>
+                <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-4">3. テンプレートを選択</p>
                 <div id="templateGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <!-- Templates will be injected here -->
                 </div>
@@ -1782,13 +1781,12 @@
                 viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
               </svg>
-              <span class="group-hover:underline underline-offset-4 decoration-gray-600">Back to selection</span>
+              <span class="group-hover:underline underline-offset-4 decoration-gray-600">選択に戻る</span>
             </button>
             <div class="mb-4 relative">
               <div class="flex items-center justify-between mb-3 ml-1">
                 <div class="flex items-center gap-3">
-                  <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">Detail the
-                    Business Scenario</label>
+                  <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">ビジネスシナリオを詳述</label>
                   <!-- Edit/Preview Toggle -->
                   <div class="flex bg-gray-800/60 rounded-lg p-0.5 border border-white/5">
                     <button id="tabEdit" onclick="setGoalTab('edit')"
@@ -1807,7 +1805,7 @@
                     class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/30 text-[9px] font-bold transition-all cursor-pointer shadow-md shadow-indigo-500/10 group"
                     title="Structure and optimize this scenario using Gemini Flash Lite">
                     <span class="group-hover:animate-pulse">🪄</span>
-                    <span>Optimize Prompt</span>
+                    <span>プロンプトを最適化</span>
                   </button>
                   <button onclick="resetForm()"
                     class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gray-700/30 hover:bg-gray-600/50 border border-gray-700/50 text-gray-400 hover:text-white text-[9px] font-bold transition-all">
@@ -1816,14 +1814,14 @@
                         d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
                       </path>
                     </svg>
-                    Clear
+                    クリア
                   </button>
                 </div>
               </div>
               <!-- Edit Tab -->
               <textarea id="userGoal" rows="10" oninput="localStorage.setItem('ge_generator_input', this.value)"
                 class="w-full bg-gray-900/50 border border-gray-700 rounded-2xl p-4 text-gray-100 placeholder-gray-600 focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all shadow-inner leading-relaxed resize-y min-h-[160px] font-mono text-xs"
-                placeholder="Example: How to help a retail chain in London optimize seasonal stock based on demographic shifts and regional foot traffic trends?"></textarea>
+                placeholder="例: ロンドンの小売チェーンが、人口動態の変化と地域の歩行者トレンドに基づいて季節在庫を最適化するにはどうすればよいですか？"></textarea>
               <!-- Preview Tab -->
               <div id="goalPreview"
                 class="hidden w-full bg-gray-900/50 border border-gray-700 rounded-2xl p-5 text-gray-100 min-h-[160px] max-h-[500px] overflow-y-auto prose-sm leading-relaxed">
@@ -1851,9 +1849,9 @@
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
                   </span>
-                  <p id="magicWandStatus" class="text-xs font-semibold text-gray-200 tracking-wide font-sans transition-all duration-300">Analyzing business goal...</p>
+                  <p id="magicWandStatus" class="text-xs font-semibold text-gray-200 tracking-wide font-sans transition-all duration-300">業務目標を分析中...</p>
                 </div>
-                <p class="text-[10px] text-gray-600 mt-1.5 font-inter">Optimizing scenario with Gemini Flash Lite</p>
+                <p class="text-[10px] text-gray-600 mt-1.5 font-inter">Gemini Flash Lite でシナリオを最適化中</p>
               </div>
             </div>
           </div>
@@ -1872,8 +1870,8 @@
             <button id="generateBtn" onclick="openOppModal()"
               class="mt-4 w-full bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white font-bold py-5 px-6 rounded-2xl transition-all shadow-lg hover:shadow-sky-500/30 active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-3 group">
               <div class="flex flex-col items-center">
-                <span id="btnText" class="text-lg uppercase tracking-widest">Generate Setup Script & Assets</span>
-                <span class="text-[10px] opacity-70 font-normal tracking-tight mt-1">This generates a .sh script to be executed in Cloud Shell</span>
+                <span id="btnText" class="text-lg uppercase tracking-widest">セットアップスクリプトとアセットを生成</span>
+                <span class="text-[10px] opacity-70 font-normal tracking-tight mt-1">Cloud Shell で実行する .sh スクリプトを生成します</span>
               </div>
               <svg id="btnSpinner" class="hidden w-6 h-6 spinner" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -1886,32 +1884,32 @@
 
             <!-- Optional Enhancements (Contextual & Subtle) -->
             <div id="mcpSuggestionLink" class="mt-4 flex items-center justify-center gap-4 text-xs text-gray-500 font-inter">
-              <span>Want to customize further?</span>
+              <span>さらにカスタマイズしたいですか？</span>
               <button onclick="openMcpModal()" class="flex items-center gap-1.5 text-sky-400 hover:text-sky-300 focus:outline-none cursor-pointer">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                Add External Data Sources (MCP)
+                外部データソースを追加 (MCP)
                 <span id="mcpCountBadge" class="hidden text-[9px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/20 px-1.5 py-0.5 rounded-full"></span>
               </button>
               <span class="text-gray-700">|</span>
               <button onclick="toggleAdvancedSettings()" class="flex items-center gap-1.5 text-gray-400 hover:text-white focus:outline-none cursor-pointer">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                Advanced Settings
+                詳細設定
               </button>
             </div>
 
             <!-- Advanced Settings Content (Moved to bottom under links) -->
             <div id="advancedSettingsContent" class="hidden mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 items-end bg-black/20 px-6 py-5 rounded-2xl border border-white/5 font-inter">
               <div>
-                <label class="block text-[10px] text-gray-500 mb-2 font-bold uppercase tracking-widest">Data Profile</label>
+                <label class="block text-[10px] text-gray-500 mb-2 font-bold uppercase tracking-widest">データプロファイル</label>
                 <select id="dataProfile" class="w-full bg-gray-800/50 border border-gray-600 rounded-xl p-2 text-xs text-gray-200">
-                  <option value="deep">🔬 Deep Analysis (3-4 Tables × 120+ rows)</option>
-                  <option value="standard" selected>⚖️ Standard (5 Tables × 80+ rows) [Recommended]</option>
-                  <option value="wide">🕸️ Wide Schema (7-8 Tables × 40-50 rows)</option>
+                  <option value="deep">🔬 詳細分析 (3〜4 テーブル × 120 行以上)</option>
+                  <option value="standard" selected>⚖️ 標準 (5 テーブル × 80 行以上) [推奨]</option>
+                  <option value="wide">🕸️ ワイドスキーマ (7〜8 テーブル × 40〜50 行)</option>
                 </select>
               </div>
               
               <div>
-                <label class="block text-[10px] text-gray-500 mb-2 font-bold uppercase tracking-widest">Public Dataset for JOINs</label>
+                <label class="block text-[10px] text-gray-500 mb-2 font-bold uppercase tracking-widest">JOIN 用パブリックデータセット</label>
                 <div class="flex items-center gap-3">
                   <label class="flex items-center gap-2 cursor-pointer group shrink-0">
                     <div class="relative">
@@ -1959,8 +1957,8 @@
                     1
                   </div>
                   <div class="flex-1">
-                    <p class="text-xs font-bold text-gray-300 uppercase tracking-tight">Domain Logic & Data Synthesis</p>
-                    <p class="text-[10px] text-gray-500 step-message italic mt-0.5">Waiting...</p>
+                    <p class="text-xs font-bold text-gray-300 uppercase tracking-tight">ドメインロジックとデータ合成</p>
+                    <p class="text-[10px] text-gray-500 step-message italic mt-0.5">待機中...</p>
                   </div>
                 </div>
                 <div id="progress-step-2" class="flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-white/5 transition-all duration-300">
@@ -1968,8 +1966,8 @@
                     2
                   </div>
                   <div class="flex-1">
-                    <p class="text-xs font-bold text-gray-300 uppercase tracking-tight">Deployable Bundle Packaging</p>
-                    <p class="text-[10px] text-gray-500 step-message italic mt-0.5">Waiting...</p>
+                    <p class="text-xs font-bold text-gray-300 uppercase tracking-tight">デプロイ可能バンドルのパッケージング</p>
+                    <p class="text-[10px] text-gray-500 step-message italic mt-0.5">待機中...</p>
                   </div>
                 </div>
               </div>
@@ -1978,7 +1976,7 @@
               <div class="p-4 rounded-xl border border-sky-500/10 bg-sky-500/5 relative overflow-hidden min-h-[100px] flex flex-col justify-between">
                 <div id="carouselTipText" class="transition-opacity duration-500 opacity-100">
                   <h4 id="tipHeading" class="text-[11px] font-bold text-sky-400 uppercase tracking-wider mb-1">⚡ Dynamic Tip</h4>
-                  <p id="tipBody" class="text-[10px] text-gray-400 leading-relaxed font-sans">Tips are loading...</p>
+                  <p id="tipBody" class="text-[10px] text-gray-400 leading-relaxed font-sans">ヒントを読み込み中...</p>
                 </div>
                 <!-- Slide Indicators -->
                 <div class="flex items-center gap-1 mt-3 justify-end">
@@ -1993,8 +1991,8 @@
             <div>
               <div class="rounded-xl border border-white/5 bg-black/20 p-4 flex flex-col justify-between h-full">
                 <div class="flex items-center justify-between mb-4">
-                  <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Google Cloud Target Architecture</h4>
-                  <span class="text-[8px] bg-sky-500/10 border border-sky-500/20 text-sky-400 px-1.5 py-0.5 rounded font-mono">Live Blueprint</span>
+                  <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Google Cloud ターゲットアーキテクチャ</h4>
+                  <span class="text-[8px] bg-sky-500/10 border border-sky-500/20 text-sky-400 px-1.5 py-0.5 rounded font-mono">ライブ設計図</span>
                 </div>
                 <div class="flex items-center justify-center flex-1 py-4">
                   <svg width="100%" height="180px" viewBox="0 0 320 220" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-gray-600">
@@ -2038,7 +2036,7 @@
                       <path d="M77 50 h3 M77 53 h3 M77 56 h2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
                       <circle cx="80" cy="49" r="1" fill="currentColor"/>
 
-                      <text x="70" y="84" text-anchor="middle" class="text-[9px] font-sans font-bold fill-current tracking-tight" stroke="none">Data Layer</text>
+                      <text x="70" y="84" text-anchor="middle" class="text-[9px] font-sans font-bold fill-current tracking-tight" stroke="none">データ層</text>
                       <text x="70" y="92" text-anchor="middle" class="text-[6.5px] font-sans font-medium opacity-60 fill-current tracking-normal" stroke="none">BigQuery &amp; Firestore</text>
                     </g>
 
@@ -2054,7 +2052,7 @@
                       <path d="M259 42 Q259 50 267 50 Q259 50 259 58 Q259 50 251 50 Q259 50 259 42" fill="none" stroke="currentColor" stroke-width="1.2"/>
                       <circle cx="259" cy="50" r="1" fill="currentColor"/>
 
-                      <text x="250" y="84" text-anchor="middle" class="text-[9px] font-sans font-bold fill-current tracking-tight" stroke="none">Gemini Agent</text>
+                      <text x="250" y="84" text-anchor="middle" class="text-[9px] font-sans font-bold fill-current tracking-tight" stroke="none">Gemini エージェント</text>
                       <text x="250" y="92" text-anchor="middle" class="text-[6.5px] font-sans font-medium opacity-60 fill-current tracking-normal" stroke="none">Pro &amp; Flash Dual-Brain</text>
                     </g>
 
@@ -2075,7 +2073,7 @@
                       <circle cx="153" cy="155.5" r="0.8" fill="currentColor"/>
                       <circle cx="153" cy="162.5" r="0.8" fill="currentColor"/>
 
-                      <text x="160" y="185" text-anchor="middle" class="text-[9px] font-sans font-bold fill-current tracking-tight" stroke="none">Cloud Run Host</text>
+                      <text x="160" y="185" text-anchor="middle" class="text-[9px] font-sans font-bold fill-current tracking-tight" stroke="none">Cloud Run ホスト</text>
                       <text x="160" y="193" text-anchor="middle" class="text-[6.5px] font-sans font-medium opacity-60 fill-current tracking-normal" stroke="none">FastAPI &amp; ADK Engine</text>
                     </g>
                   </svg>
@@ -2091,18 +2089,18 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
-              <span>Elapsed: <span id="generationElapsedTime" class="font-mono text-white font-semibold">00:00</span> / Est: ~02:00 minutes (typically under 3 minutes)</span>
+              <span>経過時間: <span id="generationElapsedTime" class="font-mono text-white font-semibold">00:00</span> / 推定: 約2分（通常3分以内）</span>
             </div>
             <button onclick="cancelGeneration()"
               class="px-4 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-[9px] font-bold uppercase tracking-widest transition-all active:scale-95">
-              Cancel Generation
+              生成をキャンセル
             </button>
           </div>
 
           <!-- Terminal-style Dynamic Logs -->
           <div class="mt-6 p-4 bg-black/40 rounded-xl border border-white/5 font-mono overflow-hidden">
             <div id="generationLogs" class="space-y-1 h-[180px] overflow-y-auto custom-scrollbar">
-              <div class="text-[9px] text-gray-500 italic opacity-50">Initializing system synthesis engines...</div>
+              <div class="text-[9px] text-gray-500 italic opacity-50">システム合成エンジンを初期化中...</div>
             </div>
           </div>
         </section>
@@ -2116,8 +2114,8 @@
         <!-- Result Section -->
         <div id="restoreLoadingPlaceholder" class="hidden glass rounded-3xl p-10 mb-10 flex flex-col items-center justify-center text-center" style="min-height:280px">
           <div class="w-12 h-12 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin mb-5"></div>
-          <p class="text-base font-bold text-white mb-1">Restoring demo assets...</p>
-          <p class="text-[11px] text-gray-400">Loading data, images, and agent config</p>
+          <p class="text-base font-bold text-white mb-1">デモアセットを復元中...</p>
+          <p class="text-[11px] text-gray-400">データ、画像、エージェント設定を読み込み中</p>
         </div>
 
         <section id="resultSection" class="hidden space-y-10 fade-in mb-10">
@@ -2131,24 +2129,24 @@
                     d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
                   </path>
                 </svg>
-                Script Generated! What happens next?
+                スクリプト生成完了！次のステップは？
               </h3>
             </div>
             <div class="space-y-8 ml-2">
               <div class="roadmap-step">
                 <div class="roadmap-dot"></div>
-                <h4 class="text-sm font-bold text-sky-400 uppercase tracking-tight mb-1">Step 2: Review</h4>
-                <p class="text-xs text-gray-400">Review the synthesized data and agent instructions below. You can refine them before proceeding to deployment.</p>
+                <h4 class="text-sm font-bold text-sky-400 uppercase tracking-tight mb-1">ステップ2: 確認</h4>
+                <p class="text-xs text-gray-400">合成されたデータとエージェントの指示を確認してください。デプロイ前に内容を調整できます。</p>
               </div>
               <div class="roadmap-step">
                 <div class="roadmap-dot"></div>
-                <h4 class="text-sm font-bold text-gray-200 uppercase tracking-tight mb-1">Step 3: Deploy</h4>
-                <p class="text-xs text-gray-400">Copy the setup script from <b>Step 3</b> and paste it into Google Cloud Shell. The script will provision resources in your selected Google Cloud project, deploy the agent to Cloud Run, and register it in Gemini Enterprise.</p>
+                <h4 class="text-sm font-bold text-gray-200 uppercase tracking-tight mb-1">ステップ3: デプロイ</h4>
+                <p class="text-xs text-gray-400">セットアップスクリプトを<b>ステップ3</b>からコピーして Google Cloud Shell に貼り付けてください。スクリプトが選択した Google Cloud プロジェクト内のリソースをプロビジョニングし、エージェントを Cloud Run にデプロイして Gemini Enterprise に登録します。</p>
               </div>
               <div class="roadmap-step">
                 <div class="roadmap-dot"></div>
-                <h4 class="text-sm font-bold text-gray-200 uppercase tracking-tight mb-1">Step 4: Run Live Demo</h4>
-                <p class="text-xs text-gray-400">Once the script completes, open the Gemini Enterprise app to interact with your agent. To help you run an effective demonstration, use the generated demo prompts tailored specifically to your business challenge and the sample data.</p>
+                <h4 class="text-sm font-bold text-gray-200 uppercase tracking-tight mb-1">ステップ4: ライブデモ実行</h4>
+                <p class="text-xs text-gray-400">スクリプトが完了したら、Gemini Enterprise アプリを開いてエージェントと対話してください。効果的なデモを行うために、業務課題とサンプルデータに合わせて生成されたデモプロンプトを活用してください。</p>
               </div>
             </div>
 
@@ -2162,8 +2160,8 @@
                     </svg>
                   </div>
                   <div>
-                    <p class="text-xs font-bold text-gray-200">Love this demo? Share it with your team!</p>
-                    <p class="text-[10px] text-gray-500">Send a direct link so others can instantly load your demo</p>
+                    <p class="text-xs font-bold text-gray-200">このデモが気に入りましたか？チームで共有しましょう！</p>
+                    <p class="text-[10px] text-gray-500">直接リンクを送ってチームのメンバーがすぐにデモを読み込めるようにします</p>
                   </div>
                 </div>
                 <button onclick="copyShareLink()" id="shareLinkBtn"
@@ -2171,7 +2169,7 @@
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
                   </svg>
-                  Copy Link
+                  リンクをコピー
                 </button>
               </div>
             </div>
@@ -2182,17 +2180,16 @@
             <div class="flex items-center gap-3 mb-8">
               <span
                 class="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500 text-white font-bold shadow-lg shadow-sky-500/40">2</span>
-              <h2 class="text-xl font-bold text-white uppercase tracking-tight">Step 2: Review</h2>
+              <h2 class="text-xl font-bold text-white uppercase tracking-tight">ステップ2: 確認</h2>
             </div>
 
             <!-- System Instruction -->
             <div class="mb-10">
               <label
                 class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                Refine Agent Persona & Instructions
+                エージェントのペルソナと指示を調整
                 <span
-                  class="text-[8px] font-normal lowercase opacity-60 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">Dynamic
-                  script update</span>
+                  class="text-[8px] font-normal lowercase opacity-60 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">スクリプトに動的反映</span>
               </label>
               <textarea id="systemInstruction" oninput="updateScriptLocally()" rows="6"
                 class="w-full bg-black/40 border border-gray-700 rounded-2xl p-5 text-[11px] text-sky-200 font-mono transition-all focus:ring-1 focus:ring-sky-500 shadow-inner leading-relaxed resize-y min-h-[150px]"></textarea>
@@ -2201,11 +2198,9 @@
             <!-- Data Preview -->
             <div>
               <div class="flex items-center justify-between mb-4">
-                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">Audit Synthesized
-                  Data Library</label>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">合成データライブラリの確認</label>
                 <button onclick="downloadAllCSV()"
-                  class="text-[9px] text-sky-400 font-bold border-b border-sky-400/30 hover:text-sky-300 transition-colors uppercase font-mono">Download
-                  Raw CSVs</button>
+                  class="text-[9px] text-sky-400 font-bold border-b border-sky-400/30 hover:text-sky-300 transition-colors uppercase font-mono">CSV をダウンロード</button>
               </div>
 
               <!-- Data DNA Badges -->
@@ -2217,8 +2212,7 @@
                       d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z">
                     </path>
                   </svg>
-                  <span class="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Data DNA — AI-Applied
-                    Realism Factors</span>
+                  <span class="text-[10px] font-bold text-purple-400 uppercase tracking-widest">データ DNA — AI によるリアリズム要素</span>
                 </div>
                 <div class="flex flex-wrap gap-2" id="dataDnaBadgesContainer"></div>
               </div>
@@ -2233,11 +2227,10 @@
                         d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01">
                       </path>
                     </svg>
-                    Data Architecture & Relationships
+                    データアーキテクチャと関係性
                   </label>
                   <span
-                    class="text-[8px] font-normal lowercase opacity-60 bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded-full border border-sky-500/20">Interactive
-                    Diagram</span>
+                    class="text-[8px] font-normal lowercase opacity-60 bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded-full border border-sky-500/20">インタラクティブ図</span>
                 </div>
                 <div class="glass p-1 rounded-2xl border border-white/5 relative overflow-hidden group">
                   <div id="erDiagramContainer"></div>
@@ -2245,12 +2238,11 @@
                   <div class="absolute bottom-4 left-4 flex flex-col gap-1.5 pointer-events-none">
                     <div class="flex items-center gap-2">
                       <div class="w-3 h-3 rounded bg-sky-500/20 border border-sky-400"></div>
-                      <span class="text-[8px] text-gray-400 font-bold uppercase tracking-widest">Table (Node)</span>
+                      <span class="text-[8px] text-gray-400 font-bold uppercase tracking-widest">テーブル（ノード）</span>
                     </div>
                     <div class="flex items-center gap-2">
                       <div class="w-6 h-0.5 bg-sky-400/40"></div>
-                      <span class="text-[8px] text-gray-400 font-bold uppercase tracking-widest">Relationship
-                        (Edge)</span>
+                      <span class="text-[8px] text-gray-400 font-bold uppercase tracking-widest">リレーション（エッジ）</span>
                     </div>
                   </div>
                 </div>
@@ -2269,8 +2261,8 @@
                 <span
                   class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white font-bold text-xl shadow-lg shadow-emerald-500/40">3</span>
                 <div>
-                  <h2 class="text-2xl font-bold text-white uppercase tracking-tight">Step 3: Deploy</h2>
-                  <p class="text-[11px] text-gray-500">Run the synthesized environment in your own Google Cloud project</p>
+                  <h2 class="text-2xl font-bold text-white uppercase tracking-tight">ステップ3: デプロイ</h2>
+                  <p class="text-[11px] text-gray-500">合成された環境をお客様自身の Google Cloud プロジェクトで実行してください</p>
                 </div>
               </div>
 
@@ -2281,21 +2273,21 @@
               <div class="flex items-center gap-3 mb-6">
                 <span
                   class="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 font-bold text-xs border border-emerald-500/30">1</span>
-                <h3 class="text-sm font-bold text-gray-200 uppercase tracking-widest">Environment Setup</h3>
+                <h3 class="text-sm font-bold text-gray-200 uppercase tracking-widest">環境セットアップ</h3>
               </div>
 
               <div class="space-y-6">
                 <!-- Cloud Shell Link for better UX -->
                 <div class="bg-sky-500/10 border border-sky-500/30 rounded-3xl p-6 mb-6 flex items-center justify-between">
                   <div>
-                    <h4 class="text-sm font-bold text-sky-400 uppercase tracking-tight mb-1">💡 Recommended Environment</h4>
+                    <h4 class="text-sm font-bold text-sky-400 uppercase tracking-tight mb-1">💡 推奨環境</h4>
                     <p class="text-[13px] text-gray-300 leading-relaxed">
-                      Click the button on the right to open Cloud Shell directly in your Google Cloud Console. We highly recommend using Cloud Shell as it comes pre-installed with all the necessary tools for this setup script. Alternatively, a step-by-step walkthrough is available by <a href="https://shell.cloud.google.com/cloudshell/editor?cloudshell_tutorial=tutorial.md&cloudshell_git_repo=https://github.com/ryotat7/ge-demo-generator.git" target="_blank" rel="noopener noreferrer" class="text-sky-400 underline hover:text-sky-300 transition-all">launching the Cloud Shell Tutorial</a>.
+                      右のボタンをクリックして Google Cloud Console から直接 Cloud Shell を開いてください。Cloud Shell にはセットアップスクリプトに必要なツールがプリインストールされているため、強くお勧めします。また、<a href="https://shell.cloud.google.com/cloudshell/editor?cloudshell_tutorial=tutorial.md&cloudshell_git_repo=https://github.com/ryotat7/ge-demo-generator.git" target="_blank" rel="noopener noreferrer" class="text-sky-400 underline hover:text-sky-300 transition-all">Cloud Shell チュートリアルを起動</a>してステップごとのガイドを利用することもできます。
                     </p>
                   </div>
                   <a href="https://console.cloud.google.com/welcome?cloudshell=true" target="_blank" rel="noopener noreferrer"
                     class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-[11px] transition-all shadow-lg flex items-center gap-2 uppercase tracking-wider border border-sky-400/20 hover:scale-105 shrink-0 ml-4">
-                    Open Cloud Shell
+                    Cloud Shell を開く
                   </a>
                 </div>
 
@@ -2309,7 +2301,7 @@
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2z"></path>
                         </svg>
                       </div>
-                      <p class="text-[13px] text-gray-300 font-medium">1. Set Active Project ID</p>
+                      <p class="text-[13px] text-gray-300 font-medium">1. アクティブなプロジェクト ID を設定</p>
                     </div>
                     
                     <div class="relative">
@@ -2339,7 +2331,7 @@
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                         </svg>
                       </div>
-                      <p class="text-[13px] text-gray-300 font-medium">2. Authenticate gcloud</p>
+                      <p class="text-[13px] text-gray-300 font-medium">2. gcloud の認証</p>
                     </div>
 
                     <div class="space-y-2">
@@ -2372,14 +2364,14 @@
               <div class="flex items-center gap-3 mb-6">
                 <span
                   class="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 font-bold text-xs border border-emerald-500/30">2</span>
-                <h3 class="text-sm font-bold text-gray-200 uppercase tracking-widest">Execute & Confirm</h3>
+                <h3 class="text-sm font-bold text-gray-200 uppercase tracking-widest">実行と確認</h3>
               </div>
 
               <div class="space-y-6">
                 <div class="flex-1">
                   <div class="flex items-center justify-between mb-4">
                     <p class="text-[13px] text-gray-300 leading-relaxed">
-                      Copy and paste the setup script into your Cloud Shell. And then hit the enter key.
+                      セットアップスクリプトをコピーして Cloud Shell に貼り付けてください。その後エンターキーを押してください。
                     </p>
                     <button onclick="copyToClipboard(document.getElementById('setupCommand').innerText)"
                       class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-[11px] transition-all shadow-lg flex items-center gap-2 uppercase tracking-wider flex-shrink-0 ml-4">
@@ -2388,7 +2380,7 @@
                           d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3">
                         </path>
                       </svg>
-                      Copy Setup Script
+                      スクリプトをコピー
                     </button>
                   </div>
 
@@ -2422,8 +2414,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
                             </path>
                           </svg>
-                          <span id="inlineToggleText" class="text-[10px] uppercase tracking-wider">Show Full
-                            Script</span>
+                          <span id="inlineToggleText" class="text-[10px] uppercase tracking-wider">スクリプト全体を表示</span>
                         </button>
                       </div>
                     </div>
@@ -2445,8 +2436,8 @@
             <span
               class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white font-bold text-xl shadow-lg shadow-emerald-500/40">4</span>
             <div>
-              <h2 class="text-2xl font-bold text-white uppercase tracking-tight">Step 4: Run Live Demo</h2>
-              <p class="text-[11px] text-gray-500">Engage with your agent using personalized scenarios</p>
+              <h2 class="text-2xl font-bold text-white uppercase tracking-tight">ステップ4: ライブデモ実行</h2>
+              <p class="text-[11px] text-gray-500">パーソナライズされたシナリオでエージェントと対話しましょう</p>
             </div>
           </div>
 
@@ -2460,8 +2451,8 @@
                 </svg>
               </span>
               <div>
-                <h3 class="text-sm font-bold text-white uppercase tracking-tight">External Domain Files</h3>
-                <p class="text-[10px] text-gray-500">Download these files and upload them to the agent chat if required</p>
+                <h3 class="text-sm font-bold text-white uppercase tracking-tight">外部ドメインファイル</h3>
+                <p class="text-[10px] text-gray-500">これらのファイルをダウンロードして、必要に応じてエージェントチャットにアップロードしてください</p>
               </div>
             </div>
             <div id="externalFilesList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2477,12 +2468,12 @@
                   d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z">
                 </path>
               </svg>
-              Recommended Demo Flow (Tailored Prompts)
+              推奨デモフロー（カスタマイズ済みプロンプト）
             </label>
             <div class="flex items-center gap-2">
-              <button onclick="copyAllDemoGuide()" id="copyAllGuideBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 hover:bg-emerald-500/30 hover:border-emerald-500/40 active:bg-emerald-500 active:text-white active:scale-95 transition-all duration-200 cursor-pointer" title="Copy demo name and all prompts to clipboard">
+              <button onclick="copyAllDemoGuide()" id="copyAllGuideBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 hover:bg-emerald-500/30 hover:border-emerald-500/40 active:bg-emerald-500 active:text-white active:scale-95 transition-all duration-200 cursor-pointer" title="デモ名とすべてのプロンプトをクリップボードにコピー">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-                Copy All
+                すべてコピー
               </button>
             </div>
           </div>
@@ -2509,22 +2500,22 @@
            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
         </div>
         <div>
-          <h3 class="text-xl font-bold text-white tracking-tight">Confirm Generation</h3>
-          <p class="text-[9px] text-gray-400 font-medium mt-1 leading-relaxed">Ready to generate your demo environment?</p>
+          <h3 class="text-xl font-bold text-white tracking-tight">生成の確認</h3>
+          <p class="text-[9px] text-gray-400 font-medium mt-1 leading-relaxed">デモ環境を生成する準備はできましたか？</p>
         </div>
       </div>
 
       <div class="space-y-6">
         <div class="pt-4">
           <button onclick="confirmGeneration()" id="confirmBtn" class="w-full px-4 py-4 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white text-[12px] font-bold shadow-lg shadow-sky-500/25 transition-all uppercase tracking-widest">
-            Start Generation
+            生成を開始
           </button>
         </div>
       </div>
     </div>
   </div>
 
-  <div id="toast">Copied to clipboard!</div>
+  <div id="toast">クリップボードにコピーしました！</div>
 
   <script type="module" src="rpc-facade.js"></script>
   <script>
@@ -2593,7 +2584,7 @@
 
       if (tab === 'preview') {
         // Render Markdown preview
-        preview.innerHTML = simpleMarkdownToHtml(textarea.value || '<span class="text-gray-500 italic">No content to preview.</span>');
+        preview.innerHTML = simpleMarkdownToHtml(textarea.value || '<span class="text-gray-500 italic">プレビューするコンテンツがありません。</span>');
         textarea.classList.add('hidden');
         preview.classList.remove('hidden');
         tabEdit.className = 'px-3 py-1 text-[9px] font-bold rounded-md transition-all text-gray-500 hover:text-gray-300';
@@ -2650,7 +2641,7 @@
     function researchDomain() {
       const domain = document.getElementById('customerDomain').value.trim();
       if (!domain) {
-        showToast('Please enter a domain name.');
+        showToast('ドメイン名を入力してください。');
         return;
       }
 
@@ -2659,7 +2650,7 @@
       btn.disabled = true;
       document.getElementById('researchIcon').classList.add('hidden');
       document.getElementById('researchSpinner').classList.remove('hidden');
-      document.getElementById('researchBtnText').textContent = 'Researching...';
+      document.getElementById('researchBtnText').textContent = '調査中...';
       document.getElementById('researchLoading').classList.remove('hidden');
       document.getElementById('researchError').classList.add('hidden');
       document.getElementById('researchResult').classList.add('hidden');
@@ -2670,12 +2661,12 @@
           btn.disabled = false;
           document.getElementById('researchIcon').classList.remove('hidden');
           document.getElementById('researchSpinner').classList.add('hidden');
-          document.getElementById('researchBtnText').textContent = 'Research';
+          document.getElementById('researchBtnText').textContent = 'リサーチ';
           document.getElementById('researchLoading').classList.add('hidden');
 
           if (!res.success) {
             document.getElementById('researchError').classList.remove('hidden');
-            document.getElementById('researchErrorText').textContent = '⚠️ ' + (res.error || 'Research failed. Please try again.');
+            document.getElementById('researchErrorText').textContent = '⚠️ ' + (res.error || 'リサーチに失敗しました。もう一度お試しください。');
             return;
           }
 
@@ -2686,10 +2677,10 @@
           btn.disabled = false;
           document.getElementById('researchIcon').classList.remove('hidden');
           document.getElementById('researchSpinner').classList.add('hidden');
-          document.getElementById('researchBtnText').textContent = 'Research';
+          document.getElementById('researchBtnText').textContent = 'リサーチ';
           document.getElementById('researchLoading').classList.add('hidden');
           document.getElementById('researchError').classList.remove('hidden');
-          document.getElementById('researchErrorText').textContent = '⚠️ ' + (err.message || 'An unexpected error occurred.');
+          document.getElementById('researchErrorText').textContent = '⚠️ ' + (err.message || '予期しないエラーが発生しました。');
         })
         .researchCompanyByDomain(domain);
     }
@@ -2745,7 +2736,7 @@
         // Selecting a new one: Enforce maximum limit of 3
         const selectedDivs = document.querySelectorAll('#researchWorkflows > div[data-selected="true"]');
         if (selectedDivs.length >= 3) {
-          showToast('⚠️ You can select a maximum of 3 workflows to keep the demo focused.');
+          showToast('⚠️ デモに集中するため、ワークフローは最大3つまで選択できます。');
           return;
         }
         
@@ -2774,12 +2765,12 @@
     }
 
     const MAGIC_WAND_STATUSES = [
-      "Analyzing business goal...",
-      "Scaffolding target role...",
-      "Structuring business scenario...",
-      "Applying business rules...",
-      "Seeding database schemas...",
-      "Polishing markdown..."
+      "業務目標を分析中...",
+      "ターゲットロールを構築中...",
+      "ビジネスシナリオを構造化中...",
+      "ビジネスルールを適用中...",
+      "データベーススキーマを設定中...",
+      "マークダウンを最適化中..."
     ];
     let magicWandInterval = null;
 
@@ -2817,12 +2808,12 @@
     function optimizeGoalWithMagicWand() {
       const el = document.getElementById('userGoal');
       const rawGoal = el.value.trim();
-      if (!rawGoal) return showToast('⚠️ Please type something in the scenario first.');
+      if (!rawGoal) return showToast('⚠️ まずシナリオに何かを入力してください。');
 
       const btn = document.getElementById('magicWandBtn');
       btn.disabled = true;
       btn._originalHTML = btn.innerHTML;
-      btn.innerHTML = `<span>⏳</span><span>Optimizing...</span>`;
+      btn.innerHTML = `<span>⏳</span><span>最適化中...</span>`;
 
       startMagicWandAnimation();
 
@@ -2837,7 +2828,7 @@
           btn.disabled = false;
           btn.innerHTML = btn._originalHTML;
           stopMagicWandAnimation();
-          showToast('❌ Optimization timed out. Apps Script took too long. Please try again.');
+          showToast('❌ 最適化がタイムアウトしました。Apps Script の処理に時間がかかりすぎました。再試行してください。');
         }
       }, 45000);
 
@@ -2856,9 +2847,9 @@
             el.value = res.optimizedGoal;
             localStorage.setItem('ge_generator_input', res.optimizedGoal);
             setGoalTab('edit'); // Switch to edit tab
-            showToast('✨ Prompt optimized successfully!');
+            showToast('✨ プロンプトの最適化が完了しました！');
           } else {
-            showToast('❌ Optimization failed: ' + (res.error || 'Unknown error'));
+            showToast('❌ 最適化に失敗しました: ' + (res.error || '不明なエラー'));
           }
         })
         .withFailureHandler(err => {
@@ -2870,7 +2861,7 @@
           btn.disabled = false;
           btn.innerHTML = btn._originalHTML;
           stopMagicWandAnimation();
-          showToast('❌ Optimization failed: ' + err.message);
+          showToast('❌ 最適化に失敗しました: ' + err.message);
         })
         .optimizeGoalWithMagicWand(rawGoal);
     }
@@ -2881,7 +2872,7 @@
       // Gather selected workflows
       const workflowDivs = document.querySelectorAll('#researchWorkflows > div[data-selected="true"]');
       if (workflowDivs.length === 0) {
-        showToast('⚠️ Please select at least one workflow.');
+        showToast('⚠️ 少なくとも1つのワークフローを選択してください。');
         return;
       }
 
@@ -2910,14 +2901,14 @@
             const goal = (res && res.success) ? res.goal : cachedResearchData.suggestedGoal;
             _buildAndApplyGoal(cachedResearchData, selectedWorkflows, goal);
             if (res && res.success) {
-              showToast('✅ Scenario regenerated for selected workflows!');
+              showToast('✅ 選択したワークフロー向けにシナリオを再生成しました！');
             }
           })
           .withFailureHandler(err => {
             _hideGoalRegenerating();
             // Fallback to original
             _buildAndApplyGoal(cachedResearchData, selectedWorkflows, cachedResearchData.suggestedGoal);
-            showToast('⚠️ Scenario regeneration failed, using original.');
+            showToast('⚠️ シナリオの再生成に失敗しました。元のシナリオを使用します。');
           })
           .regenerateGoalForWorkflows(
             { companyName: cachedResearchData.companyName, industry: cachedResearchData.industry, companySummary: cachedResearchData.companySummary },
@@ -2992,7 +2983,7 @@
         localStorage.setItem('ge_generator_input', text);
         el.classList.add('highlight-glow');
         setTimeout(() => el.classList.remove('highlight-glow'), 2000);
-        showToast('✅ Selected workflows applied!');
+        showToast('✅ 選択したワークフローを適用しました！');
         // Auto-switch to preview to show rendered Markdown
         setGoalTab('preview');
         // Scroll to the preview area
@@ -3056,17 +3047,17 @@
     function openOppModal() {
       if (window.currentMethod === 'template') {
         if (!window.templateSelected) {
-          window.showToast('Please select a scenario from the gallery.');
+          window.showToast('ギャラリーからシナリオを選択してください。');
           return;
         }
       } else if (window.currentMethod === 'manual') {
         const goal = document.getElementById('userGoal').value.trim();
         if (!goal) {
-          window.showToast('Please describe your business challenge.');
+          window.showToast('業務課題を説明してください。');
           return;
         }
       } else {
-        window.showToast('Please select a method in Step 1.');
+        window.showToast('ステップ1で方法を選択してください。');
         return;
       }
       
@@ -3219,31 +3210,31 @@
     // Premium Synthesis and Bundling Carousel and Timer Logic
     const SYNTHESIS_TIPS = [
       {
-        heading: "⚡ Powered by Gemini 3.5 Flash",
-        body: "Using Google's latest model to synthesize domain models, SQL queries, and reasoning paths in seconds."
+        heading: "⚡ Gemini 3.5 Flash を活用",
+        body: "Google の最新モデルを使用して、ドメインモデル、SQL クエリ、推論パスを数秒で合成します。"
       },
       {
-        heading: "🔌 Extend with MCP Servers",
-        body: "Include any custom MCP server by pasting its GitHub repo link directly in the Custom MCP Servers section."
+        heading: "🔌 MCP サーバーで拡張",
+        body: "カスタム MCP サーバーの GitHub リポジトリリンクをカスタム MCP サーバーセクションに貼り付けるだけで追加できます。"
       },
       {
-        heading: "📂 Workspace Context Integration",
-        body: "Enabling the Workspace MCP option allows the agent to inspect, read, and reason about your local workspace files automatically."
+        heading: "📂 ワークスペースコンテキスト統合",
+        body: "Workspace MCP オプションを有効にすると、エージェントがローカルのワークスペースファイルを自動的に参照・読み取り・推論できます。"
       }
     ];
 
     const BUNDLING_TIPS = [
       {
-        heading: "🧹 Easy Stack Cleanup",
-        body: "Run the setup script with the --cleanup flag to delete all temporary resources and Google Cloud services created during your demo."
+        heading: "🧹 簡単なスタッククリーンアップ",
+        body: "セットアップスクリプトを --cleanup フラグで実行すると、デモで作成した一時リソースと Google Cloud サービスをすべて削除できます。"
       },
       {
-        heading: "⚙️ Custom Run Configuration",
-        body: "You can override models at runtime! Run ./setup-demo.sh --model gemini-1.5-pro to test different engines in Cloud Shell."
+        heading: "⚙️ カスタム実行設定",
+        body: "実行時にモデルを上書きできます！Cloud Shell で ./setup-demo.sh --model gemini-1.5-pro を実行して異なるエンジンをテストしてください。"
       },
       {
-        heading: "📊 Instant Data Insights",
-        body: "The script automatically packages a lightweight Flask/Python Data Viewer that serves web insights via an authorized endpoint."
+        heading: "📊 即座のデータインサイト",
+        body: "スクリプトは認証済みエンドポイント経由でウェブインサイトを提供する軽量な Flask/Python データビューアを自動でパッケージします。"
       }
     ];
 
@@ -3360,7 +3351,7 @@
               icon.innerText = '1';
             }
             const msg = s1.querySelector('.step-message');
-            if (msg) msg.innerText = 'Synthesizing domain logic and planning database schemas...';
+            if (msg) msg.innerText = 'ドメインロジックを合成してデータベーススキーマを計画中...';
           }
           
           if (s2) {
@@ -3371,7 +3362,7 @@
               icon.innerText = '2';
             }
             const msg = s2.querySelector('.step-message');
-            if (msg) msg.innerText = 'Waiting to pack deployment assets...';
+            if (msg) msg.innerText = 'デプロイアセットのパッケージング待機中...';
           }
           
           // SVG UI: BQ is pulsing active
@@ -3398,7 +3389,7 @@
               icon1.innerHTML = checkmarkSvg;
             }
             const msg = s1.querySelector('.step-message');
-            if (msg) msg.innerText = 'Domain logic synthesis complete!';
+            if (msg) msg.innerText = 'ドメインロジックの合成が完了しました！';
           }
           
           // SVG UI: BQ is done, flow to Gemini starts
@@ -3421,7 +3412,7 @@
               icon.innerText = '2';
             }
             const msg = s2.querySelector('.step-message');
-            if (msg) msg.innerText = 'Bundling deployment assets... (typically 1:30 - 2:30 minutes)';
+            if (msg) msg.innerText = 'デプロイアセットをバンドル中...（通常 1:30〜2:30 分）';
           }
           
           // SVG UI: Gemini and Cloud Run light up active, Gemini -> CR flow starts
@@ -3447,7 +3438,7 @@
               icon2.innerHTML = checkmarkSvg;
             }
             const msg = s2.querySelector('.step-message');
-            if (msg) msg.innerText = 'Deployment assets successfully generated!';
+            if (msg) msg.innerText = 'デプロイアセットが正常に生成されました！';
           }
           
           // SVG UI: All done
@@ -3474,10 +3465,10 @@
       const btn = document.getElementById('generateBtn');
       btn.disabled = false;
       document.getElementById('btnSpinner').classList.add('hidden');
-      document.getElementById('btnText').innerText = 'Generate Setup Script & Assets';
+      document.getElementById('btnText').innerText = 'セットアップスクリプトとアセットを生成';
 
       document.getElementById('stepsSection').classList.add('hidden');
-      showToast('Generation cancelled');
+      showToast('生成をキャンセルしました');
     }
 
     function drawArchitectureNetwork() {
@@ -3530,7 +3521,7 @@
       if (genBtn) {
         genBtn.disabled = false;
         document.getElementById('btnSpinner').classList.add('hidden');
-        document.getElementById('btnText').innerText = 'Generate Setup Script & Assets';
+        document.getElementById('btnText').innerText = 'セットアップスクリプトとアセットを生成';
       }
 
       // Ensure step2Container (generate button area) is visible
@@ -3558,11 +3549,11 @@
     function downloadSetupScript() {
       const pre = document.getElementById('setupCommand');
       if (!pre || !pre.innerText) {
-        alert('No setup script available to download.');
+        alert('ダウンロード可能なセットアップスクリプトがありません。');
         return;
       }
       
-      showToast('Downloading setup script...');
+      showToast('セットアップスクリプトをダウンロード中...');
       
       const text = pre.innerText;
       
@@ -3597,7 +3588,7 @@
         // Expanding
         container.classList.remove('max-h-40', 'overflow-hidden');
         container.classList.add('max-h-[70vh]', 'overflow-y-auto');
-        if (text) text.textContent = 'Collapse Script';
+        if (text) text.textContent = 'スクリプトを折りたたむ';
         if (icon) {
           icon.style.transform = 'rotate(0deg)';
           icon.querySelector('path').setAttribute('d', 'M5 15l7-7 7 7');
@@ -3607,7 +3598,7 @@
         // Collapsing
         container.classList.remove('max-h-[70vh]', 'max-h-none', 'overflow-y-auto');
         container.classList.add('max-h-40', 'overflow-hidden');
-        if (text) text.textContent = 'Show Full Script';
+        if (text) text.textContent = '全スクリプトを表示';
         if (icon) {
           icon.style.transform = 'rotate(0deg)';
           icon.querySelector('path').setAttribute('d', 'M19 9l-7 7-7-7');
@@ -3918,7 +3909,7 @@
       );
 
       if (filtered.length === 0) {
-        templateGrid.innerHTML = `<div class="col-span-full py-10 text-center text-gray-500 text-[10px] italic">No matching templates found for this combination. Try another job function.</div>`;
+        templateGrid.innerHTML = `<div class="col-span-full py-10 text-center text-gray-500 text-[10px] italic">この組み合わせに一致するテンプレートが見つかりません。別の職種を試してください。</div>`;
         return;
       }
 
@@ -3976,9 +3967,9 @@
         lines.push('## Business Scenario');
         lines.push(text); // Template text as the scenario
         finalText = lines.join('\n');
-        showToast('✅ Template merged with ' + d.companyName + ' research!');
+        showToast('✅ テンプレートが ' + d.companyName + ' の調査結果と統合されました！');
       } else {
-        showToast('Template applied!');
+        showToast('テンプレートを適用しました！');
       }
 
       el.value = finalText;
@@ -4018,7 +4009,7 @@
     }
     function generateDemo() {
       const userGoal = document.getElementById('userGoal').value;
-      if (!userGoal) return alert('Goal required.');
+      if (!userGoal) return alert('目的を入力してください。');
       const options = {
         dataProfile: document.getElementById('dataProfile').value,
         publicDatasetId: document.getElementById('publicDatasetId').value,
@@ -4043,7 +4034,7 @@
 
       document.getElementById('generateBtn').disabled = true;
       document.getElementById('btnSpinner').classList.remove('hidden');
-      document.getElementById('btnText').innerText = 'SYNTHESIZING...';
+      document.getElementById('btnText').innerText = '合成中...';
 
       // Start dynamic logs
       GenerationLogger.start();
@@ -4073,14 +4064,14 @@
               GenerationLogger.stop();
               document.getElementById('generateBtn').disabled = false;
               document.getElementById('btnSpinner').classList.add('hidden');
-              document.getElementById('btnText').innerText = 'Generate Setup Script & Assets';
+              document.getElementById('btnText').innerText = 'セットアップスクリプトとアセットを生成';
               return onFailure(res.error);
             }
 
             GenerationLogger.stop();
             document.getElementById('generateBtn').disabled = false;
             document.getElementById('btnSpinner').classList.add('hidden');
-            document.getElementById('btnText').innerText = 'Generate Setup Script & Assets';
+            document.getElementById('btnText').innerText = 'セットアップスクリプトとアセットを生成';
 
             // Complete animation
             updateSynthesisProgress(2, 'completed');
@@ -4093,7 +4084,7 @@
                 showFinalResult(res);
                 
                 // Handle persistence feedback
-                showToast('✅ Demo generated successfully!');
+                showToast('✅ デモが正常に生成されました！');
               } catch (uiErr) {
                 console.error('UI Rendering Error:', uiErr);
               }
@@ -4124,7 +4115,7 @@
       document.getElementById('btnSpinner').classList.add('hidden');
       document.getElementById('stepsSection').classList.add('hidden');
       document.getElementById('errorSection').classList.remove('hidden');
-      document.getElementById('btnText').innerText = 'Generate Setup Script & Assets';
+      document.getElementById('btnText').innerText = 'セットアップスクリプトとアセットを生成';
       document.getElementById('errorMessage').innerText = err;
     }
 
@@ -4207,7 +4198,7 @@
                   <img src="data:image/jpeg;base64,${file.base64Data}" class="w-full h-full object-cover hover:scale-[1.03] transition-transform duration-300" alt="${file.fileName}"/>
                   <div class="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path></svg>
-                    Preview Document
+                    ドキュメントをプレビュー
                   </div>
                 </div>
               `;
@@ -4216,10 +4207,10 @@
               previewHeaderHtml = `
                 <div class="mb-3 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.03] hover:bg-emerald-500/[0.06] flex flex-col items-center justify-center cursor-pointer hover:border-emerald-500/40 transition-all aspect-video relative group/img" onclick="openDocModal(${index})" title="Click to preview spreadsheet">
                   <div class="text-3xl mb-1 transition-transform duration-300 group-hover/img:scale-110">📊</div>
-                  <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-mono">Excel Ledger Table</span>
+                  <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-mono">Excel 台帳テーブル</span>
                   <div class="absolute inset-0 bg-emerald-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5 rounded-xl">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path></svg>
-                    Preview Spreadsheet
+                    スプレッドシートをプレビュー
                   </div>
                 </div>
               `;
@@ -4228,10 +4219,10 @@
               previewHeaderHtml = `
                 <div class="mb-3 rounded-xl border border-red-500/10 bg-red-500/[0.03] hover:bg-red-500/[0.06] flex flex-col items-center justify-center cursor-pointer hover:border-red-500/40 transition-all aspect-video relative group/img" onclick="openDocModal(${index})" title="Click to preview document">
                   <div class="text-3xl mb-1 transition-transform duration-300 group-hover/img:scale-110">📄</div>
-                  <span class="text-[10px] font-bold text-red-400 uppercase tracking-widest font-mono">PDF Document Scan</span>
+                  <span class="text-[10px] font-bold text-red-400 uppercase tracking-widest font-mono">PDF ドキュメントスキャン</span>
                   <div class="absolute inset-0 bg-red-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5 rounded-xl">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path></svg>
-                    Preview Document
+                    ドキュメントをプレビュー
                   </div>
                 </div>
               `;
@@ -4288,7 +4279,7 @@
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                     </span>
-                    <span class="text-[9px] font-bold text-emerald-500/80 uppercase tracking-tighter">Recommended</span>
+                    <span class="text-[9px] font-bold text-emerald-500/80 uppercase tracking-tighter">おすすめ</span>
                   </div>
                </div>
                 <div class="relative bg-black/60 rounded-xl p-4 border border-white/5 hover:border-emerald-500/30 transition-all min-w-0 group/copy">
@@ -4953,7 +4944,7 @@
     function copyProjectCmd() {
       const input = document.getElementById('projectIdInput');
       const val = input ? input.value.trim() : '';
-      if (!val) return showToast('Please enter a Project ID first.', 4000);
+      if (!val) return showToast('まずプロジェクト ID を入力してください。', 4000);
       copyToClipboard(`gcloud config set project ${val} && cd ~`);
     }
 
@@ -4981,11 +4972,11 @@
       if (!currentData || !currentData.externalFiles || !currentData.externalFiles[index]) return;
       const file = currentData.externalFiles[index];
       if (!file.base64Data) {
-        showToast('No image data available to download.');
+        showToast('ダウンロード可能な画像データがありません。');
         return;
       }
       
-      showToast('Preparing image download...');
+      showToast('画像のダウンロードを準備中...');
       
       const byteCharacters = atob(file.base64Data);
       const byteNumbers = new Array(byteCharacters.length);
@@ -5004,11 +4995,11 @@
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showToast('Image downloaded successfully!');
+      showToast('画像のダウンロードが完了しました！');
     };
 
     function renderSimulatedPDF(content) {
-      if (!content) return '<div class="text-gray-400 text-center p-8">No document content available.</div>';
+      if (!content) return '<div class="text-gray-400 text-center p-8">ドキュメントコンテンツがありません。</div>';
       
       const lines = content.split('\n');
       let html = '<div class="max-w-3xl mx-auto bg-white p-8 sm:p-12 my-4 shadow-2xl border border-gray-200 rounded-xl text-slate-800 font-serif min-h-[80vh] select-text">';
@@ -5330,7 +5321,7 @@
       if (!currentData || !currentData.externalFiles || !currentData.externalFiles[index]) return;
       const file = currentData.externalFiles[index];
       
-      showToast('Preparing PDF... Please wait.');
+      showToast('PDF を準備中... しばらくお待ちください。');
       
       google.script.run
         .withSuccessHandler(function(response) {
@@ -5351,15 +5342,15 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            showToast('PDF downloaded successfully!');
+            showToast('PDF のダウンロードが完了しました！');
           } else {
             console.error('PDF generation failed:', response ? response.error : 'Unknown error');
-            showToast('Failed to generate PDF: ' + (response ? response.error : 'Unknown error'), 4000);
+            showToast('PDF の生成に失敗しました: ' + (response ? response.error : '不明なエラー'), 4000);
           }
         })
         .withFailureHandler(function(error) {
           console.error('PDF generation failed:', error);
-          showToast('Failed to generate PDF: ' + error.message, 4000);
+          showToast('PDF の生成に失敗しました: ' + error.message, 4000);
         })
         .generatePdfFromServer(file.fileContent || file.csvContent || '', file.fileName);
     };
@@ -5414,7 +5405,7 @@
         textarea.select();
         try {
           document.execCommand('copy');
-          showToast('Copied to clipboard!');
+          showToast('クリップボードにコピーしました！');
         } catch (err) {
           console.error('Copy fallback failed', err);
         }
@@ -5423,7 +5414,7 @@
 
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text)
-          .then(() => showToast('Copied to clipboard!'))
+          .then(() => showToast('クリップボードにコピーしました！'))
           .catch(() => performCopy(text));
       } else {
         performCopy(text);
@@ -5440,7 +5431,7 @@
      */
     function copyAllDemoGuide() {
       if (!currentData || !currentData.demoGuide || !currentData.demoGuide.length) {
-        showToast('No demo guide available to copy.');
+        showToast('コピー可能なデモガイドがありません。');
         return;
       }
 
@@ -5677,8 +5668,8 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
           </svg>
         </div>
-        <h2 class="text-lg font-bold text-white mb-1">Build Your AI Demo in Minutes</h2>
-        <p class="text-gray-400 text-xs">Create highly tailored, highly contextual Gemini agent demos instantly.</p>
+        <h2 class="text-lg font-bold text-white mb-1">AI デモを数分で構築</h2>
+        <p class="text-gray-400 text-xs">高度にカスタマイズされた、コンテキストに富んだ Gemini エージェントデモを即座に作成。</p>
       </div>
 
       <div class="space-y-5 mb-7">
@@ -5688,9 +5679,9 @@
             class="flex-shrink-0 w-8 h-8 rounded-xl bg-sky-500/10 flex items-center justify-center text-sm font-bold text-sky-400 border border-sky-500/20">
             🎯</div>
           <div>
-            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">Core Value: Highly Tailored Custom Demos</h4>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">コアバリュー: 高度にカスタマイズされたデモ</h4>
             <p class="text-[11px] text-gray-400 leading-relaxed">
-              Instantly generate <span class="text-sky-400 font-semibold">highly tailored, highly contextual demos</span>. The tool automatically synthesizes realistic sample data (e.g., handwritten FAXes, order forms, and BigQuery master tables) and custom agent instructions specifically matching each customer's unique business and operational challenges.
+              <span class="text-sky-400 font-semibold">高度にカスタマイズされたコンテキストに富んだデモ</span>を即座に生成。ツールは各顧客固有のビジネス課題と運用課題に合わせたリアルなサンプルデータ（手書きFAX、注文書、BigQuery マスターテーブルなど）とカスタムエージェント指示を自動合成します。
             </p>
           </div>
         </div>
@@ -5701,9 +5692,9 @@
             class="flex-shrink-0 w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-sm font-bold text-emerald-400 border border-emerald-500/20">
             💎</div>
           <div>
-            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">Business Value: Win Pitches with A2UI</h4>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">ビジネスバリュー: A2UI でピッチを勝ち取る</h4>
             <p class="text-[11px] text-gray-400 leading-relaxed">
-              Show, don't tell. Demonstrate the <span class="text-emerald-400 font-semibold">ultimate value of Gemini Enterprise</span> using <span class="text-emerald-400 font-semibold">A2UI (Agent-to-User Interface)</span>: the agent dynamically renders interactive buttons, custom data cards, and editable forms on the fly, providing a highly responsive, state-of-the-art Agentic AI UX for seamless human validation and approval.
+              説明より実演。<span class="text-emerald-400 font-semibold">A2UI（Agent-to-User Interface）</span>を使って <span class="text-emerald-400 font-semibold">Gemini Enterprise の最高の価値</span>を示します。エージェントはインタラクティブなボタン、カスタムデータカード、編集可能なフォームをオンザフライでレンダリングし、高度なエージェント AI UX でシームレスな承認フローを実現。
             </p>
           </div>
         </div>
@@ -5714,14 +5705,14 @@
             class="flex-shrink-0 w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center text-sm font-bold text-purple-400 border border-purple-500/20">
             ⚙️</div>
           <div>
-            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">Behind the Scene: Real Tech Stack</h4>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">舞台裏: 本物の技術スタック</h4>
             <p class="text-[11px] text-gray-400 leading-relaxed">
-              This is not a mockup. The generator spins up a fully-functioning cloud environment:
+              これはモックアップではありません。ジェネレーターが完全に機能するクラウド環境を構築します：
             </p>
             <ul class="list-disc list-inside mt-1 text-[10.5px] text-gray-400 space-y-0.5 pl-1">
-              <li><span class="text-gray-300 font-medium">Gemini & ADK:</span> Advanced multi-step reasoning and tool orchestration.</li>
-              <li><span class="text-gray-300 font-medium">Rich MCP Ecosystem:</span> Live connections to BigQuery, Google Maps, and Google Workspace.</li>
-              <li><span class="text-gray-300 font-medium">Interactive Data Viewer:</span> A Flask Web UI to visually track documents and database changes.</li>
+              <li><span class="text-gray-300 font-medium">Gemini & ADK:</span> 高度なマルチステップ推論とツールオーケストレーション。</li>
+              <li><span class="text-gray-300 font-medium">豊富な MCP エコシステム:</span> BigQuery、Google Maps、Google Workspace へのライブ接続。</li>
+              <li><span class="text-gray-300 font-medium">インタラクティブデータビューア:</span> ドキュメントとデータベースの変化を視覚的に追跡する Flask Web UI。</li>
             </ul>
           </div>
         </div>
@@ -5732,9 +5723,9 @@
             class="flex-shrink-0 w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-sm font-bold text-amber-400 border border-amber-500/20">
             🚀</div>
           <div>
-            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">How to Deploy: Automatic Cloud Provisioning</h4>
+            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wider mb-0.5">デプロイ方法: 自動クラウドプロビジョニング</h4>
             <p class="text-[11px] text-gray-400 leading-relaxed">
-              This tool generates a local setup script. Simply run it in <span class="text-amber-400 font-semibold">your own Google Cloud Shell</span> to automatically provision all demo resources (Cloud Run, BigQuery, Firestore) directly inside your Google Cloud project. All data remains securely within your own project boundary.
+              このツールはローカルのセットアップスクリプトを生成します。<span class="text-amber-400 font-semibold">お客様自身の Google Cloud Shell</span> で実行するだけで、すべてのデモリソース（Cloud Run、BigQuery、Firestore）を Google Cloud プロジェクト内に自動プロビジョニングします。すべてのデータはお客様のプロジェクト内に安全に保管されます。
             </p>
           </div>
         </div>
@@ -5742,7 +5733,7 @@
 
       <button onclick="closeOnboarding()"
         class="w-full bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-sky-500/20 active:scale-[0.98] text-[11px] uppercase tracking-wider">
-        Start Building Demo
+        デモ構築を開始
       </button>
     </div>
   </div>
@@ -5789,7 +5780,7 @@
           <!-- Dedicated PDF Loading Spinner (Visible during server-side generation and iframe loading) -->
           <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 z-20 rounded-xl gap-3.5">
             <div class="w-10 h-10 rounded-full border-4 border-sky-500/20 border-t-sky-500 spinner-loader"></div>
-            <span class="text-[10px] font-bold text-sky-400 uppercase tracking-widest animate-pulse">Generating High-Fidelity PDF... Please Wait</span>
+            <span class="text-[10px] font-bold text-sky-400 uppercase tracking-widest animate-pulse">高精細 PDF を生成中... お待ちください</span>
           </div>
           <!-- PDF Frame: Calls window.onPdfFrameLoad() when rendering is fully complete -->
           <iframe id="pdfPreviewFrame" src="" class="w-full h-full rounded-xl border border-white/10 hidden" style="background: #1e293b;" onload="window.onPdfFrameLoad()"></iframe>
@@ -5827,10 +5818,10 @@
           <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
         </div>
         <div class="flex items-center justify-center gap-2 mb-2">
-          <span class="feature-badge">🚀 Major Update</span>
+          <span class="feature-badge">🚀 大型アップデート</span>
         </div>
-        <h2 class="text-xl font-bold text-white mb-1">What's New</h2>
-        <p class="text-gray-400 text-xs">3 powerful capabilities to elevate your demos</p>
+        <h2 class="text-xl font-bold text-white mb-1">新着情報</h2>
+        <p class="text-gray-400 text-xs">デモをさらに強化する3つの強力な機能</p>
       </div>
 
       <!-- Scrollable Content Wrapper -->
@@ -5846,8 +5837,8 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h4 class="text-sm font-bold text-white mb-0.5">Agentic Workflow with Interactive A2UI</h4>
-            <p class="text-[11px] text-gray-200 leading-relaxed">Instantly generate highly tailored <span class="font-bold text-amber-400">agentic workflows</span> that seamlessly integrate autonomous execution with rich, interactive user interfaces (A2UI). Your agent can now process unstructured documents, auto-correct data against enterprise databases, and present dynamic UI components (cards, forms, approval flows) for real-time human-in-the-loop decisions. <span class="text-amber-400/80">Accelerate sales cycles and spark immediate "I want this" moments by showcasing complete, visually compelling business operations built instantly with zero coding.</span></p>
+            <h4 class="text-sm font-bold text-white mb-0.5">インタラクティブ A2UI によるエージェントワークフロー</h4>
+            <p class="text-[11px] text-gray-200 leading-relaxed">自律的な実行とリッチなインタラクティブ UI（A2UI）をシームレスに統合した<span class="font-bold text-amber-400">エージェントワークフロー</span>を即座に生成。エージェントが非構造化ドキュメントを処理し、エンタープライズデータベースに対してデータを自動修正し、リアルタイムのヒューマン・イン・ザ・ループ判断のための動的 UI コンポーネント（カード、フォーム、承認フロー）を表示できます。<span class="text-amber-400/80">ゼロコードで即座に構築された完全なビジネスオペレーションを視覚的に訴求することで、販売サイクルを加速し「これが欲しい」という瞬間を生み出します。</span></p>
           </div>
         </div>
         <!-- Agentic Workflow Inline Dynamic SVG Animation (ULTRA ENLARGED VERTICAL STACK - width 100% to fill 672px modal) -->
@@ -6004,7 +5995,7 @@
               <line x1="0" y1="31" x2="340" y2="31" stroke="#334155" stroke-width="1"/>
               
               <!-- 1. Raw Text Box (Centered) -->
-              <text x="170" y="48" text-anchor="middle" fill="#94a3b8" font-size="8.5" font-family="sans-serif">Original Handwritten Value</text>
+              <text x="170" y="48" text-anchor="middle" fill="#94a3b8" font-size="8.5" font-family="sans-serif">元の手書き値</text>
               <text x="170" y="61" text-anchor="middle" fill="#cbd5e1" font-size="11" font-weight="bold" font-family="monospace">"Prod-B / Qty: 120"</text>
               
               <!-- Process Flow Downward Arrow (Perfect Center Align) -->
@@ -6029,20 +6020,20 @@
               <!-- 3. Editable Qty Field (Centered with AI Mismatch [720] ➔ Human Corrected [120] Story) -->
               <g transform="translate(0, 128)">
                 <!-- Label & Input Box centered together -->
-                <text x="115" y="18" text-anchor="end" fill="#94a3b8" font-size="9" font-family="sans-serif">AI Recognized Qty:</text>
+                <text x="115" y="18" text-anchor="end" fill="#94a3b8" font-size="9" font-family="sans-serif">AI 認識数量:</text>
                 <rect x="125" y="4" width="50" height="20" rx="5" fill="#1e293b" stroke="#475569" stroke-width="1"/>
                 
                 <!-- Dynamic Qty value switching (720 in Red ➔ 120 in Blue) -->
                 <text class="anim-qty-err" x="150" y="18" text-anchor="middle" fill="#f87171" font-size="11" font-weight="bold" font-family="monospace">720</text>
                 <text class="anim-qty-ok" x="150" y="18" text-anchor="middle" fill="#38bdf8" font-size="11" font-weight="bold" font-family="monospace">120</text>
                 
-                <text x="182" y="18" fill="#64748b" font-size="8" font-family="sans-serif">(AI Mismatch ➔ Click to Edit)</text>
+                <text x="182" y="18" fill="#64748b" font-size="8" font-family="sans-serif">(AI 不一致 ➔ クリックして修正)</text>
               </g>
 
               <!-- 4. Giant Approve Button (Centered) -->
               <g transform="translate(20, 168)">
                 <rect class="anim-btn-approve" x="0" y="0" width="300" height="32" rx="8" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.2))"/>
-                <text x="150" y="20" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold" font-family="sans-serif" letter-spacing="0.5">⚡ APPROVE & EXECUTE ACTION</text>
+                <text x="150" y="20" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold" font-family="sans-serif" letter-spacing="0.5">⚡ 承認してアクションを実行</text>
               </g>
               
               <!-- Dynamic Mouse Cursor Overlay (カチカチ切り替えアニメーション) -->
@@ -6058,7 +6049,7 @@
                 <path d="M12 20 V65 A 18 6 0 0 0 48 65 V20" fill="#0284c7" fill-opacity="0.15" stroke="#38bdf8" stroke-width="1"/>
                 <ellipse cx="30" cy="38" rx="18" ry="6" stroke="#38bdf8" stroke-dasharray="2,2" stroke-width="0.8"/>
                 <ellipse cx="30" cy="52" rx="18" ry="6" stroke="#38bdf8" stroke-dasharray="2,2" stroke-width="0.8"/>
-                <text x="30" y="95" text-anchor="middle" fill="#38bdf8" font-size="9" font-family="monospace" font-weight="bold">Enterprise DB</text>
+                <text x="30" y="95" text-anchor="middle" fill="#38bdf8" font-size="9" font-family="monospace" font-weight="bold">エンタープライズ DB</text>
               </g>
             </g>
 
@@ -6070,10 +6061,10 @@
             <path class="anim-flow" d="M480 120 H510" stroke="#38bdf8" stroke-width="2" opacity="0.8"/>
 
             <rect x="88" y="98" width="36" height="13" rx="3" fill="#1e293b" stroke="#f59e0b" stroke-opacity="0.3" stroke-width="1"/>
-            <text x="106" y="107" text-anchor="middle" fill="#f59e0b" font-size="7" font-weight="bold" font-family="sans-serif">1. Input</text>
+            <text x="106" y="107" text-anchor="middle" fill="#f59e0b" font-size="7" font-weight="bold" font-family="sans-serif">1. 入力</text>
 
             <rect x="476" y="98" width="36" height="13" rx="3" fill="#1e293b" stroke="#38bdf8" stroke-opacity="0.3" stroke-width="1"/>
-            <text x="494" y="107" text-anchor="middle" fill="#38bdf8" font-size="7" font-weight="bold" font-family="sans-serif">2. Commit</text>
+            <text x="494" y="107" text-anchor="middle" fill="#38bdf8" font-size="7" font-weight="bold" font-family="sans-serif">2. コミット</text>
           </svg>
         </div>
       </div>
@@ -6085,8 +6076,8 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h4 class="text-sm font-bold text-white mb-0.5">Gemini 3.1 Flash Lite Support</h4>
-            <p class="text-[11px] text-gray-200 leading-relaxed">Easily select the highly efficient <span class="font-bold text-emerald-400">Gemini 3.1 Flash Lite</span> model as your root agent directly within the interactive setup script. <span class="text-emerald-400/80">Dramatically reduce latency in your demo environments, allowing you to deliver lightning-fast and highly responsive client presentations.</span></p>
+            <h4 class="text-sm font-bold text-white mb-0.5">Gemini 3.1 Flash Lite サポート</h4>
+            <p class="text-[11px] text-gray-200 leading-relaxed">インタラクティブなセットアップスクリプトから直接、効率的な <span class="font-bold text-emerald-400">Gemini 3.1 Flash Lite</span> モデルをルートエージェントとして簡単に選択できます。<span class="text-emerald-400/80">デモ環境のレイテンシを大幅に削減し、迅速でレスポンシブなクライアントプレゼンテーションを実現します。</span></p>
           </div>
         </div>
       </div>
@@ -6098,8 +6089,8 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h4 class="text-sm font-bold text-white mb-0.5">Custom MCP Server Import</h4>
-            <p class="text-[11px] text-gray-200 leading-relaxed">Simply paste a GitHub URL to automatically analyze and integrate any <span class="font-bold text-sky-400">Model Context Protocol (MCP)</span> server into your demo. <span class="text-sky-400/80">Instantly connect your demo agent to live, customer-specific data sources and tools, allowing you to build hyper-personalized scenarios that address exact customer pain points on the fly.</span></p>
+            <h4 class="text-sm font-bold text-white mb-0.5">カスタム MCP サーバーのインポート</h4>
+            <p class="text-[11px] text-gray-200 leading-relaxed">GitHub URL を貼り付けるだけで、任意の <span class="font-bold text-sky-400">Model Context Protocol (MCP)</span> サーバーを自動解析してデモに統合できます。<span class="text-sky-400/80">デモエージェントをライブの顧客固有データソースとツールに即座に接続し、顧客の具体的な課題にオンザフライで対応する超パーソナライズされたシナリオを構築できます。</span></p>
           </div>
         </div>
       </div>
@@ -6114,13 +6105,13 @@
         <!-- CTA Button -->
         <button onclick="closeFeatureNotify(true)"
           class="w-full feature-shimmer-btn text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-sky-500/20 active:scale-[0.98] mb-3 text-base tracking-wide">
-          🎉 LET'S GO!
+          🎉 さあ始めましょう！
         </button>
 
         <!-- Don't show again checkbox -->
         <label class="flex items-center justify-center gap-2 cursor-pointer group">
           <input type="checkbox" id="featureNotifyDontShow" class="w-3 h-3 rounded border-white/15 text-sky-500/60 focus:ring-sky-500/20 bg-white/5 cursor-pointer opacity-50 hover:opacity-80 transition-opacity">
-          <span class="text-[11px] text-gray-500 group-hover:text-gray-400 transition-colors select-none">Don't show this again</span>
+          <span class="text-[11px] text-gray-500 group-hover:text-gray-400 transition-colors select-none">次回から表示しない</span>
         </label>
       </div>
     </div>
@@ -6295,13 +6286,13 @@
           card.className = 'mcp-catalog-card catalog-animate catalog-stagger-' + Math.min(staggerIdx, 7) + (added ? ' is-added' : '') + (analyzing ? ' is-adding' : '');
           
           const apiKeyTag = server.requires_api_key === true
-            ? '<span class="mcp-tag tag-apikey"><svg class="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>API Key</span>'
+            ? '<span class="mcp-tag tag-apikey"><svg class="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>API キー要</span>'
             : server.requires_api_key === 'partial'
-            ? '<span class="mcp-tag tag-apikey"><svg class="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>Some APIs</span>'
-            : '<span class="mcp-tag tag-free"><svg class="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>No Key</span>';
+            ? '<span class="mcp-tag tag-apikey"><svg class="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>一部 API</span>'
+            : '<span class="mcp-tag tag-free"><svg class="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>キー不要</span>';
 
-          const managedTag = (server.type === 'remote' || server.type === 'workspace') ? '<span class="mcp-tag" style="background:rgba(168,85,247,0.15);color:#c084fc;border-color:rgba(168,85,247,0.25)">☁️ Managed</span>' : '';
-          const devPreviewTag = server.dev_preview ? '<span class="mcp-tag" style="background:rgba(245,158,11,0.12);color:#fbbf24;border-color:rgba(245,158,11,0.2)">🧪 Developer Preview</span>' : '';
+          const managedTag = (server.type === 'remote' || server.type === 'workspace') ? '<span class="mcp-tag" style="background:rgba(168,85,247,0.15);color:#c084fc;border-color:rgba(168,85,247,0.25)">☁️ マネージド</span>' : '';
+          const devPreviewTag = server.dev_preview ? '<span class="mcp-tag" style="background:rgba(245,158,11,0.12);color:#fbbf24;border-color:rgba(245,158,11,0.2)">🧪 開発者プレビュー</span>' : '';
           const langTag = (server.type === 'remote' || server.type === 'workspace') ? '' : '<span class="mcp-tag tag-lang">' + server.language + '</span>';
 
           card.innerHTML = '<div class="relative z-10 flex flex-col gap-2.5">' +
@@ -6319,16 +6310,16 @@
               '</div>' +
             '</div>' +
             '<div class="flex items-center gap-1.5 flex-wrap">' + managedTag + devPreviewTag + apiKeyTag + langTag + '</div>' +
-            (server.dev_preview ? '<div class="bg-amber-950/30 border border-amber-500/15 rounded-lg p-2 mt-0.5"><p class="text-[10px] text-amber-300/80 leading-snug"><svg class="w-2.5 h-2.5 inline -mt-0.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>Requires enrollment in the <a href="https://developers.google.com/workspace/preview" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="text-amber-300 underline hover:text-amber-200">Google Workspace Developer Preview Program</a>.</p></div>' : '') +
+            (server.dev_preview ? '<div class="bg-amber-950/30 border border-amber-500/15 rounded-lg p-2 mt-0.5"><p class="text-[10px] text-amber-300/80 leading-snug"><svg class="w-2.5 h-2.5 inline -mt-0.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg><a href="https://developers.google.com/workspace/preview" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="text-amber-300 underline hover:text-amber-200">Google Workspace Developer Preview Program</a> への登録が必要です。</p></div>' : '') +
             (server.demo_tip ? '<p class="text-[10px] text-sky-400/60 leading-snug"><svg class="w-2.5 h-2.5 inline -mt-0.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>' + server.demo_tip + '</p>' : '') +
             (server.type === 'workspace'
               ? '<button onclick="' + (added ? 'removeWorkspaceMcpFromPlan()' : 'addWorkspaceMcpFromCatalog()') + '" id="catalog-btn-' + server.id + '" class="catalog-toggle-btn mt-1 w-full py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ' +
                 (added ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/30' : 'bg-sky-500/10 text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 hover:border-sky-500/30 active:scale-[0.98]') + '">' +
-                (added ? '<span class="catalog-btn-added"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Added</span><span class="catalog-btn-remove"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>Remove</span>' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>Add to Demo') +
+                (added ? '<span class="catalog-btn-added"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>追加済み</span><span class="catalog-btn-remove"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>削除</span>' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>デモに追加') +
               '</button>'
               : '<button onclick="' + (added ? 'removeCatalogServer(\'' + server.id + '\')' : 'addCatalogServer(\'' + server.id + '\')') + '" id="catalog-btn-' + server.id + '" class="catalog-toggle-btn mt-1 w-full py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ' +
                 (added ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/30' : analyzing ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20 opacity-70 pointer-events-none' : 'bg-sky-500/10 text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 hover:border-sky-500/30 active:scale-[0.98]') + '">' +
-                (added ? '<span class="catalog-btn-added"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Added</span><span class="catalog-btn-remove"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>Remove</span>' : analyzing ? '<div class="w-3.5 h-3.5 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>Analyzing...' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>Add to Demo') +
+                (added ? '<span class="catalog-btn-added"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>追加済み</span><span class="catalog-btn-remove"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>削除</span>' : analyzing ? '<div class="w-3.5 h-3.5 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>解析中...' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>デモに追加') +
               '</button>') +
           '</div>';
           cards.appendChild(card);
@@ -6338,7 +6329,7 @@
 
       // Empty state
       if (grid.children.length === 0) {
-        grid.innerHTML = '<div class="text-center py-8 text-gray-500 text-sm">No servers match your search. Try the <button onclick="switchMcpTab(\'url\')" class="text-sky-400 underline">Import from URL</button> tab.</div>';
+        grid.innerHTML = '<div class="text-center py-8 text-gray-500 text-sm">検索に一致するサーバーがありません。<button onclick="switchMcpTab(\'url\')" class="text-sky-400 underline">URL からインポート</button>タブを試してください。</div>';
       }
     }
 
@@ -6367,10 +6358,10 @@
           : 'bg-sky-500/10 text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 hover:border-sky-500/30 active:scale-[0.98]'; // Glassmorphism
 
         const btnContent = allAdded
-          ? '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Added'
+          ? '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>追加済み'
           : isAnalyzing
-          ? '<div class="w-3 h-3 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>Analyzing...'
-          : '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>Add Combo';
+          ? '<div class="w-3 h-3 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>解析中...'
+          : '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>まとめて追加';
 
         const card = document.createElement('div');
         card.className = 'mcp-recipe-card';
@@ -6429,7 +6420,7 @@
       const card = document.getElementById('catalog-card-' + serverId);
       if (card) card.classList.add('is-adding');
       if (btn) {
-        btn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>Analyzing...';
+        btn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin"></div>解析中...';
         btn.classList.add('opacity-70', 'pointer-events-none');
       }
 
@@ -6529,18 +6520,18 @@
       if (hasGoal) {
         icon.className = 'flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-sky-500/15';
         icon.innerHTML = '<svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
-        title.textContent = totalCount + ' server' + (totalCount > 1 ? 's' : '') + ' selected — ready to go!';
-        desc.textContent = 'Your business challenge is set. Close this catalog and generate.';
+        title.textContent = totalCount + ' 個のサーバーを選択 — 準備完了！';
+        desc.textContent = 'ビジネス課題が設定されました。カタログを閉じて生成してください。';
         cta.className = 'next-step-cta flex-shrink-0 cta-generate cursor-pointer';
-        cta.innerHTML = 'Generate Setup Script <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>';
+        cta.innerHTML = 'セットアップスクリプトを生成 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>';
         window._mcpNextStepAction = 'generate';
       } else {
         icon.className = 'flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-amber-500/15';
         icon.innerHTML = '<svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
-        title.textContent = totalCount + ' server' + (totalCount > 1 ? 's' : '') + ' selected — define your challenge next';
-        desc.textContent = 'Pick from the gallery or describe a customer scenario to continue.';
+        title.textContent = totalCount + ' 個のサーバーを選択 — 次に課題を定義してください';
+        desc.textContent = 'ギャラリーから選択するか、顧客シナリオを入力して続行してください。';
         cta.className = 'next-step-cta flex-shrink-0 cta-setup cursor-pointer';
-        cta.innerHTML = 'Set Up Challenge <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>';
+        cta.innerHTML = '課題を設定 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>';
         window._mcpNextStepAction = 'setup';
       }
 
@@ -6600,7 +6591,7 @@
 
     window.triggerMcpAnalysis = function() {
       const url = document.getElementById('mcpRepoUrl').value.trim();
-      if(!url) return alert('Please enter a valid GitHub Repository URL.');
+      if(!url) return alert('有効な GitHub リポジトリ URL を入力してください。');
       
       const btn = document.getElementById('btnMcpImport');
       const loading = document.getElementById('mcpLoading');
@@ -6638,9 +6629,9 @@
           if (isDuplicate) {
             addButtonHtml = '<div class="p-2 bg-amber-950/30 border border-amber-500/20 rounded-xl text-xs text-amber-400 mt-2">⚠️ This MCP server is already added to your demo plan.</div>' +
               '<button disabled class="w-full bg-gray-700 text-gray-400 mt-4 py-3 font-bold text-sm rounded-2xl cursor-not-allowed flex items-center justify-center gap-2 select-none">' +
-              '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Already Added</button>';
+              '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>追加済み</button>';
           } else {
-            addButtonHtml = '<button onclick="applyImportAndClose()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white mt-4 py-3 font-bold text-sm rounded-2xl transition-all flex items-center justify-center gap-2 select-none">Add to Demo Generation</button>';
+            addButtonHtml = '<button onclick="applyImportAndClose()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white mt-4 py-3 font-bold text-sm rounded-2xl transition-all flex items-center justify-center gap-2 select-none">デモ生成に追加</button>';
           }
           
           document.getElementById('mcpStatusMessage').innerHTML = '<div class="p-4 bg-emerald-950/30 border border-emerald-500/20 rounded-2xl text-sm text-emerald-400">✅ <strong>Analysis Completed!</strong> Language: ' + data.language.toUpperCase() + ' (' + data.transport_mode.toUpperCase() + ')</div>' + addButtonHtml;
@@ -6649,7 +6640,7 @@
           btn.disabled = false;
           btn.classList.remove('bg-sky-500', 'hover:bg-sky-600');
           btn.classList.add('bg-slate-600', 'hover:bg-slate-700');
-          btn.innerText = 'Re-analyze';
+          btn.innerText = '再解析';
              
           const box = document.getElementById('mcpEnvVarsBox');
           box.innerHTML = '';
@@ -6660,7 +6651,7 @@
             });
             document.getElementById('mcpEnvVarList').classList.remove('hidden');
           } else {
-            box.innerHTML = '<span class="text-gray-500 font-sans">No environmental variables are required.</span>';
+            box.innerHTML = '<span class="text-gray-500 font-sans">環境変数は必要ありません。</span>';
             document.getElementById('mcpEnvVarList').classList.remove('hidden');
           }
 
@@ -6701,7 +6692,7 @@
       const existingUrl = lastAnalyzedMcp.github_url;
       if (existingUrl && cachedImportedMcpList.some(m => m.github_url === existingUrl)) {
         const existingName = cachedImportedMcpList.find(m => m.github_url === existingUrl)?.name || existingUrl;
-        alert('⚠️ This MCP server is already added:\n' + existingName + '\n\nDuplicate entries are not allowed.');
+        alert('⚠️ この MCP サーバーはすでに追加されています:\n' + existingName + '\n\n重複した追加は許可されていません。');
         return;
       }
 
@@ -6721,7 +6712,7 @@
       const btn = document.getElementById('btnMcpImport');
       btn.classList.remove('bg-slate-600', 'hover:bg-slate-700');
       btn.classList.add('bg-sky-500', 'hover:bg-sky-600');
-      btn.innerText = 'Analyze';
+      btn.innerText = '解析';
     }
 
     window.removeMcpFromPlan = function(index) {
@@ -6748,7 +6739,7 @@
             '<p class="text-xs text-gray-400">☁️ MANAGED · GMAIL, DRIVE, CALENDAR, CHAT</p>' +
           '</div>' +
         '</div>' +
-        '<button onclick="removeWorkspaceMcpFromPlan()" class="text-gray-500 hover:text-white text-xs underline focus:outline-none">Remove</button>';
+        '<button onclick="removeWorkspaceMcpFromPlan()" class="text-gray-500 hover:text-white text-xs underline focus:outline-none">削除</button>';
         container.appendChild(wsEl);
       }
 
@@ -6771,7 +6762,7 @@
             '<p class="text-xs text-gray-400">' + subtitle + '</p>' +
           '</div>' +
         '</div>' +
-        '<button onclick="removeMcpFromPlan(' + i + ')" class="text-gray-500 hover:text-white text-xs underline focus:outline-none">Remove</button>';
+        '<button onclick="removeMcpFromPlan(' + i + ')" class="text-gray-500 hover:text-white text-xs underline focus:outline-none">削除</button>';
         container.appendChild(el);
       });
     }
