@@ -195,6 +195,71 @@ describe('makeJobRunner / runProvision', () => {
       expect(envVars.find(e => e.name === 'SCRIPT_REF')).toBeDefined();
     });
   });
+
+  describe('with envRef provided', () => {
+    const ENV_REF = 'gs://my-bucket/envs/demo-acme-001.env';
+
+    it('appends DEMO_DIR=demo.id and ENV_REF to the env array', async () => {
+      const jobsClient = makeStubJobsClient();
+      const registry = makeStubRegistry();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runProvision({ demo: DEMO, scriptRef: SCRIPT_REF, secrets: SECRETS, registry, now: NOW_FN, envRef: ENV_REF });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const envVars = callArg.overrides.containerOverrides[0].env;
+      const demoDir = envVars.find(e => e.name === 'DEMO_DIR');
+      const envRefEntry = envVars.find(e => e.name === 'ENV_REF');
+      expect(demoDir).toBeDefined();
+      expect(demoDir.value).toBe(DEMO.id);
+      expect(envRefEntry).toBeDefined();
+      expect(envRefEntry.value).toBe(ENV_REF);
+    });
+
+    it('still includes SCRIPT_REF, ASSUME_YES, and secrets when envRef is provided', async () => {
+      const jobsClient = makeStubJobsClient();
+      const registry = makeStubRegistry();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runProvision({ demo: DEMO, scriptRef: SCRIPT_REF, secrets: SECRETS, registry, now: NOW_FN, envRef: ENV_REF });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const envVars = callArg.overrides.containerOverrides[0].env;
+      expect(envVars.find(e => e.name === 'SCRIPT_REF')?.value).toBe(SCRIPT_REF);
+      expect(envVars.find(e => e.name === 'ASSUME_YES')?.value).toBe('1');
+      for (const [key, value] of Object.entries(SECRETS)) {
+        expect(envVars.find(e => e.name === key)?.value).toBe(value);
+      }
+    });
+  });
+
+  describe('without envRef (backward-compat)', () => {
+    it('does NOT include DEMO_DIR or ENV_REF when envRef is omitted', async () => {
+      const jobsClient = makeStubJobsClient();
+      const registry = makeStubRegistry();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runProvision({ demo: DEMO, scriptRef: SCRIPT_REF, secrets: SECRETS, registry, now: NOW_FN });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const envVars = callArg.overrides.containerOverrides[0].env;
+      expect(envVars.find(e => e.name === 'DEMO_DIR')).toBeUndefined();
+      expect(envVars.find(e => e.name === 'ENV_REF')).toBeUndefined();
+    });
+
+    it('does NOT include DEMO_DIR or ENV_REF when envRef is an empty string', async () => {
+      const jobsClient = makeStubJobsClient();
+      const registry = makeStubRegistry();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runProvision({ demo: DEMO, scriptRef: SCRIPT_REF, secrets: SECRETS, registry, now: NOW_FN, envRef: '' });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const envVars = callArg.overrides.containerOverrides[0].env;
+      expect(envVars.find(e => e.name === 'DEMO_DIR')).toBeUndefined();
+      expect(envVars.find(e => e.name === 'ENV_REF')).toBeUndefined();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -348,6 +413,68 @@ describe('makeJobRunner / runCleanup', () => {
       expect(result.ok).toBe(false);
       expect(result.executionId).toBe(execName);
       expect(result.demoId).toBe(DEMO.id);
+    });
+  });
+
+  describe('with envRef provided', () => {
+    const ENV_REF = 'gs://my-bucket/envs/demo-acme-001.env';
+
+    it('appends DEMO_DIR=demo.id and ENV_REF to the env array', async () => {
+      const jobsClient = makeStubJobsClient();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runCleanup({ demo: DEMO, scriptRef: CLEANUP_SCRIPT_REF, secrets: SECRETS, envRef: ENV_REF });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const envVars = callArg.overrides.containerOverrides[0].env;
+      const demoDir = envVars.find(e => e.name === 'DEMO_DIR');
+      const envRefEntry = envVars.find(e => e.name === 'ENV_REF');
+      expect(demoDir).toBeDefined();
+      expect(demoDir.value).toBe(DEMO.id);
+      expect(envRefEntry).toBeDefined();
+      expect(envRefEntry.value).toBe(ENV_REF);
+    });
+
+    it('still includes SCRIPT_REF, ASSUME_YES, CLEANUP_MODE, and secrets when envRef is provided', async () => {
+      const jobsClient = makeStubJobsClient();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runCleanup({ demo: DEMO, scriptRef: CLEANUP_SCRIPT_REF, secrets: SECRETS, envRef: ENV_REF });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const envVars = callArg.overrides.containerOverrides[0].env;
+      expect(envVars.find(e => e.name === 'SCRIPT_REF')?.value).toBe(CLEANUP_SCRIPT_REF);
+      expect(envVars.find(e => e.name === 'ASSUME_YES')?.value).toBe('1');
+      expect(envVars.find(e => e.name === 'CLEANUP_MODE')?.value).toBe('1');
+      for (const [key, value] of Object.entries(SECRETS)) {
+        expect(envVars.find(e => e.name === key)?.value).toBe(value);
+      }
+    });
+  });
+
+  describe('without envRef (backward-compat)', () => {
+    it('does NOT include DEMO_DIR or ENV_REF when envRef is omitted', async () => {
+      const jobsClient = makeStubJobsClient();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runCleanup({ demo: DEMO, scriptRef: CLEANUP_SCRIPT_REF, secrets: SECRETS });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const envVars = callArg.overrides.containerOverrides[0].env;
+      expect(envVars.find(e => e.name === 'DEMO_DIR')).toBeUndefined();
+      expect(envVars.find(e => e.name === 'ENV_REF')).toBeUndefined();
+    });
+
+    it('does NOT include DEMO_DIR or ENV_REF when envRef is an empty string', async () => {
+      const jobsClient = makeStubJobsClient();
+      const runner = makeJobRunner({ jobsClient, projectId: PROJECT_ID, region: REGION, jobName: JOB_NAME });
+
+      await runner.runCleanup({ demo: DEMO, scriptRef: CLEANUP_SCRIPT_REF, secrets: SECRETS, envRef: '' });
+
+      const [callArg] = jobsClient.runJob.mock.calls[0];
+      const envVars = callArg.overrides.containerOverrides[0].env;
+      expect(envVars.find(e => e.name === 'DEMO_DIR')).toBeUndefined();
+      expect(envVars.find(e => e.name === 'ENV_REF')).toBeUndefined();
     });
   });
 });

@@ -40,15 +40,18 @@ export function makeJobRunner({ jobsClient, projectId, region, jobName }) {
      * @param {object} [opts.secrets]   - Key→value map of env vars to inject (credentials, etc.)
      * @param {object} opts.registry    - DemoRegistry (must implement transition(id, state, now))
      * @param {Function} opts.now       - () => ISO date string (injected for testability)
+     * @param {string} [opts.envRef]    - GCS URI for the env file (e.g. gs://<bucket>/envs/<id>.env).
+     *                                    When provided, DEMO_DIR and ENV_REF are appended to the env array.
      * @returns {Promise<{ demoId: string, executionId: string|null, state: string, ok: boolean }>}
      */
-    async runProvision({ demo, scriptRef, secrets = {}, registry, now }) {
+    async runProvision({ demo, scriptRef, secrets = {}, registry, now, envRef }) {
       // Build env overrides: secrets first, then SCRIPT_REF and ASSUME_YES on top
       const secretEnvs = Object.entries(secrets).map(([name, value]) => ({ name, value }));
       const env = [
         ...secretEnvs,
         { name: 'SCRIPT_REF', value: scriptRef },
         { name: 'ASSUME_YES', value: '1' },
+        ...(envRef ? [{ name: 'DEMO_DIR', value: demo.id }, { name: 'ENV_REF', value: envRef }] : []),
       ];
 
       let executionId = null;
@@ -108,9 +111,11 @@ export function makeJobRunner({ jobsClient, projectId, region, jobName }) {
      * @param {object} opts.demo       - Demo object (must have .id)
      * @param {string} opts.scriptRef  - GCS URI of the headless cleanup script
      * @param {object} [opts.secrets]  - Key→value map of env vars to inject
+     * @param {string} [opts.envRef]   - GCS URI for the env file (e.g. gs://<bucket>/envs/<id>.env).
+     *                                   When provided, DEMO_DIR and ENV_REF are appended to the env array.
      * @returns {Promise<{ demoId: string, executionId: string|null, ok: boolean }>}
      */
-    async runCleanup({ demo, scriptRef, secrets = {} }) {
+    async runCleanup({ demo, scriptRef, secrets = {}, envRef }) {
       // Build env overrides: secrets first, then script delivery + cleanup flags
       const secretEnvs = Object.entries(secrets).map(([name, value]) => ({ name, value }));
       const env = [
@@ -118,6 +123,7 @@ export function makeJobRunner({ jobsClient, projectId, region, jobName }) {
         { name: 'SCRIPT_REF', value: scriptRef },
         { name: 'ASSUME_YES', value: '1' },
         { name: 'CLEANUP_MODE', value: '1' },
+        ...(envRef ? [{ name: 'DEMO_DIR', value: demo.id }, { name: 'ENV_REF', value: envRef }] : []),
       ];
 
       let executionId = null;
