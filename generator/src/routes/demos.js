@@ -1,6 +1,26 @@
 import { Router } from 'express';
 
 /**
+ * Feature A: after a successful provision (build → active), open the demo agent's
+ * Cloud Run ingress to `all` so a cross-project/cross-org Gemini Enterprise can
+ * reach it (the generated script deploys with ingress=internal). Best-effort —
+ * never throws, no-ops when geRegistrar is unconfigured or the provision failed.
+ *
+ * @param {object} services        - route services (may have geRegistrar + config)
+ * @param {object} provisionResult - result of jobRunner.runProvision ({ ok, ... })
+ * @param {string} demoId          - the agent Cloud Run service name (== demo id)
+ */
+async function maybeOpenIngress(services, provisionResult, demoId) {
+  if (!provisionResult?.ok) return;
+  if (typeof services?.geRegistrar?.setIngressAll !== 'function') return;
+  try {
+    await services.geRegistrar.setIngressAll(demoId, services.config?.agentRegion);
+  } catch (e) {
+    console.error('[setIngressAll] failed:', e?.message ?? e);
+  }
+}
+
+/**
  * demosRouter — GET /api/demos, GET /api/demos/:id (Plan A, unchanged)
  *               POST /api/demos              (Plan C Task 7 — build start)
  *               GET /api/demos/:id/status    (Plan C Task 7 — status)
@@ -171,7 +191,8 @@ export function demosRouter(registry, services = {}) {
       // Fire-and-forget: response returns immediately; runProvision does the long work.
       Promise.resolve().then(() =>
         jobRunner.runProvision({ demo, scriptRef, secrets: {}, envRef, registry, now: nowFn })
-      ).catch((err) => console.error('[provision] async kick failed:', err?.message ?? err));
+      ).then((result) => maybeOpenIngress(services, result, demo.id))
+        .catch((err) => console.error('[provision] async kick failed:', err?.message ?? err));
       return res.status(202).json({ demoId: demo.id, state: 'building' });
     } catch (err) { next(err); }
   });
@@ -290,9 +311,10 @@ export function demosRouter(registry, services = {}) {
           now: now ?? (() => new Date().toISOString()),
           envRef,
         })
-      ).catch((err) => {
-        console.error('[runProvision] async kick failed:', err?.message ?? err);
-      });
+      ).then((provResult) => maybeOpenIngress(services, provResult, result.demoId))
+        .catch((err) => {
+          console.error('[runProvision] async kick failed:', err?.message ?? err);
+        });
 
       // 5. Respond immediately with building state
       res.status(202).json({ demoId: result.demoId, state: 'building' });

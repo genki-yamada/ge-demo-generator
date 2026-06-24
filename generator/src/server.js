@@ -26,6 +26,12 @@ const config = {
   ...loadConfig(process.env),
   jobName: process.env.GENERATOR_JOB_NAME || 'provisioner',
   appVersion: process.env.APP_VERSION || 'v10.100-public',
+  // Gemini Enterprise registration target (Feature B-1) + agent region (Feature A).
+  // GE_APP_ID empty → register-ge endpoint 503s and the auto-ingress hook no-ops.
+  geProjectNumber: process.env.GE_PROJECT_NUMBER || '',
+  geAppId: process.env.GE_APP_ID || '',
+  geLocation: process.env.GE_LOCATION || 'global',
+  agentRegion: process.env.AGENT_REGION || 'us-central1',
 };
 
 // ─── Registry / auth (unchanged) ─────────────────────────────────────────────────
@@ -73,6 +79,7 @@ const { services } = buildServices({
   storageClient: storage,
   config,
   registry,
+  getToken,
 });
 
 // ─── App ───────────────────────────────────────────────────────────────────────
