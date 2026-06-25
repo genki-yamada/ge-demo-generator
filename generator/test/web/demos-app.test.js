@@ -476,3 +476,143 @@ describe('installDemosApp – HTTP error handling', () => {
     expect(doc._elements.toastArea.textContent).toContain('HTTP 404');
   });
 });
+
+// ---------------------------------------------------------------------------
+// installDemosApp – GE register button
+// ---------------------------------------------------------------------------
+
+describe('installDemosApp – GE register button', () => {
+  it('renders a GE-register button for active demo rows', async () => {
+    const demos = [
+      { id: 'demo-active-111', ownerCe: 'ce@x.com', goal: 'g1', state: 'active', createdAt: '2026-01-01T00:00:00.000Z' },
+      { id: 'demo-building-222', ownerCe: 'ce@y.com', goal: 'g2', state: 'building', createdAt: '2026-01-02T00:00:00.000Z' },
+    ];
+    const fetchImpl = makeFetch([{ ok: true, body: { demos } }]);
+    const doc = makeDomStub();
+
+    installDemosApp({ doc, fetchImpl, pollInterval: 0, autoLoad: false });
+    // Directly render via loadDemos
+    const app = installDemosApp({ doc, fetchImpl: makeFetch([{ ok: true, body: { demos } }]), pollInterval: 0, autoLoad: false });
+    await app.loadDemos();
+
+    const tbody = doc._elements.demosTableBody;
+    // active row: find the tr for demo-active-111
+    const activeRow = tbody._children.find(tr => tr.dataset && tr.dataset.demoId === 'demo-active-111');
+    expect(activeRow).toBeTruthy();
+
+    // The action cell is the last cell
+    const actionTd = activeRow.cells[activeRow.cells.length - 1];
+    const geBtn = actionTd._children.find(el => el.className === 'btn-ge-register');
+    expect(geBtn).toBeTruthy();
+    expect(geBtn.textContent).toBe('GE に登録');
+
+    // building row should NOT have a GE register button
+    const buildingRow = tbody._children.find(tr => tr.dataset && tr.dataset.demoId === 'demo-building-222');
+    expect(buildingRow).toBeTruthy();
+    const buildingActionTd = buildingRow.cells[buildingRow.cells.length - 1];
+    const noBuildingGeBtn = buildingActionTd._children.find(el => el.className === 'btn-ge-register');
+    expect(noBuildingGeBtn).toBeUndefined();
+  });
+
+  it('calling the GE-register handler invokes win.registerDemoToGe with the demoId', async () => {
+    const demoId = 'demo-active-111';
+    const demos = [
+      { id: demoId, ownerCe: 'ce@x.com', goal: 'g1', state: 'active', createdAt: '2026-01-01T00:00:00.000Z' },
+    ];
+    const fetchImpl = makeFetch([{ ok: true, body: { demos } }]);
+    const doc = makeDomStub();
+
+    const registerDemoToGe = vi.fn(() => Promise.resolve({ demoId, agentId: 'agent-1', alreadyRegistered: false }));
+    const win = { registerDemoToGe };
+
+    const app = installDemosApp({ doc, win, fetchImpl, pollInterval: 0, autoLoad: false });
+    await app.loadDemos();
+
+    const tbody = doc._elements.demosTableBody;
+    const activeRow = tbody._children.find(tr => tr.dataset && tr.dataset.demoId === demoId);
+    const actionTd = activeRow.cells[activeRow.cells.length - 1];
+    const geBtn = actionTd._children.find(el => el.className === 'btn-ge-register');
+
+    // Simulate click by calling the registered listener
+    const clickHandlers = geBtn._listeners['click'];
+    expect(clickHandlers).toHaveLength(1);
+    await clickHandlers[0]();
+
+    expect(registerDemoToGe).toHaveBeenCalledWith(demoId);
+    // Toast should show success message
+    expect(doc._elements.toastArea.textContent).toContain('Gemini Enterprise に登録しました');
+  });
+
+  it('shows alreadyRegistered toast suffix when result.alreadyRegistered is true', async () => {
+    const demoId = 'demo-active-222';
+    const demos = [
+      { id: demoId, ownerCe: 'ce@x.com', goal: 'g1', state: 'active', createdAt: '2026-01-01T00:00:00.000Z' },
+    ];
+    const fetchImpl = makeFetch([{ ok: true, body: { demos } }]);
+    const doc = makeDomStub();
+
+    const registerDemoToGe = vi.fn(() => Promise.resolve({ demoId, agentId: 'agent-1', alreadyRegistered: true }));
+    const win = { registerDemoToGe };
+
+    const app = installDemosApp({ doc, win, fetchImpl, pollInterval: 0, autoLoad: false });
+    await app.loadDemos();
+
+    const tbody = doc._elements.demosTableBody;
+    const activeRow = tbody._children.find(tr => tr.dataset && tr.dataset.demoId === demoId);
+    const actionTd = activeRow.cells[activeRow.cells.length - 1];
+    const geBtn = actionTd._children.find(el => el.className === 'btn-ge-register');
+
+    await geBtn._listeners['click'][0]();
+
+    expect(doc._elements.toastArea.textContent).toContain('（既に登録済み）');
+  });
+
+  it('shows error toast and re-enables button when registerDemoToGe throws', async () => {
+    const demoId = 'demo-active-333';
+    const demos = [
+      { id: demoId, ownerCe: 'ce@x.com', goal: 'g1', state: 'active', createdAt: '2026-01-01T00:00:00.000Z' },
+    ];
+    const fetchImpl = makeFetch([{ ok: true, body: { demos } }]);
+    const doc = makeDomStub();
+
+    const registerDemoToGe = vi.fn(() => Promise.reject(new Error('agent not found')));
+    const win = { registerDemoToGe };
+
+    const app = installDemosApp({ doc, win, fetchImpl, pollInterval: 0, autoLoad: false });
+    await app.loadDemos();
+
+    const tbody = doc._elements.demosTableBody;
+    const activeRow = tbody._children.find(tr => tr.dataset && tr.dataset.demoId === demoId);
+    const actionTd = activeRow.cells[activeRow.cells.length - 1];
+    const geBtn = actionTd._children.find(el => el.className === 'btn-ge-register');
+
+    await geBtn._listeners['click'][0]();
+
+    expect(doc._elements.toastArea.textContent).toContain('GE登録に失敗しました: agent not found');
+    expect(geBtn.disabled).toBe(false);
+  });
+
+  it('shows unavailable toast when win.registerDemoToGe is not set', async () => {
+    const demoId = 'demo-active-444';
+    const demos = [
+      { id: demoId, ownerCe: 'ce@x.com', goal: 'g1', state: 'active', createdAt: '2026-01-01T00:00:00.000Z' },
+    ];
+    const fetchImpl = makeFetch([{ ok: true, body: { demos } }]);
+    const doc = makeDomStub();
+
+    // win without registerDemoToGe
+    const win = {};
+
+    const app = installDemosApp({ doc, win, fetchImpl, pollInterval: 0, autoLoad: false });
+    await app.loadDemos();
+
+    const tbody = doc._elements.demosTableBody;
+    const activeRow = tbody._children.find(tr => tr.dataset && tr.dataset.demoId === demoId);
+    const actionTd = activeRow.cells[activeRow.cells.length - 1];
+    const geBtn = actionTd._children.find(el => el.className === 'btn-ge-register');
+
+    await geBtn._listeners['click'][0]();
+
+    expect(doc._elements.toastArea.textContent).toBe('GE登録は利用できません');
+  });
+});

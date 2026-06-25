@@ -44,6 +44,7 @@ import { makeJobRunner } from './provision/job-runner.js';
 import { deinteractivize } from './provision/deinteractivize.js';
 import { makeScriptStore } from './provision/script-store.js';
 import { makeCleanupRunner } from './provision/cleanup-runner.js';
+import { makeGeRegistrar } from './provision/ge-registrar.js';
 
 /**
  * @param {object} clients
@@ -55,7 +56,7 @@ import { makeCleanupRunner } from './provision/cleanup-runner.js';
  * @param {object} [clients.registry]            - Optional DemoRegistry instance (enables cleanupRunner)
  * @returns {{ services: object }}
  */
-export function buildServices({ vertexClient, bqClient, jobsClient, secretManagerClient, storageClient, config, registry }) {
+export function buildServices({ vertexClient, bqClient, jobsClient, secretManagerClient, storageClient, config, registry, getToken, fetchImpl }) {
   // GAS-shaped wrapper: (prompt) => Promise<text>. generateSetupScript calls this.
   const callVertexAI = async (prompt) => vertexClient.generateContent(prompt);
 
@@ -138,6 +139,14 @@ export function buildServices({ vertexClient, bqClient, jobsClient, secretManage
     ? makeCleanupRunner({ scriptStore, deinteractivize, jobRunner, registry, now })
     : undefined;
 
+  // ge-registrar.js — registers a demo's deployed agent to a Gemini Enterprise app
+  // (Feature B-1) and opens the agent's Cloud Run ingress (Feature A). Requires a
+  // cloud-platform token (getToken) and a configured GE target (config.geAppId).
+  // Left undefined when unconfigured → register-ge endpoint 503s, ingress hook no-ops.
+  const geRegistrar = (getToken && config.geAppId)
+    ? makeGeRegistrar({ getToken, fetchImpl: fetchImpl ?? ((url, opts) => fetch(url, opts)), config })
+    : undefined;
+
   const services = {
     generateDemo,
     deinteractivize,
@@ -152,6 +161,8 @@ export function buildServices({ vertexClient, bqClient, jobsClient, secretManage
     updateInstruction,
     appConfig,
     cleanupRunner,
+    geRegistrar,
+    config,
   };
 
   return { services };

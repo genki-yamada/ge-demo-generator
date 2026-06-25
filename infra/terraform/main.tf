@@ -113,6 +113,28 @@ resource "google_cloud_run_v2_service" "generator" {
         name  = "IAP_AUDIENCE"
         value = local.iap_audience
       }
+      # ── Gemini Enterprise registration env vars (ADR-0006) ───────────────────
+      # Used by src/provision/ge-registrar.js to open ingress and register demo
+      # agents to the GE app after a successful build.
+      # IMPORTANT: granting the runtime SA a Discovery Engine role in the GE
+      # project (sts-gemini-enterprise-dev) is a manual prerequisite NOT managed
+      # by this Terraform — the GE-project admin must perform it once.
+      env {
+        name  = "GE_PROJECT_NUMBER"
+        value = var.ge_project_number
+      }
+      env {
+        name  = "GE_APP_ID"
+        value = var.ge_app_id
+      }
+      env {
+        name  = "GE_LOCATION"
+        value = var.ge_location
+      }
+      env {
+        name  = "AGENT_REGION"
+        value = var.agent_region
+      }
     }
   }
 
@@ -276,6 +298,17 @@ resource "google_project_iam_member" "runtime_secretmanager_admin" {
 resource "google_project_iam_member" "runtime_run_developer" {
   project = var.project_id
   role    = "roles/run.developer"
+  member  = "serviceAccount:${google_service_account.generator_runtime.email}"
+}
+
+# GE registration (ADR-0006) requires the runtime SA to call Cloud Run Admin API:
+#   - services.update  (ingress change)  → covered by run.developer
+#   - services.setIamPolicy (grant GE DE SA run.invoker) → NOT in run.developer; requires run.admin
+# run.admin is a superset of run.developer; the binding above is kept for
+# explicit documentation and backward compatibility.
+resource "google_project_iam_member" "runtime_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
   member  = "serviceAccount:${google_service_account.generator_runtime.email}"
 }
 

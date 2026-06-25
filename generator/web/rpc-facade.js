@@ -243,6 +243,23 @@ export function installRpcFacade({ win = window, fetchImpl = window.fetch.bind(w
     if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
     return data;
   };
+
+  /**
+   * Register a demo's agent to Gemini Enterprise.
+   * POST /api/demos/:id/register-ge → { demoId, agentId, alreadyRegistered }.
+   * Resolves with the response body on 2xx; throws Error(message) otherwise.
+   *
+   * @param {string} demoId
+   * @returns {Promise<{demoId:string, agentId:string, alreadyRegistered:boolean}>}
+   */
+  win.registerDemoToGe = async function registerDemoToGe(demoId) {
+    const r = await fetchImpl('/api/demos/' + encodeURIComponent(demoId) + '/register-ge', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+    return data;
+  };
 }
 
 // Auto-install in a browser context (not during module tests where window is absent)

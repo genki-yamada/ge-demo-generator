@@ -38,3 +38,34 @@ variable "iap_audience" {
   description = "IAP の JWT audience の明示オーバーライド。空の場合は main.tf の local で Cloud Run 形式 /projects/<NUMBER>/locations/<REGION>/services/generator を自動導出する。注意: この値が誤り/不一致だと iapAuth が JWT 検証に失敗し /api が全て 401 になる（空＝検証スキップではない）。"
   default     = ""
 }
+
+# ── Gemini Enterprise registration (ADR-0006) ─────────────────────────────────
+# Used by the app-layer GE registrar (src/provision/ge-registrar.js) to open
+# ingress and register built demo agents to a Gemini Enterprise app.
+# NOTE: granting the runtime SA a Discovery Engine role in the GE project
+# (sts-gemini-enterprise-dev) is a manual one-time prerequisite performed by
+# the GE-project admin — it is NOT managed by this Terraform configuration.
+
+variable "ge_project_number" {
+  type        = string
+  description = "Gemini Enterprise プロジェクトのプロジェクト番号。GE DE SA の特定と Discovery Engine API 呼び出し先の解決に使用する。未設定の場合は GE 登録機能が無効になる。"
+  default     = ""
+}
+
+variable "ge_app_id" {
+  type        = string
+  description = "Gemini Enterprise アプリの ID（Discovery Engine engine ID）。エージェントカード登録先を指定する。未設定の場合は GE 登録機能が無効になる。"
+  default     = ""
+}
+
+variable "ge_location" {
+  type        = string
+  description = "Gemini Enterprise アプリのロケーション（Discovery Engine のリージョン）。通常は global。"
+  default     = "global"
+}
+
+variable "agent_region" {
+  type        = string
+  description = "生成されたデモエージェント（Cloud Run サービス）がデプロイされるリージョン。ingress 変更・IAM 付与時に使用する。"
+  default     = "us-central1"
+}

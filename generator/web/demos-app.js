@@ -138,6 +138,7 @@ export function renderRowData(demo) {
  *
  * @param {object} [opts]
  * @param {object} [opts.doc=document]    - Target document (inject fake in tests)
+ * @param {object} [opts.win=window]      - Target global object (inject fake in tests)
  * @param {Function} [opts.fetchImpl]     - fetch implementation (inject fake in tests)
  * @param {number} [opts.pollInterval]    - ms between polls (default 3000; use >0 in browser)
  * @param {boolean} [opts.autoLoad=true]  - if true, calls loadDemos() on install
@@ -145,6 +146,7 @@ export function renderRowData(demo) {
  */
 export function installDemosApp({
   doc = (typeof document !== 'undefined' ? document : null),
+  win = (typeof window !== 'undefined' ? window : null),
   fetchImpl = (typeof window !== 'undefined' ? window.fetch.bind(window) : null),
   pollInterval = 3000,
   autoLoad = true,
@@ -228,6 +230,15 @@ export function installDemosApp({
         const span = doc.createElement('span');
         span.textContent = '削除中...';
         actionTd.appendChild(span);
+      }
+
+      if (demo.state === 'active') {
+        const geBtn = doc.createElement('button');
+        geBtn.className = 'btn-ge-register';
+        geBtn.textContent = 'GE に登録';
+        geBtn.dataset.demoId = demo.id;
+        geBtn.addEventListener('click', () => registerToGe(demo.id, geBtn));
+        actionTd.appendChild(geBtn);
       }
 
       tr.appendChild(actionTd);
@@ -414,6 +425,29 @@ export function installDemosApp({
     // 202 accepted — update badge optimistically and start polling
     updateStateDisplay(demoId, 'deleting');
     await pollStatus(demoId);
+  }
+
+  /**
+   * Register a demo's agent to Gemini Enterprise.
+   * Calls win.registerDemoToGe(demoId) and shows a toast on success/failure.
+   *
+   * @param {string} demoId
+   * @param {HTMLElement} btn - the button element to disable during the request
+   * @returns {Promise<void>}
+   */
+  async function registerToGe(demoId, btn) {
+    if (!win || !win.registerDemoToGe) {
+      showToast('GE登録は利用できません');
+      return;
+    }
+    if (btn) btn.disabled = true;
+    try {
+      const result = await win.registerDemoToGe(demoId);
+      showToast('Gemini Enterprise に登録しました' + (result.alreadyRegistered ? '（既に登録済み）' : ''));
+    } catch (e) {
+      showToast('GE登録に失敗しました: ' + (e.message || e), true);
+      if (btn) btn.disabled = false;
+    }
   }
 
   // ---- event wiring (runs only if doc is available) -------------------------
