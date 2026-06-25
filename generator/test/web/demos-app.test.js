@@ -514,18 +514,19 @@ describe('installDemosApp – GE register button', () => {
     expect(noBuildingGeBtn).toBeUndefined();
   });
 
-  it('calling the GE-register handler invokes win.registerDemoToGe with the demoId', async () => {
+  it('GE-register handler POSTs to /api/demos/:id/register-ge and shows success toast', async () => {
     const demoId = 'demo-active-111';
     const demos = [
       { id: demoId, ownerCe: 'ce@x.com', goal: 'g1', state: 'active', createdAt: '2026-01-01T00:00:00.000Z' },
     ];
-    const fetchImpl = makeFetch([{ ok: true, body: { demos } }]);
+    // index 0 = loadDemos; index 1 = the register POST
+    const fetchImpl = makeFetch([
+      { ok: true, body: { demos } },
+      { ok: true, body: { demoId, agentId: 'agent-1', alreadyRegistered: false } },
+    ]);
     const doc = makeDomStub();
 
-    const registerDemoToGe = vi.fn(() => Promise.resolve({ demoId, agentId: 'agent-1', alreadyRegistered: false }));
-    const win = { registerDemoToGe };
-
-    const app = installDemosApp({ doc, win, fetchImpl, pollInterval: 0, autoLoad: false });
+    const app = installDemosApp({ doc, fetchImpl, pollInterval: 0, autoLoad: false });
     await app.loadDemos();
 
     const tbody = doc._elements.demosTableBody;
@@ -533,28 +534,29 @@ describe('installDemosApp – GE register button', () => {
     const actionTd = activeRow.cells[activeRow.cells.length - 1];
     const geBtn = actionTd._children.find(el => el.className === 'btn-ge-register');
 
-    // Simulate click by calling the registered listener
     const clickHandlers = geBtn._listeners['click'];
     expect(clickHandlers).toHaveLength(1);
     await clickHandlers[0]();
 
-    expect(registerDemoToGe).toHaveBeenCalledWith(demoId);
-    // Toast should show success message
+    // second fetch call is the register POST (no dependency on rpc-facade / window)
+    const call = fetchImpl.mock.calls[1];
+    expect(call[0]).toBe(`/api/demos/${demoId}/register-ge`);
+    expect(call[1].method).toBe('POST');
     expect(doc._elements.toastArea.textContent).toContain('Gemini Enterprise に登録しました');
   });
 
-  it('shows alreadyRegistered toast suffix when result.alreadyRegistered is true', async () => {
+  it('shows alreadyRegistered toast suffix when the response sets alreadyRegistered', async () => {
     const demoId = 'demo-active-222';
     const demos = [
       { id: demoId, ownerCe: 'ce@x.com', goal: 'g1', state: 'active', createdAt: '2026-01-01T00:00:00.000Z' },
     ];
-    const fetchImpl = makeFetch([{ ok: true, body: { demos } }]);
+    const fetchImpl = makeFetch([
+      { ok: true, body: { demos } },
+      { ok: true, body: { demoId, agentId: 'agent-1', alreadyRegistered: true } },
+    ]);
     const doc = makeDomStub();
 
-    const registerDemoToGe = vi.fn(() => Promise.resolve({ demoId, agentId: 'agent-1', alreadyRegistered: true }));
-    const win = { registerDemoToGe };
-
-    const app = installDemosApp({ doc, win, fetchImpl, pollInterval: 0, autoLoad: false });
+    const app = installDemosApp({ doc, fetchImpl, pollInterval: 0, autoLoad: false });
     await app.loadDemos();
 
     const tbody = doc._elements.demosTableBody;
@@ -567,18 +569,18 @@ describe('installDemosApp – GE register button', () => {
     expect(doc._elements.toastArea.textContent).toContain('（既に登録済み）');
   });
 
-  it('shows error toast and re-enables button when registerDemoToGe throws', async () => {
+  it('shows error toast and re-enables button when the register POST fails', async () => {
     const demoId = 'demo-active-333';
     const demos = [
       { id: demoId, ownerCe: 'ce@x.com', goal: 'g1', state: 'active', createdAt: '2026-01-01T00:00:00.000Z' },
     ];
-    const fetchImpl = makeFetch([{ ok: true, body: { demos } }]);
+    const fetchImpl = makeFetch([
+      { ok: true, body: { demos } },
+      { ok: false, status: 500, body: { error: 'agent not found' } },
+    ]);
     const doc = makeDomStub();
 
-    const registerDemoToGe = vi.fn(() => Promise.reject(new Error('agent not found')));
-    const win = { registerDemoToGe };
-
-    const app = installDemosApp({ doc, win, fetchImpl, pollInterval: 0, autoLoad: false });
+    const app = installDemosApp({ doc, fetchImpl, pollInterval: 0, autoLoad: false });
     await app.loadDemos();
 
     const tbody = doc._elements.demosTableBody;
@@ -590,29 +592,5 @@ describe('installDemosApp – GE register button', () => {
 
     expect(doc._elements.toastArea.textContent).toContain('GE登録に失敗しました: agent not found');
     expect(geBtn.disabled).toBe(false);
-  });
-
-  it('shows unavailable toast when win.registerDemoToGe is not set', async () => {
-    const demoId = 'demo-active-444';
-    const demos = [
-      { id: demoId, ownerCe: 'ce@x.com', goal: 'g1', state: 'active', createdAt: '2026-01-01T00:00:00.000Z' },
-    ];
-    const fetchImpl = makeFetch([{ ok: true, body: { demos } }]);
-    const doc = makeDomStub();
-
-    // win without registerDemoToGe
-    const win = {};
-
-    const app = installDemosApp({ doc, win, fetchImpl, pollInterval: 0, autoLoad: false });
-    await app.loadDemos();
-
-    const tbody = doc._elements.demosTableBody;
-    const activeRow = tbody._children.find(tr => tr.dataset && tr.dataset.demoId === demoId);
-    const actionTd = activeRow.cells[activeRow.cells.length - 1];
-    const geBtn = actionTd._children.find(el => el.className === 'btn-ge-register');
-
-    await geBtn._listeners['click'][0]();
-
-    expect(doc._elements.toastArea.textContent).toBe('GE登録は利用できません');
   });
 });
