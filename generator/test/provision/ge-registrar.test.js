@@ -164,8 +164,10 @@ describe('makeGeRegistrar / grantInvokerToDeSa', () => {
     expect(result.changed).toBe(false);
     // Only getIamPolicy was called — no setIamPolicy
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    const [url] = fetchImpl.mock.calls[0];
+    const [url, opts] = fetchImpl.mock.calls[0];
     expect(url).toContain(':getIamPolicy');
+    // Cloud Run Admin v2 binds :getIamPolicy as GET (POST → 404).
+    expect(opts?.method).toBe('GET');
   });
 
   it('calls setIamPolicy with the DE SA added to the invoker binding when it was absent', async () => {

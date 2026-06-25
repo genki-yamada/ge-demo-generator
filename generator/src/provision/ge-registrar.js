@@ -99,11 +99,12 @@ export function makeGeRegistrar({ getToken, fetchImpl, config }) {
       `https://run.googleapis.com/v2/projects/${config.projectId}` +
       `/locations/${region}/services/${serviceName}`;
 
-    // 1. Read current IAM policy
+    // 1. Read current IAM policy.
+    // Cloud Run Admin v2 binds :getIamPolicy as HTTP GET (only :setIamPolicy is
+    // POST). Using POST here returns 404 ("requested URL not found"), so this MUST
+    // be a GET with no body.
     const getPolicyRes = await authedFetch(`${baseUrl}:getIamPolicy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+      method: 'GET',
     });
     if (!getPolicyRes.ok) {
       const body = await getPolicyRes.text();
