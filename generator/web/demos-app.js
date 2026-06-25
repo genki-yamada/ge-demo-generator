@@ -429,25 +429,41 @@ export function installDemosApp({
 
   /**
    * Register a demo's agent to Gemini Enterprise.
-   * Calls win.registerDemoToGe(demoId) and shows a toast on success/failure.
+   * POSTs /api/demos/:id/register-ge directly via fetchImpl (mirrors the cleanup
+   * flow). demos.html does NOT load rpc-facade.js, so this must not depend on
+   * window.registerDemoToGe — it calls the endpoint itself.
    *
    * @param {string} demoId
    * @param {HTMLElement} btn - the button element to disable during the request
    * @returns {Promise<void>}
    */
   async function registerToGe(demoId, btn) {
-    if (!win || !win.registerDemoToGe) {
-      showToast('GE登録は利用できません');
+    if (btn) btn.disabled = true;
+    let r;
+    try {
+      r = await fetchImpl(`/api/demos/${encodeURIComponent(demoId)}/register-ge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+    } catch (fetchErr) {
+      showToast('GE登録エラー: ' + fetchErr.message, true);
+      if (btn) btn.disabled = false;
       return;
     }
-    if (btn) btn.disabled = true;
-    try {
-      const result = await win.registerDemoToGe(demoId);
-      showToast('Gemini Enterprise に登録しました' + (result.alreadyRegistered ? '（既に登録済み）' : ''));
-    } catch (e) {
-      showToast('GE登録に失敗しました: ' + (e.message || e), true);
+    if (!r.ok) {
+      let errMsg = 'HTTP ' + r.status;
+      try {
+        const body = await r.json();
+        if (body && body.error) errMsg = body.error;
+      } catch (_) { /* ignore json parse error */ }
+      showToast('GE登録に失敗しました: ' + errMsg, true);
       if (btn) btn.disabled = false;
+      return;
     }
+    let result = {};
+    try { result = await r.json(); } catch (_) { /* ignore */ }
+    showToast('Gemini Enterprise に登録しました' + (result.alreadyRegistered ? '（既に登録済み）' : ''));
   }
 
   // ---- event wiring (runs only if doc is available) -------------------------
