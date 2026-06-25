@@ -172,6 +172,33 @@ export function makeGeRegistrar({ getToken, fetchImpl, config }) {
       `/locations/${config.geLocation}/collections/default_collection` +
       `/engines/${config.geAppId}/assistants/default_assistant/agents`;
 
+    // Idempotency pre-check: GE returns a 400 FAILED_PRECONDITION ("Failed to
+    // allocate quota for agent creation") rather than 409 when a same-name agent
+    // already exists, so we must detect duplicates ourselves. List existing agents
+    // and short-circuit if one already carries this demo's card name. Non-fatal:
+    // any error here falls through to the create attempt.
+    try {
+      const listRes = await authedFetch(`${url}?pageSize=100`, { method: 'GET' });
+      if (listRes.ok) {
+        const list = await listRes.json().catch(() => ({}));
+        for (const a of (list.agents ?? [])) {
+          let cardName = '';
+          try {
+            const c = a?.a2aAgentDefinition?.jsonAgentCard;
+            cardName = c ? JSON.parse(c).name : '';
+          } catch { /* ignore malformed card */ }
+          if (cardName === demoId) {
+            const rn = a.name ?? null;
+            return {
+              agentResourceName: rn,
+              agentId: rn ? rn.split('/').pop() : null,
+              alreadyRegistered: true,
+            };
+          }
+        }
+      }
+    } catch { /* non-fatal — proceed to create */ }
+
     // Build the agent card (jsonAgentCard is serialized as a string per GE API spec)
     const agentCard = {
       protocolVersion: '1.0',

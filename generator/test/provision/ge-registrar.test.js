@@ -264,7 +264,8 @@ describe('makeGeRegistrar / registerAgent', () => {
 
     await registrar.registerAgent({ demoId: DEMO_ID, serviceUrl: SERVICE_URI });
 
-    const [url] = fetchImpl.mock.calls[0];
+    // calls[0] is the idempotency list GET; calls[1] is the create POST.
+    const [url] = fetchImpl.mock.calls[1];
     expect(url).toMatch(/^https:\/\/discoveryengine\.googleapis\.com\//);
     expect(url).toContain(`/projects/${CONFIG.geProjectNumber}`);
     expect(url).toContain(`/engines/${CONFIG.geAppId}`);
@@ -279,7 +280,7 @@ describe('makeGeRegistrar / registerAgent', () => {
 
     await registrar.registerAgent({ demoId: DEMO_ID, serviceUrl: SERVICE_URI });
 
-    const [url] = fetchImpl.mock.calls[0];
+    const [url] = fetchImpl.mock.calls[1];
     expect(url).toMatch(/^https:\/\/us-discoveryengine\.googleapis\.com\//);
   });
 
@@ -290,7 +291,7 @@ describe('makeGeRegistrar / registerAgent', () => {
 
     await registrar.registerAgent({ demoId: DEMO_ID, serviceUrl: SERVICE_URI });
 
-    const [, opts] = fetchImpl.mock.calls[0];
+    const [, opts] = fetchImpl.mock.calls[1];
     expect(opts.headers.Authorization).toBe('Bearer tok');
     expect(opts.headers['X-Goog-User-Project']).toBe(CONFIG.geProjectNumber);
   });
@@ -302,7 +303,7 @@ describe('makeGeRegistrar / registerAgent', () => {
 
     await registrar.registerAgent({ demoId: DEMO_ID, serviceUrl: SERVICE_URI });
 
-    const [, opts] = fetchImpl.mock.calls[0];
+    const [, opts] = fetchImpl.mock.calls[1];
     const sentBody = JSON.parse(opts.body);
 
     // jsonAgentCard must be a STRING (not an object)
@@ -339,12 +340,34 @@ describe('makeGeRegistrar / registerAgent', () => {
   });
 
   it('throws with status + body on HTTP 500', async () => {
-    const fetchImpl = makeFetch({ ok: false, status: 500, textBody: 'Internal Server Error' });
+    // First call is the idempotency list GET (no agents) → falls through to POST → 500.
+    const fetchImpl = makeMultiFetch([
+      { ok: true, status: 200, jsonBody: { agents: [] } },
+      { ok: false, status: 500, textBody: 'Internal Server Error' },
+    ]);
     const registrar = makeGeRegistrar({ getToken, fetchImpl, config: CONFIG });
 
     await expect(
       registrar.registerAgent({ demoId: DEMO_ID, serviceUrl: SERVICE_URI }),
     ).rejects.toThrow('500');
+  });
+
+  it('idempotency: returns alreadyRegistered (no POST) when an agent with the same card name exists', async () => {
+    const existing = `projects/${CONFIG.geProjectNumber}/locations/global/collections/default_collection/engines/${CONFIG.geAppId}/assistants/default_assistant/agents/999`;
+    const fetchImpl = makeMultiFetch([
+      { ok: true, status: 200, jsonBody: { agents: [
+        { name: existing, a2aAgentDefinition: { jsonAgentCard: JSON.stringify({ name: DEMO_ID }) } },
+      ] } },
+    ]);
+    const registrar = makeGeRegistrar({ getToken, fetchImpl, config: CONFIG });
+
+    const result = await registrar.registerAgent({ demoId: DEMO_ID, serviceUrl: SERVICE_URI });
+
+    expect(result.alreadyRegistered).toBe(true);
+    expect(result.agentId).toBe('999');
+    // Only the list GET happened — no create POST
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls[0][1]?.method).toBe('GET');
   });
 });
 
@@ -390,7 +413,10 @@ describe('makeGeRegistrar / registerToGe', () => {
       responses.push({ ok: true, status: 200, jsonBody: {} });
     }
 
-    // Step 3: registerAgent — POST to GE
+    // Step 3a: registerAgent idempotency pre-check — list agents (none match → create)
+    responses.push({ ok: true, status: 200, jsonBody: { agents: [] } });
+
+    // Step 3b: registerAgent — POST to GE
     responses.push({
       ok: agentStatus !== 409 && agentStatus < 400,
       status: agentStatus,
